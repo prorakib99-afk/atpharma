@@ -1,37 +1,44 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({
+class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({
     super.key,
-    this.onSignIn,
-    this.onForgetPassword,
-    this.onSignUpTap,
+    this.onSignUp,
+    this.onGuestTap,
+    this.onSignInTap,
     this.onGoogleTap,
     this.onAppleTap,
     this.onFacebookTap,
   });
 
-  final void Function(String email, String password, bool rememberMe)? onSignIn;
-  final VoidCallback? onForgetPassword;
-  final VoidCallback? onSignUpTap;
+  final void Function(
+    String fullName,
+    String phone,
+    String email,
+    String password,
+  )? onSignUp;
+  final VoidCallback? onGuestTap;
+  final VoidCallback? onSignInTap;
   final VoidCallback? onGoogleTap;
   final VoidCallback? onAppleTap;
   final VoidCallback? onFacebookTap;
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _RegisterScreenState extends State<RegisterScreen> {
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
-  bool _rememberMe = false;
 
   static const _primary = Color(0xff0b83d9);
   static const _primaryDark = Color(0xff005384);
   static const _primaryLight = Color(0xff1896ea);
+  static const _primarySoft = Color(0xffe7f3fb);
   static const _textDark = Color(0xff131314);
   static const _subtitleWhite = Color(0xfff7f8fa);
   static const _dividerGray = Color(0xfff0f2f5);
@@ -39,6 +46,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -64,67 +73,106 @@ class _LoginScreenState extends State<LoginScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       // ---------------- HERO (blue) ----------------
-                      Container(
-                        width: double.infinity,
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [_primaryDark, _primary, _primaryLight],
-                          ),
-                        ),
-                        padding: EdgeInsets.fromLTRB(
-                          horizontalPadding,
-                          28,
-                          horizontalPadding,
-                          44,
-                        ),
-                        child: Column(
+                      ClipRect(
+                        child: Stack(
+                          clipBehavior: Clip.hardEdge,
                           children: [
-                            Container(
-                              width: 104,
-                              height: 104,
-                              padding: const EdgeInsets.all(16),
-                              decoration: const BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Color(0x22000000),
-                                    blurRadius: 20,
-                                    offset: Offset(0, 10),
+                            Positioned.fill(
+                              child: Container(
+                                decoration: const BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [_primaryDark, _primary, _primaryLight],
                                   ),
-                                ],
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(14),
-                                child: Image.asset(
-                                  'assets/images/at_pharma_icon.png',
-                                  fit: BoxFit.contain,
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 26),
-                            const Text(
-                              'Welcome Back!',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 32,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                                letterSpacing: -0.5,
+                            Positioned(
+                              top: -60,
+                              left: -40,
+                              child: Container(
+                                width: 220,
+                                height: 220,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.08),
+                                    width: 18,
+                                  ),
+                                ),
                               ),
                             ),
-                            const SizedBox(height: 10),
-                            const Text(
-                              'Please sign in to your account',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 16,
-                                fontWeight: FontWeight.w400,
-                                color: _subtitleWhite,
+                            Positioned(
+                              top: 40,
+                              right: -70,
+                              child: Container(
+                                width: 260,
+                                height: 260,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.08),
+                                    width: 18,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Padding(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: horizontalPadding,
+                                vertical: 36,
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 104,
+                                    height: 104,
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Color(0x22000000),
+                                          blurRadius: 20,
+                                          offset: Offset(0, 10),
+                                        ),
+                                      ],
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(14),
+                                      child: Image.asset(
+                                        'assets/images/at_pharma_icon.png',
+                                        fit: BoxFit.contain,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 26),
+                                  const Text(
+                                    'Get Started!',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white,
+                                      letterSpacing: -0.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  const Text(
+                                    'Enter your details to create account',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w400,
+                                      color: _subtitleWhite,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
@@ -152,6 +200,40 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            const Text(
+                              'Full Name',
+                              style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: _textDark,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            _InputField(
+                              controller: _nameController,
+                              hint: 'Enter your name',
+                              icon: Icons.person_outline,
+                              keyboardType: TextInputType.name,
+                            ),
+                            const SizedBox(height: 20),
+                            const Text(
+                              'Phone',
+                              style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: _textDark,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            _InputField(
+                              controller: _phoneController,
+                              hint: 'Enter phone number',
+                              iconAsset: 'assets/icons/phone.svg',
+                              keyboardType: TextInputType.phone,
+                            ),
+                            const SizedBox(height: 20),
                             const Text(
                               'Email',
                               style: TextStyle(
@@ -197,75 +279,24 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 14),
-                            Row(
-                              children: [
-                                SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: Checkbox(
-                                    value: _rememberMe,
-                                    activeColor: _primary,
-                                    materialTapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(5),
-                                    ),
-                                    onChanged: (v) => setState(
-                                      () => _rememberMe = v ?? false,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                const Text(
-                                  'Remember me',
-                                  style: TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontSize: 14,
-                                    color: _textDark,
-                                  ),
-                                ),
-                                const Spacer(),
-                                GestureDetector(
-                                  onTap: widget.onForgetPassword,
-                                  child: const Text(
-                                    'Forget Password?',
-                                    style: TextStyle(
-                                      fontFamily: 'Poppins',
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                      color: _primary,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 26),
-                            SizedBox(
-                              height: 56,
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: _primary,
-                                  foregroundColor: Colors.white,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                ),
-                                onPressed: () => widget.onSignIn?.call(
-                                  _emailController.text,
-                                  _passwordController.text,
-                                  _rememberMe,
-                                ),
-                                child: const Text(
-                                  'Sign In',
-                                  style: TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
+                            const SizedBox(height: 28),
+                            _AuthButton(
+                              label: 'Sign Up',
+                              backgroundColor: _primary,
+                              textColor: Colors.white,
+                              onTap: () => widget.onSignUp?.call(
+                                _nameController.text,
+                                _phoneController.text,
+                                _emailController.text,
+                                _passwordController.text,
                               ),
+                            ),
+                            const SizedBox(height: 16),
+                            _AuthButton(
+                              label: 'Continue as a guest',
+                              backgroundColor: _primarySoft,
+                              textColor: _primary,
+                              onTap: widget.onGuestTap,
                             ),
                             const SizedBox(height: 28),
                             Row(
@@ -279,7 +310,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 const Padding(
                                   padding: EdgeInsets.symmetric(horizontal: 12),
                                   child: Text(
-                                    'Or sign in with',
+                                    'Or sign up with',
                                     style: TextStyle(
                                       fontFamily: 'Poppins',
                                       fontSize: 13,
@@ -332,7 +363,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 const Text(
-                                  'Don’t you have an account? ',
+                                  'Do you have an account? ',
                                   style: TextStyle(
                                     fontFamily: 'Poppins',
                                     fontSize: 13,
@@ -340,9 +371,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                 ),
                                 GestureDetector(
-                                  onTap: widget.onSignUpTap,
+                                  onTap: widget.onSignInTap,
                                   child: const Text(
-                                    'Sign Up',
+                                    'Sign In',
                                     style: TextStyle(
                                       fontFamily: 'Poppins',
                                       fontSize: 13,
@@ -368,21 +399,22 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-/// Rounded text field with an SVG leading icon, shared by the Email and
-/// Password fields.
+/// Rounded text field with an SVG leading icon, shared by all form fields.
 class _InputField extends StatelessWidget {
   const _InputField({
     required this.controller,
     required this.hint,
-    required this.iconAsset,
+    this.iconAsset,
+    this.icon,
     this.obscureText = false,
     this.suffixIcon,
     this.keyboardType,
-  });
+  }) : assert(iconAsset != null || icon != null);
 
   final TextEditingController controller;
   final String hint;
-  final String iconAsset;
+  final String? iconAsset;
+  final IconData? icon;
   final bool obscureText;
   final Widget? suffixIcon;
   final TextInputType? keyboardType;
@@ -409,12 +441,14 @@ class _InputField extends StatelessWidget {
         ),
         prefixIcon: Padding(
           padding: const EdgeInsets.only(left: 16, right: 12),
-          child: SvgPicture.asset(
-            iconAsset,
-            width: 20,
-            height: 20,
-            colorFilter: const ColorFilter.mode(_hintGray, BlendMode.srcIn),
-          ),
+          child: icon != null
+              ? Icon(icon, size: 20, color: _hintGray)
+              : SvgPicture.asset(
+                  iconAsset!,
+                  width: 20,
+                  height: 20,
+                  colorFilter: const ColorFilter.mode(_hintGray, BlendMode.srcIn),
+                ),
         ),
         prefixIconConstraints: const BoxConstraints(minWidth: 48, minHeight: 20),
         suffixIcon: suffixIcon,
@@ -436,7 +470,46 @@ class _InputField extends StatelessWidget {
   }
 }
 
-/// Circular social sign-in button (Google / Apple / Facebook).
+/// Full-width pill button, reused for "Sign Up" and "Continue as a guest".
+class _AuthButton extends StatelessWidget {
+  const _AuthButton({
+    required this.label,
+    required this.backgroundColor,
+    required this.textColor,
+    required this.onTap,
+  });
+
+  final String label;
+  final Color backgroundColor;
+  final Color textColor;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 56,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: backgroundColor,
+          foregroundColor: textColor,
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        ),
+        onPressed: onTap,
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontFamily: 'Poppins',
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Circular social sign-up button (Google / Apple / Facebook).
 class _SocialButton extends StatelessWidget {
   const _SocialButton({required this.child, this.onTap});
 

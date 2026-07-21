@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 
 import 'core/routes/app_routes.dart';
 import 'features/auth/presentation/pages/login_screen.dart';
+import 'features/auth/presentation/pages/register_screen.dart';
 import 'features/auth/presentation/pages/splash_screen.dart';
+import 'features/auth/presentation/pages/start_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,7 +34,7 @@ class AtPharmaApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'AT Pharma',
+      title: 'AT Pharma App',
       debugShowCheckedModeBanner: false,
       initialRoute: AppRoutes.splash,
       theme: ThemeData(
@@ -46,8 +48,20 @@ class AtPharmaApp extends StatelessWidget {
       ),
       routes: {
         AppRoutes.splash: (context) =>
-            const SplashScreen(nextRoute: AppRoutes.login),
-        AppRoutes.login: (context) => const LoginScreen(),
+            const SplashScreen(nextRoute: AppRoutes.startpage),
+
+        AppRoutes.startpage: (context) => StartPage(
+          onSignInTap: () => Navigator.of(context).pushNamed(AppRoutes.login),
+          onSignUpTap: () => Navigator.of(context).pushNamed(AppRoutes.register),
+        ),
+
+        AppRoutes.login: (context) => LoginScreen(
+          onSignUpTap: () => Navigator.of(context).pushNamed(AppRoutes.register),
+        ),
+
+        AppRoutes.register: (context) => RegisterScreen(
+          onSignInTap: () => Navigator.of(context).pushNamed(AppRoutes.login),
+        ),
       },
     );
   }
