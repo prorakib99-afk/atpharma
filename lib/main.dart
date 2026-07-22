@@ -4,6 +4,11 @@ import 'package:flutter/services.dart';
 import 'core/routes/app_routes.dart';
 import 'features/auth/presentation/pages/login_screen.dart';
 import 'features/auth/presentation/pages/register_screen.dart';
+import 'features/auth/presentation/pages/home_screen.dart';
+import 'features/auth/presentation/pages/explore_screen.dart';
+import 'features/auth/presentation/pages/prescription_screen.dart';
+import 'features/auth/presentation/pages/search_screen.dart';
+import 'features/auth/presentation/pages/cart_screen.dart';
 import 'features/auth/presentation/pages/splash_screen.dart';
 import 'features/auth/presentation/pages/start_page.dart';
 
@@ -52,8 +57,16 @@ class AtPharmaApp extends StatelessWidget {
 
         AppRoutes.startpage: (context) => StartPage(
           onSignInTap: () => Navigator.of(context).pushNamed(AppRoutes.login),
+          onGuestTap: () =>
+              Navigator.of(context).pushReplacementNamed(AppRoutes.home),
           onSignUpTap: () => Navigator.of(context).pushNamed(AppRoutes.register),
         ),
+
+        AppRoutes.home: (context) => const HomeScreen(),
+        AppRoutes.explore: (context) => const ExploreScreen(),
+        AppRoutes.prescription: (context) => const PrescriptionScreen(),
+        AppRoutes.search: (context) => const SearchScreen(),
+        AppRoutes.cart: (context) => const CartScreen(),
 
         AppRoutes.login: (context) => LoginScreen(
           onSignUpTap: () => Navigator.of(context).pushNamed(AppRoutes.register),
