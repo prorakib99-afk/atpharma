@@ -31,7 +31,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   static const _primary = Color(0xff0b83d9);
   static const _primaryDark = Color(0xff005384);
-  static const _primaryLight = Color(0xff1896ea);
   static const _textDark = Color(0xff131314);
   static const _subtitleWhite = Color(0xfff7f8fa);
   static const _dividerGray = Color(0xfff0f2f5);
@@ -47,9 +46,17 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: LayoutBuilder(
+      backgroundColor: _primaryDark,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [_primaryDark, _primary],
+          ),
+        ),
+        child: SafeArea(
+          child: LayoutBuilder(
           builder: (context, constraints) {
             final width = constraints.maxWidth;
             final isTablet = width >= 600;
@@ -66,13 +73,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       // ---------------- HERO (blue) ----------------
                       Container(
                         width: double.infinity,
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [_primaryDark, _primary, _primaryLight],
-                          ),
-                        ),
                         padding: EdgeInsets.fromLTRB(
                           horizontalPadding,
                           28,
@@ -136,8 +136,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         decoration: const BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.only(
-                            topLeft: Radius.circular(32),
-                            topRight: Radius.circular(32),
+                            topLeft: Radius.circular(56),
+                            topRight: Radius.circular(56),
                           ),
                           boxShadow: [
                             BoxShadow(color: Color(0x14000000), blurRadius: 29),
@@ -361,7 +361,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
             );
-          },
+            },
+          ),
         ),
       ),
     );

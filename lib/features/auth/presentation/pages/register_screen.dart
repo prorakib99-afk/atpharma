@@ -37,7 +37,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   static const _primary = Color(0xff0b83d9);
   static const _primaryDark = Color(0xff005384);
-  static const _primaryLight = Color(0xff1896ea);
   static const _primarySoft = Color(0xffe7f3fb);
   static const _textDark = Color(0xff131314);
   static const _subtitleWhite = Color(0xfff7f8fa);
@@ -56,9 +55,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: LayoutBuilder(
+      backgroundColor: _primaryDark,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [_primaryDark, _primary],
+          ),
+        ),
+        child: SafeArea(
+          child: LayoutBuilder(
           builder: (context, constraints) {
             final width = constraints.maxWidth;
             final isTablet = width >= 600;
@@ -77,17 +84,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         child: Stack(
                           clipBehavior: Clip.hardEdge,
                           children: [
-                            Positioned.fill(
-                              child: Container(
-                                decoration: const BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [_primaryDark, _primary, _primaryLight],
-                                  ),
-                                ),
-                              ),
-                            ),
                             Positioned(
                               top: -60,
                               left: -40,
@@ -118,14 +114,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 ),
                               ),
                             ),
-                            Padding(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: horizontalPadding,
-                                vertical: 36,
-                              ),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
+                            SizedBox(
+                              width: double.infinity,
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: horizontalPadding,
+                                  vertical: 36,
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
                                   Container(
                                     width: 104,
                                     height: 104,
@@ -172,7 +171,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                       color: _subtitleWhite,
                                     ),
                                   ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           ],
@@ -184,8 +184,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         decoration: const BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.only(
-                            topLeft: Radius.circular(32),
-                            topRight: Radius.circular(32),
+                            topLeft: Radius.circular(56),
+                            topRight: Radius.circular(56),
                           ),
                           boxShadow: [
                             BoxShadow(color: Color(0x14000000), blurRadius: 29),
@@ -392,7 +392,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
               ),
             );
-          },
+            },
+          ),
         ),
       ),
     );

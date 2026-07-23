@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'screen_product_details.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../../../../shared/widgets/navigation_page_scaffold.dart';
 
@@ -19,17 +22,201 @@ class HomeScreen extends StatelessWidget {
   );
 }
 
-class _HomeBody extends StatelessWidget {
+class _HomeBody extends StatefulWidget {
   const _HomeBody();
+
+  @override
+  State<_HomeBody> createState() => _HomeBodyState();
+}
+
+class _HomeBodyState extends State<_HomeBody> with WidgetsBindingObserver {
+  String _address = 'Finding your location...';
+  bool _locationRequestRunning = false;
+
+  String get _greeting {
+    final hour = DateTime.now().hour;
+    if (hour >= 5 && hour < 12) return 'Good Morning';
+    if (hour == 12) return 'Good Noon';
+    if (hour >= 13 && hour < 17) return 'Good Afternoon';
+    if (hour >= 17 && hour < 21) return 'Good Evening';
+    return 'Good Night';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadLocation());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadLocation(showServiceDialog: false);
+    }
+  }
+
+  Future<void> _loadLocation({bool showServiceDialog = true}) async {
+    if (_locationRequestRunning) return;
+    _locationRequestRunning = true;
+
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        if (mounted) setState(() => _address = 'Location is turned off');
+        if (showServiceDialog && mounted) await _showLocationServiceDialog();
+        return;
+      }
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.denied) {
+        if (mounted) setState(() => _address = 'Location permission denied');
+        return;
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          setState(() => _address = 'Allow location from app settings');
+          await _showAppSettingsDialog();
+        }
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 15),
+        ),
+      );
+      final places = await Geocoding().placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _address = places.isEmpty
+            ? '${position.latitude.toStringAsFixed(4)}, '
+                  '${position.longitude.toStringAsFixed(4)}'
+            : _formatAddress(places.first);
+      });
+    } catch (_) {
+      if (mounted) setState(() => _address = 'Unable to find your location');
+    } finally {
+      _locationRequestRunning = false;
+    }
+  }
+
+  String _formatAddress(Placemark place) {
+    final street = (place.street ?? '').trim();
+    final roadNumber = (place.subThoroughfare ?? '').trim();
+    final roadName = (place.thoroughfare ?? '').trim();
+    final area = (place.subLocality ?? '').trim();
+    final city = (place.locality ?? '').trim();
+    final division = (place.administrativeArea ?? '').trim();
+    final country = (place.country ?? '').trim();
+
+    final roadAddress = street.isNotEmpty
+        ? street
+        : [roadNumber, roadName].where((part) => part.isNotEmpty).join(' ');
+    final shortAddress = roadAddress.isNotEmpty
+        ? roadAddress
+        : area.isNotEmpty
+        ? area
+        : city;
+
+    final candidates = <String>[shortAddress, division, country];
+
+    final parts = <String>[];
+    for (final candidate in candidates) {
+      if (candidate.isEmpty) continue;
+      final normalized = candidate.toLowerCase();
+      final isDuplicate = parts.any((part) {
+        final existing = part.toLowerCase();
+        return existing == normalized ||
+            existing.contains(normalized) ||
+            normalized.contains(existing);
+      });
+      if (!isDuplicate) parts.add(candidate);
+      if (parts.length == 3) break;
+    }
+
+    return parts.isEmpty ? 'Current location' : parts.join(', ');
+  }
+
+  Future<void> _showLocationServiceDialog() async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Turn on location'),
+        content: const Text(
+          'AT Pharma needs GPS location to show your current delivery address.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              Geolocator.openLocationSettings();
+            },
+            child: const Text('Open Settings'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showAppSettingsDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Location permission required'),
+        content: const Text(
+          'Please allow location permission from app settings to show your address.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              Geolocator.openAppSettings();
+            },
+            child: const Text('Open Settings'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) => SafeArea(
     bottom: false,
     child: Column(
       children: [
-        const Padding(
+        Padding(
           padding: EdgeInsets.fromLTRB(20, 8, 20, 0),
-          child: _Header(),
+          child: _Header(
+            greeting: _greeting,
+            address: _address,
+            onAddressTap: () => _loadLocation(),
+          ),
         ),
         Expanded(
           child: CustomScrollView(
@@ -76,19 +263,51 @@ class _HomeBody extends StatelessWidget {
 }
 
 class _Header extends StatelessWidget {
-  const _Header();
+  const _Header({
+    required this.greeting,
+    required this.address,
+    required this.onAddressTap,
+  });
+
+  final String greeting;
+  final String address;
+  final VoidCallback onAddressTap;
 
   @override
   Widget build(BuildContext context) => Row(
     children: [
-      const Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Good Morning', style: _Text.title16),
-            SizedBox(height: 4),
-            Text('Dhanmondi, Dhaka', style: _Text.body12),
-          ],
+      Expanded(
+        child: InkWell(
+          onTap: onAddressTap,
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(greeting, style: _Text.title16),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.location_on_outlined,
+                      size: 13,
+                      color: _Colors.body,
+                    ),
+                    const SizedBox(width: 3),
+                    Flexible(
+                      child: Text(
+                        address,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: _Text.body12,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
       ),
       const _RoundButton(icon: Icons.notifications_none_rounded),
@@ -314,94 +533,113 @@ class _ProductCard extends StatelessWidget {
   final bool rating;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(6),
-    decoration: BoxDecoration(
-      color: _Colors.card,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: Colors.white, width: 2),
-      boxShadow: const [
-        BoxShadow(
-          color: Color(0x12000000),
-          blurRadius: 18,
-          offset: Offset(0, 5),
+  Widget build(BuildContext context) => InkWell(
+    onTap: () => Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ScreenProductDetails(
+          product: ProductDetailsData(
+            name: product.name,
+            image: product.image,
+            description: product.description.isEmpty
+                ? 'Quality healthcare product for your everyday needs.'
+                : product.description,
+            brand: product.brand,
+            price: product.price,
+          ),
         ),
-      ],
+      ),
     ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          height: rating ? 82 : 148,
-          child: Stack(
-            clipBehavior: Clip.none,
+    borderRadius: BorderRadius.circular(16),
+    child: Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: _Colors.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white, width: 2),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x12000000),
+            blurRadius: 18,
+            offset: Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            height: rating ? 82 : 148,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Positioned.fill(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.asset(
+                      product.image,
+                      fit: BoxFit.cover,
+                      cacheWidth: 320,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  right: -1,
+                  bottom: -14,
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: const BoxDecoration(
+                      color: _Colors.blue,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.add, color: Colors.white, size: 23),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 15),
+          Text(product.brand, style: _Text.brand10),
+          const SizedBox(height: 2),
+          Row(
             children: [
-              Positioned.fill(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: Image.asset(
-                    product.image,
-                    fit: BoxFit.cover,
-                    cacheWidth: 320,
-                  ),
+              Expanded(
+                child: Text(
+                  product.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: _Text.cardTitle12,
                 ),
               ),
-              Positioned(
-                right: -1,
-                bottom: -14,
-                child: Container(
-                  width: 32,
-                  height: 32,
-                  decoration: const BoxDecoration(
-                    color: _Colors.blue,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.add, color: Colors.white, size: 23),
-                ),
-              ),
+              if (product.rx) const _RxBadge(),
             ],
           ),
-        ),
-        const SizedBox(height: 15),
-        const Text('FreshLife', style: _Text.brand10),
-        const SizedBox(height: 2),
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                product.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: _Text.cardTitle12,
+          if (!rating) ...[
+            const SizedBox(height: 4),
+            Text(
+              product.description,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: _Text.caption10,
+            ),
+            const Spacer(),
+            const Divider(height: 1, color: _Colors.border),
+            const SizedBox(height: 7),
+          ] else
+            const Spacer(),
+          Row(
+            children: [
+              Expanded(
+                child: rating
+                    ? const _Rating()
+                    : const Text('In Stock', style: _Text.stock10),
               ),
-            ),
-            if (product.rx) const _RxBadge(),
-          ],
-        ),
-        if (!rating) ...[
-          const SizedBox(height: 4),
-          Text(
-            product.description,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: _Text.caption10,
+              Text('৳${product.price}', style: _Text.price16),
+            ],
           ),
-          const Spacer(),
-          const Divider(height: 1, color: _Colors.border),
-          const SizedBox(height: 7),
-        ] else
-          const Spacer(),
-        Row(
-          children: [
-            Expanded(
-              child: rating
-                  ? const _Rating()
-                  : const Text('82 in stock', style: _Text.stock10),
-            ),
-            const Text('৳500', style: _Text.price16),
-          ],
-        ),
-      ],
+        ],
+      ),
     ),
   );
 }
@@ -532,9 +770,18 @@ class _ArticleCard extends StatelessWidget {
 }
 
 class _Product {
-  const _Product(this.name, this.description, this.image, {this.rx = false});
+  const _Product(
+    this.name,
+    this.description,
+    this.image, {
+    this.rx = false,
+    this.brand = 'FreshLife',
+    this.price = 500,
+  });
   final String name, description, image;
   final bool rx;
+  final String brand;
+  final int price;
 }
 
 class _Article {
@@ -553,29 +800,62 @@ const _buyAgain = [
     'Organic Honey 500g',
     'Pure natural honey.',
     'assets/images/product_1_opt.jpg',
+    brand: "Nature's Own",
+    price: 450,
   ),
   _Product(
     'Hand Sanitizer Gel...',
     'Kills 99.9% germs.',
     'assets/images/product_2_opt.jpg',
+    brand: 'CleanCare',
+    price: 150,
   ),
   _Product(
     'ORS Oral Saline Sachet',
     'Helps prevent dehydration',
     'assets/images/product_3_opt.jpg',
+    price: 20,
   ),
   _Product(
     'Vitamin D3 60K',
     'This is a pain energy booster.',
     'assets/images/product_4_opt.jpg',
+    brand: 'HealthPlus',
+    price: 350,
   ),
 ];
 
 const _featured = [
-  _Product('Organic Honey 500g', '', 'assets/images/product_5_opt.jpg'),
-  _Product('Cefixime 200mg', '', 'assets/images/product_6_opt.jpg', rx: true),
-  _Product('Metformin 500mg', '', 'assets/images/product_7_opt.jpg', rx: true),
-  _Product('Vitamin D3 60K', '', 'assets/images/product_4_opt.jpg'),
+  _Product(
+    'Organic Honey 500g',
+    '',
+    'assets/images/product_5_opt.jpg',
+    brand: "Nature's Own",
+    price: 450,
+  ),
+  _Product(
+    'Cefixime 200mg',
+    '',
+    'assets/images/product_6_opt.jpg',
+    rx: true,
+    brand: 'Square Pharma',
+    price: 120,
+  ),
+  _Product(
+    'Metformin 500mg',
+    '',
+    'assets/images/product_7_opt.jpg',
+    rx: true,
+    brand: 'Beximco Pharma',
+    price: 90,
+  ),
+  _Product(
+    'Vitamin D3 60K',
+    '',
+    'assets/images/product_4_opt.jpg',
+    brand: 'HealthPlus',
+    price: 350,
+  ),
 ];
 
 const _articles = [

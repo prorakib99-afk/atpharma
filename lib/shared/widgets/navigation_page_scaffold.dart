@@ -15,6 +15,7 @@ class NavigationPageScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: backgroundColor,
+    extendBody: true,
     body: body,
     bottomNavigationBar: _NavigationBar(currentPage: currentPage),
   );
@@ -42,7 +43,7 @@ class _NavigationBar extends StatelessWidget {
     return Container(
       height: 104 + bottom,
       padding: EdgeInsets.fromLTRB(20, 8, 20, 16 + bottom),
-      color: Colors.white,
+      color: Colors.transparent,
       child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
         _NavGroup(children: [
           _NavIcon(asset: 'assets/icons/home_icon.svg', active: currentPage == NavigationPage.home, onTap: () => _open(context, NavigationPage.home)),

@@ -11,6 +11,7 @@ import 'features/auth/presentation/pages/search_screen.dart';
 import 'features/auth/presentation/pages/cart_screen.dart';
 import 'features/auth/presentation/pages/splash_screen.dart';
 import 'features/auth/presentation/pages/start_page.dart';
+import 'features/auth/presentation/pages/screen_product_details.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -59,7 +60,8 @@ class AtPharmaApp extends StatelessWidget {
           onSignInTap: () => Navigator.of(context).pushNamed(AppRoutes.login),
           onGuestTap: () =>
               Navigator.of(context).pushReplacementNamed(AppRoutes.home),
-          onSignUpTap: () => Navigator.of(context).pushNamed(AppRoutes.register),
+          onSignUpTap: () =>
+              Navigator.of(context).pushNamed(AppRoutes.register),
         ),
 
         AppRoutes.home: (context) => const HomeScreen(),
@@ -67,13 +69,22 @@ class AtPharmaApp extends StatelessWidget {
         AppRoutes.prescription: (context) => const PrescriptionScreen(),
         AppRoutes.search: (context) => const SearchScreen(),
         AppRoutes.cart: (context) => const CartScreen(),
+        AppRoutes.productDetails: (context) => const ScreenProductDetails(
+          product: ProductDetailsData(
+            name: 'ORS Oral Saline Sachet',
+            image: 'assets/images/product_3_opt.jpg',
+          ),
+        ),
 
         AppRoutes.login: (context) => LoginScreen(
-          onSignUpTap: () => Navigator.of(context).pushNamed(AppRoutes.register),
+          onSignUpTap: () =>
+              Navigator.of(context).pushNamed(AppRoutes.register),
         ),
 
         AppRoutes.register: (context) => RegisterScreen(
           onSignInTap: () => Navigator.of(context).pushNamed(AppRoutes.login),
+          onGuestTap: () =>
+              Navigator.of(context).pushReplacementNamed(AppRoutes.home),
         ),
       },
     );

@@ -21,7 +21,6 @@ class StartPage extends StatelessWidget {
 
   static const _primary = Color(0xff0b83d9);
   static const _primaryDark = Color(0xff005384);
-  static const _primaryLight = Color(0xff1896ea);
   static const _primarySoft = Color(0xffe7f3fb);
   static const _textDark = Color(0xff131314);
   static const _subtitleWhite = Color(0xfff7f8fa);
@@ -31,130 +30,38 @@ class StartPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        bottom: false,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final width = constraints.maxWidth;
-            final isTablet = width >= 600;
-            final contentMaxWidth = isTablet ? 480.0 : double.infinity;
-            final horizontalPadding = width <= 340 ? 20.0 : 24.0;
+      backgroundColor: _primaryDark,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [_primaryDark, _primary],
+          ),
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              final isTablet = width >= 600;
+              final contentMaxWidth = isTablet ? 480.0 : double.infinity;
+              final horizontalPadding = width <= 340 ? 20.0 : 24.0;
 
-            return Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: contentMaxWidth),
-                child: Column(
-                  children: [
-                    // ---------------- HERO (blue) ----------------
-                    Container(
-                      width: double.infinity,
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [_primaryDark, _primary, _primaryLight],
-                        ),
-                      ),
-                      child: Padding(
-                        padding: EdgeInsets.fromLTRB(
-                          horizontalPadding,
-                          32,
-                          horizontalPadding,
-                          36,
-                        ),
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: SizedBox(
-                            width: constraints.maxWidth - horizontalPadding * 2,
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                const _LogoBadge(),
-                                const SizedBox(height: 24),
-                                const Text(
-                                  'Care, Delivered Simply',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    decoration: TextDecoration.none,
-                                    fontSize: 28,
-                                    color: Colors.white,
-                                    fontFamily: 'Poppins',
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                const Text(
-                                  'Medicines, wellness and everyday essentials simple, secure and close to you.',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    decoration: TextDecoration.none,
-                                    fontSize: 13,
-                                    color: _subtitleWhite,
-                                    fontFamily: 'Poppins',
-                                    fontWeight: FontWeight.w400,
-                                  ),
-                                ),
-                                const SizedBox(height: 32),
-                                Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(24),
-                                    boxShadow: const [
-                                      BoxShadow(
-                                        color: Color(0x0a000000),
-                                        blurRadius: 24,
-                                      ),
-                                    ],
-                                  ),
-                                  child: const Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      _FeatureRow(
-                                        'Order without creating an account',
-                                      ),
-                                      SizedBox(height: 12),
-                                      _FeatureRow(
-                                        'Upload prescriptions securely',
-                                      ),
-                                      SizedBox(height: 12),
-                                      _FeatureRow(
-                                        'Log in for history and live tracking',
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // ---------------- BOTTOM (white) ----------------
-                    Expanded(
-                      child: Container(
+              return Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: contentMaxWidth),
+                  child: Column(
+                    children: [
+                      // ---------------- HERO (blue) ----------------
+                      SizedBox(
                         width: double.infinity,
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.only(
-                            topLeft: Radius.circular(32),
-                            topRight: Radius.circular(32),
-                          ),
-                          boxShadow: [
-                            BoxShadow(color: Color(0x14000000), blurRadius: 29),
-                          ],
-                        ),
                         child: Padding(
                           padding: EdgeInsets.fromLTRB(
                             horizontalPadding,
                             32,
                             horizontalPadding,
-                            20,
+                            36,
                           ),
                           child: FittedBox(
                             fit: BoxFit.scaleDown,
@@ -165,109 +72,62 @@ class StartPage extends StatelessWidget {
                                 mainAxisSize: MainAxisSize.min,
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
-                                  _AuthButton(
-                                    label: 'Sign in to your account',
-                                    backgroundColor: _primary,
-                                    textColor: Colors.white,
-                                    onTap: onSignInTap,
-                                  ),
-                                  const SizedBox(height: 16),
-                                  _AuthButton(
-                                    label: 'Continue as a guest',
-                                    backgroundColor: _primarySoft,
-                                    textColor: _primary,
-                                    onTap: onGuestTap,
-                                  ),
-                                  const SizedBox(height: 32),
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    children: [
-                                      Container(
-                                        width: 80,
-                                        height: 1,
-                                        color: _dividerGray,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      const Text(
-                                        'Or sign in with',
-                                        style: TextStyle(
-                                          decoration: TextDecoration.none,
-                                          fontSize: 12,
-                                          color: _mutedGray,
-                                          fontFamily: 'Poppins',
-                                          fontWeight: FontWeight.w400,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Container(
-                                        width: 80,
-                                        height: 1,
-                                        color: _dividerGray,
-                                      ),
-                                    ],
-                                  ),
+                                  const _LogoBadge(),
                                   const SizedBox(height: 24),
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      _SocialButton(
-                                        onTap: onGoogleTap,
-                                        child: SvgPicture.asset(
-                                          'assets/icons/google_logo.svg',
-                                          width: 28,
-                                          height: 28,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 16),
-                                      _SocialButton(
-                                        onTap: onAppleTap,
-                                        child: SvgPicture.asset(
-                                          'assets/icons/apple_logo.svg',
-                                          width: 28,
-                                          height: 28,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 16),
-                                      _SocialButton(
-                                        onTap: onFacebookTap,
-                                        child: SvgPicture.asset(
-                                          'assets/icons/facebook_logo.svg',
-                                          width: 28,
-                                          height: 28,
-                                        ),
-                                      ),
-                                    ],
+                                  const Text(
+                                    'Care, Delivered Simply',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      decoration: TextDecoration.none,
+                                      fontSize: 28,
+                                      color: Colors.white,
+                                      fontFamily: 'Poppins',
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'Medicines, wellness and everyday essentials simple, secure and close to you.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      decoration: TextDecoration.none,
+                                      fontSize: 13,
+                                      color: _subtitleWhite,
+                                      fontFamily: 'Poppins',
+                                      fontWeight: FontWeight.w400,
+                                    ),
                                   ),
                                   const SizedBox(height: 32),
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Text(
-                                        'Don’t you have an account? ',
-                                        style: TextStyle(
-                                          decoration: TextDecoration.none,
-                                          fontSize: 12,
-                                          color: _textDark,
-                                          fontFamily: 'Poppins',
-                                          fontWeight: FontWeight.w400,
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(24),
+                                      boxShadow: const [
+                                        BoxShadow(
+                                          color: Color(0x0a000000),
+                                          blurRadius: 24,
                                         ),
-                                      ),
-                                      GestureDetector(
-                                        onTap: onSignUpTap,
-                                        child: const Text(
-                                          'Sign Up',
-                                          style: TextStyle(
-                                            decoration: TextDecoration.none,
-                                            fontSize: 12,
-                                            color: _primary,
-                                            fontFamily: 'Poppins',
-                                            fontWeight: FontWeight.w500,
-                                          ),
+                                      ],
+                                    ),
+                                    child: const Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        _FeatureRow(
+                                          'Order without creating an account',
                                         ),
-                                      ),
-                                    ],
+                                        SizedBox(height: 12),
+                                        _FeatureRow(
+                                          'Upload prescriptions securely',
+                                        ),
+                                        SizedBox(height: 12),
+                                        _FeatureRow(
+                                          'Log in for history and live tracking',
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ],
                               ),
@@ -275,12 +135,158 @@ class StartPage extends StatelessWidget {
                           ),
                         ),
                       ),
-                    ),
-                  ],
+
+                      // ---------------- BOTTOM (white) ----------------
+                      Expanded(
+                        child: Container(
+                          width: double.infinity,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.only(
+                              topLeft: Radius.circular(56),
+                              topRight: Radius.circular(56),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Color(0x14000000),
+                                blurRadius: 29,
+                              ),
+                            ],
+                          ),
+                          child: Padding(
+                            padding: EdgeInsets.fromLTRB(
+                              horizontalPadding,
+                              32,
+                              horizontalPadding,
+                              20,
+                            ),
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: SizedBox(
+                                width:
+                                    constraints.maxWidth -
+                                    horizontalPadding * 2,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    _AuthButton(
+                                      label: 'Sign in to your account',
+                                      backgroundColor: _primary,
+                                      textColor: Colors.white,
+                                      onTap: onSignInTap,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    _AuthButton(
+                                      label: 'Continue as a guest',
+                                      backgroundColor: _primarySoft,
+                                      textColor: _primary,
+                                      onTap: onGuestTap,
+                                    ),
+                                    const SizedBox(height: 32),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
+                                      children: [
+                                        Container(
+                                          width: 80,
+                                          height: 1,
+                                          color: _dividerGray,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        const Text(
+                                          'Or sign in with',
+                                          style: TextStyle(
+                                            decoration: TextDecoration.none,
+                                            fontSize: 12,
+                                            color: _mutedGray,
+                                            fontFamily: 'Poppins',
+                                            fontWeight: FontWeight.w400,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          width: 80,
+                                          height: 1,
+                                          color: _dividerGray,
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 24),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        _SocialButton(
+                                          onTap: onGoogleTap,
+                                          child: SvgPicture.asset(
+                                            'assets/icons/google_logo.svg',
+                                            width: 28,
+                                            height: 28,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 16),
+                                        _SocialButton(
+                                          onTap: onAppleTap,
+                                          child: SvgPicture.asset(
+                                            'assets/icons/apple_logo.svg',
+                                            width: 28,
+                                            height: 28,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 16),
+                                        _SocialButton(
+                                          onTap: onFacebookTap,
+                                          child: SvgPicture.asset(
+                                            'assets/icons/facebook_logo.svg',
+                                            width: 28,
+                                            height: 28,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 32),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Text(
+                                          'Don’t you have an account? ',
+                                          style: TextStyle(
+                                            decoration: TextDecoration.none,
+                                            fontSize: 12,
+                                            color: _textDark,
+                                            fontFamily: 'Poppins',
+                                            fontWeight: FontWeight.w400,
+                                          ),
+                                        ),
+                                        GestureDetector(
+                                          onTap: onSignUpTap,
+                                          child: const Text(
+                                            'Sign Up',
+                                            style: TextStyle(
+                                              decoration: TextDecoration.none,
+                                              fontSize: 12,
+                                              color: _primary,
+                                              fontFamily: 'Poppins',
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
     );

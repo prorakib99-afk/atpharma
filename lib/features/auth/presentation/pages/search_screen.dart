@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'screen_product_details.dart';
 
 import '../../../../shared/widgets/navigation_page_scaffold.dart';
 
@@ -12,10 +13,20 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
+  final _scrollController = ScrollController();
   final List<String> _recent = ['Paracetamol', 'Vitamin D3', 'Hand Sanitizer'];
   String _query = '';
   bool _submitted = false;
   int _page = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+    });
+  }
 
   List<String> get _suggestions {
     final query = _query.trim().toLowerCase();
@@ -64,10 +75,22 @@ class _SearchScreenState extends State<SearchScreen> {
     _focusNode.requestFocus();
   }
 
+  void _scrollToSearchField() {
+    Future<void>.delayed(const Duration(milliseconds: 300), () {
+      if (!mounted || !_scrollController.hasClients) return;
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOutCubic,
+      );
+    });
+  }
+
   @override
   void dispose() {
     _controller.dispose();
     _focusNode.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -84,27 +107,36 @@ class _SearchScreenState extends State<SearchScreen> {
           ),
           Expanded(
             child: CustomScrollView(
+              controller: _scrollController,
               physics: const BouncingScrollPhysics(),
               slivers: [
                 SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 28, 20, 20),
-                  sliver: SliverToBoxAdapter(child: _content()),
+                  padding: EdgeInsets.fromLTRB(
+                    20,
+                    28,
+                    20,
+                    120 + MediaQuery.paddingOf(context).bottom,
+                  ),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate.fixed([
+                      _content(),
+                      const SizedBox(height: 20),
+                      _SearchField(
+                        controller: _controller,
+                        focusNode: _focusNode,
+                        submitted: _submitted,
+                        onChanged: (value) => setState(() {
+                          _query = value;
+                          _submitted = false;
+                        }),
+                        onSubmitted: _search,
+                        onClear: _clearSearch,
+                        onTap: _scrollToSearchField,
+                      ),
+                    ]),
+                  ),
                 ),
               ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-            child: _SearchField(
-              controller: _controller,
-              focusNode: _focusNode,
-              submitted: _submitted,
-              onChanged: (value) => setState(() {
-                _query = value;
-                _submitted = false;
-              }),
-              onSubmitted: _search,
-              onClear: _clearSearch,
             ),
           ),
         ],
@@ -113,7 +145,7 @@ class _SearchScreenState extends State<SearchScreen> {
   );
 
   Widget _content() {
-    if (_submitted)
+    if (_submitted) {
       return _results.isEmpty
           ? _NoResults(query: _query, onSuggestion: _search)
           : _Results(
@@ -122,12 +154,14 @@ class _SearchScreenState extends State<SearchScreen> {
               page: _page,
               onPageChanged: (page) => setState(() => _page = page),
             );
-    if (_query.trim().isNotEmpty)
+    }
+    if (_query.trim().isNotEmpty) {
       return _SuggestionState(
         query: _query,
         suggestions: _suggestions,
         onSelected: _search,
       );
+    }
     return _DefaultState(
       recent: _recent,
       onPopular: _search,
@@ -189,15 +223,19 @@ class _RoundIcon extends StatelessWidget {
   const _RoundIcon(this.icon);
   final IconData icon;
   @override
-  Widget build(BuildContext context) => Container(
-    width: 40,
-    height: 40,
-    decoration: const BoxDecoration(
-      color: Colors.white,
-      shape: BoxShape.circle,
-      boxShadow: [BoxShadow(color: Color(0x14000000), blurRadius: 28)],
+  Widget build(BuildContext context) => InkWell(
+    onTap: () {},
+    customBorder: const CircleBorder(),
+    child: Container(
+      width: 40,
+      height: 40,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        boxShadow: [BoxShadow(color: Color(0x14000000), blurRadius: 28)],
+      ),
+      child: Icon(icon, size: 20),
     ),
-    child: Icon(icon, size: 20),
   );
 }
 
@@ -209,6 +247,7 @@ class _SearchField extends StatelessWidget {
     required this.onChanged,
     required this.onSubmitted,
     required this.onClear,
+    required this.onTap,
   });
   final TextEditingController controller;
   final FocusNode focusNode;
@@ -216,11 +255,13 @@ class _SearchField extends StatelessWidget {
   final ValueChanged<String> onChanged;
   final ValueChanged<String> onSubmitted;
   final VoidCallback onClear;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) => TextField(
     controller: controller,
     focusNode: focusNode,
+    onTap: onTap,
     onChanged: onChanged,
     onSubmitted: onSubmitted,
     textInputAction: TextInputAction.search,
@@ -657,17 +698,33 @@ class _HorizontalCard extends StatelessWidget {
   const _HorizontalCard(this.product);
   final _Product product;
   @override
-  Widget build(BuildContext context) => Container(
-    height: 116,
-    padding: const EdgeInsets.all(8),
-    decoration: BoxDecoration(
-      color: _Colors.card,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: Colors.white, width: 2),
-      boxShadow: const [BoxShadow(color: Color(0x10000000), blurRadius: 12)],
+  Widget build(BuildContext context) => InkWell(
+    onTap: () => Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ScreenProductDetails(
+          product: ProductDetailsData(
+            name: product.name,
+            image: product.image,
+            description: product.description,
+            brand: product.brand,
+            price: product.price,
+          ),
+        ),
+      ),
     ),
-    child: Row(
-      children: [
+    borderRadius: BorderRadius.circular(16),
+    child: Container(
+      height: 116,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: _Colors.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white, width: 2),
+        boxShadow: const [BoxShadow(color: Color(0x10000000), blurRadius: 12)],
+      ),
+      child: Row(
+        children: [
         ClipRRect(
           borderRadius: BorderRadius.circular(8),
           child: Image.asset(
@@ -683,9 +740,9 @@ class _HorizontalCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'FreshLife',
-                style: TextStyle(
+              Text(
+                product.brand,
+                style: const TextStyle(
                   fontSize: 10,
                   color: _Colors.green,
                   fontWeight: FontWeight.w500,
@@ -707,26 +764,31 @@ class _HorizontalCard extends StatelessWidget {
                   if (product.rx) const _RxBadge(),
                 ],
               ),
-              const Text(
-                'Pure natural honey.',
-                style: TextStyle(fontSize: 10, color: _Colors.body),
+              Text(
+                product.description,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 10, color: _Colors.body),
               ),
               const Spacer(),
               const Divider(height: 1, color: _Colors.border),
               const SizedBox(height: 5),
-              const Row(
+              Row(
                 children: [
-                  Expanded(
+                  const Expanded(
                     child: Text(
-                      '82 in stock',
+                      'In Stock',
                       style: TextStyle(fontSize: 10, color: _Colors.blue),
                     ),
                   ),
                   Text(
-                    '৳500',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    '৳${product.price}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
                   CircleAvatar(
                     radius: 16,
                     backgroundColor: _Colors.blue,
@@ -737,7 +799,8 @@ class _HorizontalCard extends StatelessWidget {
             ],
           ),
         ),
-      ],
+        ],
+      ),
     ),
   );
 }
@@ -746,92 +809,113 @@ class _GridCard extends StatelessWidget {
   const _GridCard(this.product);
   final _Product product;
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(6),
-    decoration: BoxDecoration(
-      color: _Colors.card,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: Colors.white, width: 2),
-      boxShadow: const [BoxShadow(color: Color(0x10000000), blurRadius: 14)],
+  Widget build(BuildContext context) => InkWell(
+    onTap: () => Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ScreenProductDetails(
+          product: ProductDetailsData(
+            name: product.name,
+            image: product.image,
+            description: product.description,
+            brand: product.brand,
+            price: product.price,
+          ),
+        ),
+      ),
     ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          height: 148,
-          child: Stack(
-            clipBehavior: Clip.none,
+    borderRadius: BorderRadius.circular(16),
+    child: Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: _Colors.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white, width: 2),
+        boxShadow: const [BoxShadow(color: Color(0x10000000), blurRadius: 14)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            height: 148,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Positioned.fill(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.asset(
+                      product.image,
+                      fit: BoxFit.cover,
+                      cacheWidth: 320,
+                    ),
+                  ),
+                ),
+                const Positioned(
+                  right: -1,
+                  bottom: -14,
+                  child: CircleAvatar(
+                    radius: 16,
+                    backgroundColor: _Colors.blue,
+                    child: Icon(Icons.add_rounded, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 15),
+          Text(
+            product.brand,
+            style: const TextStyle(
+              fontSize: 10,
+              color: _Colors.green,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          Row(
             children: [
-              Positioned.fill(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: Image.asset(
-                    product.image,
-                    fit: BoxFit.cover,
-                    cacheWidth: 320,
+              Expanded(
+                child: Text(
+                  product.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
-              const Positioned(
-                right: -1,
-                bottom: -14,
-                child: CircleAvatar(
-                  radius: 16,
-                  backgroundColor: _Colors.blue,
-                  child: Icon(Icons.add_rounded, color: Colors.white),
+              if (product.rx) const _RxBadge(),
+            ],
+          ),
+          Text(
+            product.description,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 10, color: _Colors.body),
+          ),
+          const Spacer(),
+          const Divider(height: 1, color: _Colors.border),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'In Stock',
+                  style: TextStyle(fontSize: 10, color: _Colors.blue),
+                ),
+              ),
+              Text(
+                '৳${product.price}',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 15),
-        const Text(
-          'FreshLife',
-          style: TextStyle(
-            fontSize: 10,
-            color: _Colors.green,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                product.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            if (product.rx) const _RxBadge(),
-          ],
-        ),
-        const Text(
-          'Pure natural honey.',
-          maxLines: 1,
-          style: TextStyle(fontSize: 10, color: _Colors.body),
-        ),
-        const Spacer(),
-        const Divider(height: 1, color: _Colors.border),
-        const SizedBox(height: 6),
-        const Row(
-          children: [
-            Expanded(
-              child: Text(
-                '82 in stock',
-                style: TextStyle(fontSize: 10, color: _Colors.blue),
-              ),
-            ),
-            Text(
-              '৳500',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-          ],
-        ),
-      ],
+        ],
+      ),
     ),
   );
 }
@@ -897,11 +981,22 @@ class _Pagination extends StatelessWidget {
 }
 
 class _Product {
-  const _Product(this.name, this.image, this.tags, {this.rx = false});
+  const _Product(
+    this.name,
+    this.image,
+    this.tags, {
+    this.rx = false,
+    this.description = 'Quality healthcare product for your everyday needs.',
+    this.brand = 'FreshLife',
+    this.price = 500,
+  });
   final String name;
   final String image;
   final String tags;
   final bool rx;
+  final String description;
+  final String brand;
+  final int price;
 }
 
 const _products = [
@@ -910,37 +1005,57 @@ const _products = [
     'assets/images/product_5_opt.jpg',
     'paracetamol fever medicine pain',
     rx: true,
+    description: 'Fast relief from fever and mild to moderate pain.',
+    brand: 'ACI Limited',
+    price: 30,
   ),
   _Product(
     'Cefixime 200mg',
     'assets/images/product_6_opt.jpg',
     'cefixime antibiotic medicine',
+    description: 'Broad-spectrum antibiotic for bacterial infections.',
+    brand: 'Square Pharma',
+    price: 120,
   ),
   _Product(
     'Metformin 500mg',
     'assets/images/product_7_opt.jpg',
     'metformin diabetes medicine',
     rx: true,
+    description: 'Helps control blood sugar levels in type 2 diabetes.',
+    brand: 'Beximco Pharma',
+    price: 90,
   ),
   _Product(
     'Vitamin D3 60K',
     'assets/images/product_4_opt.jpg',
     'vitamin supplement medicine',
+    description: 'This is a pain energy booster.',
+    brand: 'HealthPlus',
+    price: 350,
   ),
   _Product(
     'Organic Honey 500g',
     'assets/images/product_1_opt.jpg',
     'honey grocery fever',
+    description: 'Pure natural honey.',
+    brand: "Nature's Own",
+    price: 450,
   ),
   _Product(
     'Hand Sanitizer Gel',
     'assets/images/product_2_opt.jpg',
     'sanitizer skin care personal care',
+    description: 'Kills 99.9% germs.',
+    brand: 'CleanCare',
+    price: 150,
   ),
   _Product(
     'ORS Oral Saline Sachet',
     'assets/images/product_3_opt.jpg',
     'ors saline fever dehydration medicine',
+    description: 'Helps prevent dehydration and restore body fluids quickly.',
+    price: 20,
   ),
 ];
 
