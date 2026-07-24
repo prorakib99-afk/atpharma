@@ -4,10 +4,10 @@ class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
 
   @override
-  State<CartScreen> createState() => _MyWidgetState();
+  State<CartScreen> createState() => _CartScreenState();
 }
 
-class _MyWidgetState extends State<CartScreen> {
+class _CartScreenState extends State<CartScreen> {
   @override
   Widget build(BuildContext context) {
     return const Placeholder();
