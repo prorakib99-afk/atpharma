@@ -6,12 +6,11 @@ import '../api_request_options.dart';
 
 final class RetryInterceptor extends Interceptor {
   RetryInterceptor({
-    required Dio dio,
+    required this._dio,
     this.maximumRetries = 2,
     this.baseDelay = const Duration(milliseconds: 500),
     this.maximumDelay = const Duration(seconds: 4),
-  }) : assert(maximumRetries >= 0),
-       _dio = dio;
+  }) : assert(maximumRetries >= 0);
 
   final Dio _dio;
   final int maximumRetries;

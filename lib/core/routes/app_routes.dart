@@ -10,5 +10,6 @@ abstract final class AppRoutes {
   static const String prescription = '/prescription';
   static const String search = '/search';
   static const String cart = '/cart';
+  static const String checkout = '/checkout';
   static const String productDetails = '/product-details';
 }

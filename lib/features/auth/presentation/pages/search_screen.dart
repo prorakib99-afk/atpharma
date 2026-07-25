@@ -1,7 +1,16 @@
-import 'package:flutter/material.dart';
-import 'screen_product_details.dart';
+import 'dart:async';
 
+import 'package:flutter/material.dart';
+
+import '../../../../core/di/injection_container.dart';
+import '../../../../core/error/app_result.dart';
+import '../../../../core/pagination/paginated_result.dart';
 import '../../../../shared/widgets/navigation_page_scaffold.dart';
+import '../../../shop/domain/entities/shop_product_entity.dart';
+import '../../../shop/domain/entities/shop_product_query.dart';
+import '../../../shop/domain/usecases/cancel_shop_products_request_use_case.dart';
+import '../../../shop/domain/usecases/get_shop_products_use_case.dart';
+import 'screen_product_details.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -15,13 +24,26 @@ class _SearchScreenState extends State<SearchScreen> {
   final _focusNode = FocusNode();
   final _scrollController = ScrollController();
   final List<String> _recent = ['Paracetamol', 'Vitamin D3', 'Hand Sanitizer'];
+  late final GetShopProductsUseCase _getProducts;
+  late final CancelShopProductsRequestUseCase _cancelProducts;
+  PaginatedResult<ShopProductEntity> _productsPage =
+      PaginatedResult.empty<ShopProductEntity>(perPage: 6);
+  List<ShopProductEntity> _suggestedProducts = const <ShopProductEntity>[];
+  Timer? _debounce;
   String _query = '';
   bool _submitted = false;
-  int _page = 0;
+  bool _loading = true;
+  String? _error;
+  int _requestVersion = 0;
+
+  static const String _requestKey = 'search-screen-products';
 
   @override
   void initState() {
     super.initState();
+    _getProducts = sl<GetShopProductsUseCase>();
+    _cancelProducts = sl<CancelShopProductsRequestUseCase>();
+    _loadProducts(page: 1);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scrollController.hasClients) return;
       _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
@@ -29,49 +51,84 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   List<String> get _suggestions {
-    final query = _query.trim().toLowerCase();
-    if (query.isEmpty) return const [];
-    final values = _searchTerms
-        .where((item) => item.toLowerCase().contains(query))
-        .toList();
-    values.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-    return values;
+    return _productsPage.items
+        .map((ShopProductEntity product) => product.name)
+        .toSet()
+        .take(6)
+        .toList(growable: false);
   }
 
-  List<_Product> get _results {
-    final query = _query.trim().toLowerCase();
-    if (query.isEmpty) return const [];
-    return _products.where((product) {
-      final text = '${product.name} ${product.tags}'.toLowerCase();
-      return text.contains(query) ||
-          query
-              .split(' ')
-              .any((word) => word.length > 2 && text.contains(word));
-    }).toList();
+  Future<void> _loadProducts({required int page, String? search}) async {
+    final String normalizedSearch = (search ?? _query).trim();
+    final int version = ++_requestVersion;
+    _cancelProducts(requestKey: _requestKey);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    final AppResult<PaginatedResult<ShopProductEntity>> result =
+        await _getProducts(
+          query: ShopProductQuery(
+            page: page,
+            perPage: 6,
+            search: normalizedSearch,
+            sort: ShopProductSort.newest,
+          ),
+          requestKey: _requestKey,
+        );
+
+    if (!mounted || version != _requestVersion) return;
+    setState(() {
+      _loading = false;
+      final data = result.dataOrNull;
+      if (data != null) {
+        _productsPage = data;
+        if (normalizedSearch.isEmpty) {
+          _suggestedProducts = List<ShopProductEntity>.unmodifiable(data.items);
+        }
+      } else {
+        _error = result.failureOrNull?.message ?? 'Unable to load products.';
+      }
+    });
+  }
+
+  void _onQueryChanged(String value) {
+    setState(() {
+      _query = value;
+      _submitted = false;
+    });
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 400), () {
+      if (!mounted) return;
+      _loadProducts(page: 1, search: value.trim());
+    });
   }
 
   void _search([String? value]) {
     final query = (value ?? _controller.text).trim();
     if (query.isEmpty) return;
+    _debounce?.cancel();
     _controller.text = query;
     _controller.selection = TextSelection.collapsed(offset: query.length);
     setState(() {
       _query = query;
       _submitted = true;
-      _page = 0;
       _recent.removeWhere((item) => item.toLowerCase() == query.toLowerCase());
       _recent.insert(0, query);
     });
+    _loadProducts(page: 1, search: query);
     _focusNode.unfocus();
   }
 
   void _clearSearch() {
     _controller.clear();
+    _debounce?.cancel();
     setState(() {
       _query = '';
       _submitted = false;
-      _page = 0;
     });
+    _loadProducts(page: 1, search: '');
     _focusNode.requestFocus();
   }
 
@@ -88,6 +145,9 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
+    ++_requestVersion;
+    _cancelProducts(requestKey: _requestKey);
     _controller.dispose();
     _focusNode.dispose();
     _scrollController.dispose();
@@ -125,10 +185,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         controller: _controller,
                         focusNode: _focusNode,
                         submitted: _submitted,
-                        onChanged: (value) => setState(() {
-                          _query = value;
-                          _submitted = false;
-                        }),
+                        onChanged: _onQueryChanged,
                         onSubmitted: _search,
                         onClear: _clearSearch,
                         onTap: _scrollToSearchField,
@@ -145,14 +202,30 @@ class _SearchScreenState extends State<SearchScreen> {
   );
 
   Widget _content() {
+    if (_loading && _productsPage.isEmpty) {
+      return const SizedBox(
+        height: 260,
+        child: Center(child: CircularProgressIndicator(color: _Colors.blue)),
+      );
+    }
+    if (_error != null && _productsPage.isEmpty) {
+      return _SearchError(
+        message: _error!,
+        onRetry: () => _loadProducts(page: 1),
+      );
+    }
     if (_submitted) {
-      return _results.isEmpty
-          ? _NoResults(query: _query, onSuggestion: _search)
+      return _productsPage.isEmpty
+          ? _NoResults(
+              query: _query,
+              onSuggestion: _search,
+              alternatives: _suggestedProducts,
+            )
           : _Results(
               query: _query,
-              results: _results,
-              page: _page,
-              onPageChanged: (page) => setState(() => _page = page),
+              page: _productsPage,
+              loading: _loading,
+              onPageChanged: (page) => _loadProducts(page: page),
             );
     }
     if (_query.trim().isNotEmpty) {
@@ -163,6 +236,7 @@ class _SearchScreenState extends State<SearchScreen> {
       );
     }
     return _DefaultState(
+      products: _suggestedProducts,
       recent: _recent,
       onPopular: _search,
       onRecent: _search,
@@ -295,12 +369,14 @@ class _SearchField extends StatelessWidget {
 
 class _DefaultState extends StatelessWidget {
   const _DefaultState({
+    required this.products,
     required this.recent,
     required this.onPopular,
     required this.onRecent,
     required this.onRemoveRecent,
     required this.onClearRecent,
   });
+  final List<ShopProductEntity> products;
   final List<String> recent;
   final ValueChanged<String> onPopular;
   final ValueChanged<String> onRecent;
@@ -344,7 +420,7 @@ class _DefaultState extends StatelessWidget {
           children: [
             const Text('Suggested for you', style: _Text.section),
             const SizedBox(height: 16),
-            ..._products
+            ...products
                 .take(4)
                 .map(
                   (product) => Padding(
@@ -544,24 +620,21 @@ class _SuggestionTile extends StatelessWidget {
 class _Results extends StatelessWidget {
   const _Results({
     required this.query,
-    required this.results,
     required this.page,
+    required this.loading,
     required this.onPageChanged,
   });
   final String query;
-  final List<_Product> results;
-  final int page;
+  final PaginatedResult<ShopProductEntity> page;
+  final bool loading;
   final ValueChanged<int> onPageChanged;
 
   @override
   Widget build(BuildContext context) {
-    const pageSize = 6;
-    final pageCount = (results.length / pageSize).ceil();
-    final visible = results.skip(page * pageSize).take(pageSize).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('${results.length} results for “$query”', style: _Text.section),
+        Text('${page.total} results for “$query”', style: _Text.section),
         const SizedBox(height: 4),
         const Text(
           'Medicine, syrup & fever relief',
@@ -569,20 +642,24 @@ class _Results extends StatelessWidget {
         ),
         const SizedBox(height: 20),
         GridView.builder(
-          itemCount: visible.length,
+          itemCount: page.items.length,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
             crossAxisSpacing: 8,
             mainAxisSpacing: 8,
-            mainAxisExtent: 270,
+            mainAxisExtent: 280,
           ),
-          itemBuilder: (_, index) => _GridCard(visible[index]),
+          itemBuilder: (_, index) => _GridCard(page.items[index]),
         ),
-        if (pageCount > 1) ...[
+        if (page.totalPages > 1) ...[
           const SizedBox(height: 24),
-          _Pagination(page: page, count: pageCount, onChanged: onPageChanged),
+          _Pagination(
+            page: page.page - 1,
+            count: page.totalPages,
+            onChanged: (index) => onPageChanged(index + 1),
+          ),
         ],
       ],
     );
@@ -590,9 +667,14 @@ class _Results extends StatelessWidget {
 }
 
 class _NoResults extends StatelessWidget {
-  const _NoResults({required this.query, required this.onSuggestion});
+  const _NoResults({
+    required this.query,
+    required this.onSuggestion,
+    required this.alternatives,
+  });
   final String query;
   final ValueChanged<String> onSuggestion;
+  final List<ShopProductEntity> alternatives;
 
   @override
   Widget build(BuildContext context) => Column(
@@ -664,7 +746,7 @@ class _NoResults extends StatelessWidget {
           children: [
             const Text('Popular alternatives', style: _Text.section),
             const SizedBox(height: 16),
-            ..._products
+            ...alternatives
                 .take(3)
                 .map(
                   (product) => Padding(
@@ -696,7 +778,7 @@ class _Panel extends StatelessWidget {
 
 class _HorizontalCard extends StatelessWidget {
   const _HorizontalCard(this.product);
-  final _Product product;
+  final ShopProductEntity product;
   @override
   Widget build(BuildContext context) => InkWell(
     onTap: () => Navigator.push(
@@ -704,11 +786,13 @@ class _HorizontalCard extends StatelessWidget {
       MaterialPageRoute(
         builder: (_) => ScreenProductDetails(
           product: ProductDetailsData(
+            id: product.id,
             name: product.name,
-            image: product.image,
-            description: product.description,
-            brand: product.brand,
-            price: product.price,
+            image: product.primaryImageUrl,
+            description: product.displayDescription,
+            brand: product.displayCompanyName,
+            price: product.sellingPrice.round(),
+            prescriptionRequired: product.prescriptionRequired,
           ),
         ),
       ),
@@ -725,80 +809,78 @@ class _HorizontalCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.asset(
-            product.image,
-            width: 104,
-            height: 100,
-            fit: BoxFit.cover,
-            cacheWidth: 208,
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: _SearchProductImage(
+              imageUrl: product.primaryImageUrl,
+              width: 104,
+              height: 100,
+            ),
           ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                product.brand,
-                style: const TextStyle(
-                  fontSize: 10,
-                  color: _Colors.green,
-                  fontWeight: FontWeight.w500,
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  product.displayCompanyName,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: _Colors.green,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-              ),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      product.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        product.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    if (product.prescriptionRequired) const _RxBadge(),
+                  ],
+                ),
+                Text(
+                  product.displayDescription,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 10, color: _Colors.body),
+                ),
+                const Spacer(),
+                const Divider(height: 1, color: _Colors.border),
+                const SizedBox(height: 5),
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'In Stock',
+                        style: TextStyle(fontSize: 10, color: _Colors.blue),
+                      ),
+                    ),
+                    Text(
+                      _formatPrice(product.sellingPrice),
                       style: const TextStyle(
-                        fontSize: 12,
+                        fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                  ),
-                  if (product.rx) const _RxBadge(),
-                ],
-              ),
-              Text(
-                product.description,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 10, color: _Colors.body),
-              ),
-              const Spacer(),
-              const Divider(height: 1, color: _Colors.border),
-              const SizedBox(height: 5),
-              Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'In Stock',
-                      style: TextStyle(fontSize: 10, color: _Colors.blue),
+                    const SizedBox(width: 12),
+                    CircleAvatar(
+                      radius: 16,
+                      backgroundColor: _Colors.blue,
+                      child: Icon(Icons.add_rounded, color: Colors.white),
                     ),
-                  ),
-                  Text(
-                    '৳${product.price}',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  CircleAvatar(
-                    radius: 16,
-                    backgroundColor: _Colors.blue,
-                    child: Icon(Icons.add_rounded, color: Colors.white),
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
         ],
       ),
     ),
@@ -807,7 +889,7 @@ class _HorizontalCard extends StatelessWidget {
 
 class _GridCard extends StatelessWidget {
   const _GridCard(this.product);
-  final _Product product;
+  final ShopProductEntity product;
   @override
   Widget build(BuildContext context) => InkWell(
     onTap: () => Navigator.push(
@@ -815,11 +897,13 @@ class _GridCard extends StatelessWidget {
       MaterialPageRoute(
         builder: (_) => ScreenProductDetails(
           product: ProductDetailsData(
+            id: product.id,
             name: product.name,
-            image: product.image,
-            description: product.description,
-            brand: product.brand,
-            price: product.price,
+            image: product.primaryImageUrl,
+            description: product.displayDescription,
+            brand: product.displayCompanyName,
+            price: product.sellingPrice.round(),
+            prescriptionRequired: product.prescriptionRequired,
           ),
         ),
       ),
@@ -844,10 +928,8 @@ class _GridCard extends StatelessWidget {
                 Positioned.fill(
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(10),
-                    child: Image.asset(
-                      product.image,
-                      fit: BoxFit.cover,
-                      cacheWidth: 320,
+                    child: _SearchProductImage(
+                      imageUrl: product.primaryImageUrl,
                     ),
                   ),
                 ),
@@ -865,7 +947,7 @@ class _GridCard extends StatelessWidget {
           ),
           const SizedBox(height: 15),
           Text(
-            product.brand,
+            product.displayCompanyName,
             style: const TextStyle(
               fontSize: 10,
               color: _Colors.green,
@@ -885,11 +967,11 @@ class _GridCard extends StatelessWidget {
                   ),
                 ),
               ),
-              if (product.rx) const _RxBadge(),
+              if (product.prescriptionRequired) const _RxBadge(),
             ],
           ),
           Text(
-            product.description,
+            product.displayDescription,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontSize: 10, color: _Colors.body),
@@ -906,7 +988,7 @@ class _GridCard extends StatelessWidget {
                 ),
               ),
               Text(
-                '৳${product.price}',
+                _formatPrice(product.sellingPrice),
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -936,6 +1018,79 @@ class _RxBadge extends StatelessWidget {
   );
 }
 
+class _SearchProductImage extends StatelessWidget {
+  const _SearchProductImage({required this.imageUrl, this.width, this.height});
+
+  final String imageUrl;
+  final double? width;
+  final double? height;
+
+  @override
+  Widget build(BuildContext context) {
+    if (imageUrl.trim().isEmpty) return const _SearchImageFallback();
+
+    return Image.network(
+      imageUrl,
+      width: width,
+      height: height,
+      fit: BoxFit.cover,
+      cacheWidth: 360,
+      filterQuality: FilterQuality.low,
+      errorBuilder: (_, _, _) => const _SearchImageFallback(),
+    );
+  }
+}
+
+class _SearchImageFallback extends StatelessWidget {
+  const _SearchImageFallback();
+
+  @override
+  Widget build(BuildContext context) {
+    return const ColoredBox(
+      color: Color(0xFFF1F5F9),
+      child: Center(
+        child: Icon(Icons.medication_outlined, color: _Colors.blue, size: 38),
+      ),
+    );
+  }
+}
+
+class _SearchError extends StatelessWidget {
+  const _SearchError({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 260,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            const Icon(Icons.wifi_off_rounded, color: _Colors.body),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 12, color: _Colors.body),
+            ),
+            const SizedBox(height: 12),
+            FilledButton(onPressed: onRetry, child: const Text('Retry')),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _formatPrice(double price) {
+  return price == price.roundToDouble()
+      ? '৳${price.toStringAsFixed(0)}'
+      : '৳${price.toStringAsFixed(2)}';
+}
+
 class _Pagination extends StatelessWidget {
   const _Pagination({
     required this.page,
@@ -945,137 +1100,45 @@ class _Pagination extends StatelessWidget {
   final int page;
   final int count;
   final ValueChanged<int> onChanged;
+
   @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      ...List.generate(
-        count,
-        (index) => Padding(
-          padding: const EdgeInsets.only(right: 8),
-          child: InkWell(
-            onTap: () => onChanged(index),
-            child: CircleAvatar(
-              radius: 16,
-              backgroundColor: index == page ? _Colors.blue : _Colors.card,
-              child: Text(
-                '${index + 1}',
-                style: TextStyle(
-                  color: index == page ? Colors.white : _Colors.text,
+  Widget build(BuildContext context) {
+    final int start = (page - 1).clamp(0, (count - 3).clamp(0, count));
+    final int end = (start + 3).clamp(0, count);
+
+    return Row(
+      children: [
+        for (int index = start; index < end; index++)
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: InkWell(
+              onTap: () => onChanged(index),
+              customBorder: const CircleBorder(),
+              child: CircleAvatar(
+                radius: 16,
+                backgroundColor: index == page ? _Colors.blue : _Colors.card,
+                child: Text(
+                  '${index + 1}',
+                  style: TextStyle(
+                    color: index == page ? Colors.white : _Colors.text,
+                  ),
                 ),
               ),
             ),
           ),
+        const Spacer(),
+        IconButton(
+          onPressed: page > 0 ? () => onChanged(page - 1) : null,
+          icon: const Icon(Icons.chevron_left_rounded),
         ),
-      ),
-      const Spacer(),
-      IconButton(
-        onPressed: page > 0 ? () => onChanged(page - 1) : null,
-        icon: const Icon(Icons.chevron_left_rounded),
-      ),
-      IconButton(
-        onPressed: page + 1 < count ? () => onChanged(page + 1) : null,
-        icon: const Icon(Icons.chevron_right_rounded),
-      ),
-    ],
-  );
+        IconButton(
+          onPressed: page + 1 < count ? () => onChanged(page + 1) : null,
+          icon: const Icon(Icons.chevron_right_rounded),
+        ),
+      ],
+    );
+  }
 }
-
-class _Product {
-  const _Product(
-    this.name,
-    this.image,
-    this.tags, {
-    this.rx = false,
-    this.description = 'Quality healthcare product for your everyday needs.',
-    this.brand = 'FreshLife',
-    this.price = 500,
-  });
-  final String name;
-  final String image;
-  final String tags;
-  final bool rx;
-  final String description;
-  final String brand;
-  final int price;
-}
-
-const _products = [
-  _Product(
-    'Paracetamol 500mg',
-    'assets/images/product_5_opt.jpg',
-    'paracetamol fever medicine pain',
-    rx: true,
-    description: 'Fast relief from fever and mild to moderate pain.',
-    brand: 'ACI Limited',
-    price: 30,
-  ),
-  _Product(
-    'Cefixime 200mg',
-    'assets/images/product_6_opt.jpg',
-    'cefixime antibiotic medicine',
-    description: 'Broad-spectrum antibiotic for bacterial infections.',
-    brand: 'Square Pharma',
-    price: 120,
-  ),
-  _Product(
-    'Metformin 500mg',
-    'assets/images/product_7_opt.jpg',
-    'metformin diabetes medicine',
-    rx: true,
-    description: 'Helps control blood sugar levels in type 2 diabetes.',
-    brand: 'Beximco Pharma',
-    price: 90,
-  ),
-  _Product(
-    'Vitamin D3 60K',
-    'assets/images/product_4_opt.jpg',
-    'vitamin supplement medicine',
-    description: 'This is a pain energy booster.',
-    brand: 'HealthPlus',
-    price: 350,
-  ),
-  _Product(
-    'Organic Honey 500g',
-    'assets/images/product_1_opt.jpg',
-    'honey grocery fever',
-    description: 'Pure natural honey.',
-    brand: "Nature's Own",
-    price: 450,
-  ),
-  _Product(
-    'Hand Sanitizer Gel',
-    'assets/images/product_2_opt.jpg',
-    'sanitizer skin care personal care',
-    description: 'Kills 99.9% germs.',
-    brand: 'CleanCare',
-    price: 150,
-  ),
-  _Product(
-    'ORS Oral Saline Sachet',
-    'assets/images/product_3_opt.jpg',
-    'ors saline fever dehydration medicine',
-    description: 'Helps prevent dehydration and restore body fluids quickly.',
-    price: 20,
-  ),
-];
-
-const _searchTerms = [
-  'Baby Care',
-  'Cefixime 200mg',
-  'Diabetes Care',
-  'Fever medicine',
-  'Hand Sanitizer',
-  'Metformin 500mg',
-  'Napa Extra 500mg',
-  'Organic Honey',
-  'ORS Oral Saline',
-  'Paracetamol 500mg',
-  'Paracetamol for fever',
-  'Paracetamol syrup',
-  'Personal Care',
-  'Skin Care',
-  'Vitamin D3 60K',
-];
 
 class _Colors {
   static const blue = Color(0xFF0B83D9);

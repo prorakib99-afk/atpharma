@@ -6,7 +6,7 @@ import 'api_exception.dart';
 typedef ProgressCallback = void Function(int sentOrReceived, int total);
 
 final class DioClient {
-  DioClient({required Dio dio}) : _dio = dio;
+  DioClient({required this._dio});
 
   final Dio _dio;
 

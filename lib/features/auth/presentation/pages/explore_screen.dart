@@ -1,13 +1,182 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+
+import '../../../../core/di/injection_container.dart';
+import '../../../../core/error/app_result.dart';
+import '../../../../core/pagination/paginated_result.dart';
+import '../../../../shared/widgets/navigation_page_scaffold.dart';
+import '../../../shop/domain/entities/shop_product_entity.dart';
+import '../../../shop/domain/entities/shop_product_query.dart';
+import '../../../shop/domain/usecases/cancel_shop_products_request_use_case.dart';
+import '../../../shop/domain/usecases/get_shop_products_use_case.dart';
+import 'floating_explore_filter_screen.dart';
 import 'screen_product_details.dart';
 
-import '../../../../shared/widgets/navigation_page_scaffold.dart';
-import 'floating_explore_filter_screen.dart';
-
-class ExploreScreen extends StatelessWidget {
+class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key});
 
   static const String routeName = '/explore';
+
+  @override
+  State<ExploreScreen> createState() => _ExploreScreenState();
+}
+
+class _ExploreScreenState extends State<ExploreScreen> {
+  static const String _requestKey = 'explore-products';
+  static const String _prefetchKey = 'explore-products-prefetch';
+  static const int _perPage = 12;
+
+  late final GetShopProductsUseCase _getProducts;
+  late final CancelShopProductsRequestUseCase _cancelProducts;
+  final Map<int, PaginatedResult<ShopProductEntity>> _cache =
+      <int, PaginatedResult<ShopProductEntity>>{};
+  final TextEditingController _searchController = TextEditingController();
+
+  PaginatedResult<ShopProductEntity> _page =
+      PaginatedResult.empty<ShopProductEntity>(perPage: _perPage);
+  Timer? _searchDebounce;
+  String _search = '';
+  bool _loading = true;
+  String? _error;
+  int _version = 0;
+  ExploreFilter _filter = const ExploreFilter();
+
+  ShopProductQuery _query(int page) {
+    return ShopProductQuery(
+      page: page,
+      perPage: _perPage,
+      search: _search,
+      categoryIds: _filter.categoryIds,
+      minPrice: _filter.minPrice,
+      maxPrice: _filter.maxPrice,
+      availability: switch (_filter.availability) {
+        true => ShopProductAvailability.inStock,
+        false => ShopProductAvailability.outOfStock,
+        null => ShopProductAvailability.all,
+      },
+      prescription: switch (_filter.prescription) {
+        true => ShopProductPrescription.required,
+        false => ShopProductPrescription.notRequired,
+        null => ShopProductPrescription.all,
+      },
+      featured: _filter.featured,
+      sort: ShopProductSort.popular,
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _getProducts = sl<GetShopProductsUseCase>();
+    _cancelProducts = sl<CancelShopProductsRequestUseCase>();
+    _loadPage(1);
+  }
+
+  Future<void> _loadPage(int page) async {
+    if (page < 1 || (_page.totalPages > 0 && page > _page.totalPages)) return;
+
+    final PaginatedResult<ShopProductEntity>? cached = _cache[page];
+    if (cached != null) {
+      setState(() {
+        _page = cached;
+        _loading = false;
+        _error = null;
+      });
+      _prefetch(page + 1);
+      return;
+    }
+
+    final int version = ++_version;
+    _cancelProducts(requestKey: _requestKey);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    final AppResult<PaginatedResult<ShopProductEntity>> result =
+        await _getProducts(query: _query(page), requestKey: _requestKey);
+
+    if (!mounted || version != _version) return;
+    final data = result.dataOrNull;
+    setState(() {
+      _loading = false;
+      if (data != null) {
+        _page = data;
+        _cache[page] = data;
+      } else {
+        _error = result.failureOrNull?.message ?? 'Unable to load products.';
+      }
+    });
+    if (data != null) _prefetch(page + 1);
+  }
+
+  Future<void> _prefetch(int page) async {
+    if (!mounted ||
+        _cache.containsKey(page) ||
+        (_page.totalPages > 0 && page > _page.totalPages)) {
+      return;
+    }
+    final result = await _getProducts(
+      query: _query(page),
+      requestKey: _prefetchKey,
+    );
+    if (!mounted) return;
+    final data = result.dataOrNull;
+    if (data != null) _cache[page] = data;
+  }
+
+  void _applySearch(String value) {
+    final String normalized = value.trim();
+    if (normalized == _search) return;
+
+    _cancelProducts(requestKey: _prefetchKey);
+    _cache.clear();
+    setState(() => _search = normalized);
+    unawaited(_loadPage(1));
+  }
+
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(
+      const Duration(milliseconds: 400),
+      () => _applySearch(value),
+    );
+  }
+
+  void _onSearchSubmitted(String value) {
+    _searchDebounce?.cancel();
+    _applySearch(value);
+  }
+
+  void _clearSearch() {
+    _searchDebounce?.cancel();
+    _searchController.clear();
+    _applySearch('');
+  }
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    ++_version;
+    _cancelProducts(requestKey: _requestKey);
+    _cancelProducts(requestKey: _prefetchKey);
+    super.dispose();
+  }
+
+  Future<void> _openFilters() async {
+    final ExploreFilter? result = await showFloatingExploreFilterScreen(
+      context,
+      initial: _filter,
+      productCount: _page.total,
+    );
+    if (!mounted || result == null) return;
+    _cancelProducts(requestKey: _prefetchKey);
+    _cache.clear();
+    setState(() => _filter = result);
+    await _loadPage(1);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,11 +198,16 @@ class ExploreScreen extends StatelessWidget {
                     _Responsive.pagePadding(context),
                     0,
                   ),
-                  child: const Column(
+                  child: Column(
                     children: [
-                      _ExploreHeader(),
-                      SizedBox(height: 24),
-                      _ExploreSearchBar(),
+                      const _ExploreHeader(),
+                      const SizedBox(height: 24),
+                      _ExploreSearchBar(
+                        controller: _searchController,
+                        onChanged: _onSearchChanged,
+                        onSubmitted: _onSearchSubmitted,
+                        onClear: _clearSearch,
+                      ),
                     ],
                   ),
                 ),
@@ -48,7 +222,15 @@ class ExploreScreen extends StatelessWidget {
                           _Responsive.pagePadding(context),
                           208 + bottomSafe,
                         ),
-                        sliver: const SliverToBoxAdapter(child: _ProductGrid()),
+                        sliver: SliverToBoxAdapter(
+                          child: _ExploreProductsContent(
+                            page: _page,
+                            loading: _loading,
+                            error: _error,
+                            onRetry: () => _loadPage(_page.page),
+                            onPageChanged: _loadPage,
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -59,7 +241,10 @@ class ExploreScreen extends StatelessWidget {
               left: _Responsive.pagePadding(context),
               right: _Responsive.pagePadding(context),
               bottom: 112 + bottomSafe,
-              child: const _FilterPanel(),
+              child: _FilterPanel(
+                activeFilterCount: _filter.activeCount,
+                onFilterTap: _openFilters,
+              ),
             ),
           ],
         ),
@@ -179,49 +364,172 @@ class _ProfileAvatar extends StatelessWidget {
 }
 
 class _ExploreSearchBar extends StatelessWidget {
-  const _ExploreSearchBar();
+  const _ExploreSearchBar({
+    required this.controller,
+    required this.onChanged,
+    required this.onSubmitted,
+    required this.onClear,
+  });
+
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+  final ValueChanged<String> onSubmitted;
+  final VoidCallback onClear;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 52,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _ExploreColors.border, width: 0.8),
-      ),
-      child: const Row(
-        children: [
-          Icon(Icons.search_rounded, size: 22, color: _ExploreColors.body),
-          SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'Search by product name, brands...',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 12,
-                height: 16 / 12,
-                fontWeight: FontWeight.w400,
-                color: _ExploreColors.placeholder,
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: controller,
+      builder: (context, value, child) => SizedBox(
+        height: 52,
+        child: TextField(
+          controller: controller,
+          onChanged: onChanged,
+          onSubmitted: onSubmitted,
+          textInputAction: TextInputAction.search,
+          style: const TextStyle(
+            fontFamily: 'Poppins',
+            fontSize: 12,
+            color: _ExploreColors.title,
+          ),
+          decoration: InputDecoration(
+            hintText: 'Search by product name, brands...',
+            hintStyle: const TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 12,
+              fontWeight: FontWeight.w400,
+              color: _ExploreColors.placeholder,
+            ),
+            prefixIcon: const Icon(
+              Icons.search_rounded,
+              size: 22,
+              color: _ExploreColors.body,
+            ),
+            suffixIcon: value.text.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: 'Clear search',
+                    onPressed: onClear,
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      size: 20,
+                      color: _ExploreColors.body,
+                    ),
+                  ),
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding: const EdgeInsets.symmetric(vertical: 16),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(18),
+              borderSide: const BorderSide(
+                color: _ExploreColors.border,
+                width: 0.8,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(18),
+              borderSide: const BorderSide(
+                color: _ExploreColors.primary,
+                width: 1.2,
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
+class _ExploreProductsContent extends StatelessWidget {
+  const _ExploreProductsContent({
+    required this.page,
+    required this.loading,
+    required this.error,
+    required this.onRetry,
+    required this.onPageChanged,
+  });
+
+  final PaginatedResult<ShopProductEntity> page;
+  final bool loading;
+  final String? error;
+  final VoidCallback onRetry;
+  final ValueChanged<int> onPageChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    if (loading && page.isEmpty) {
+      return const SizedBox(
+        height: 320,
+        child: Center(
+          child: CircularProgressIndicator(color: _ExploreColors.primary),
+        ),
+      );
+    }
+    if (error != null && page.isEmpty) {
+      return SizedBox(
+        height: 320,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const Icon(Icons.wifi_off_rounded, color: _ExploreColors.body),
+              const SizedBox(height: 8),
+              Text(error!, textAlign: TextAlign.center),
+              const SizedBox(height: 12),
+              FilledButton(onPressed: onRetry, child: const Text('Retry')),
+            ],
+          ),
+        ),
+      );
+    }
+    if (page.isEmpty) {
+      return const SizedBox(
+        height: 320,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Icon(
+                Icons.inventory_2_outlined,
+                size: 42,
+                color: _ExploreColors.body,
+              ),
+              SizedBox(height: 10),
+              Text(
+                'No products match these filters',
+                style: TextStyle(color: _ExploreColors.body),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      children: <Widget>[
+        AnimatedOpacity(
+          opacity: loading ? .45 : 1,
+          duration: const Duration(milliseconds: 160),
+          child: _ProductGrid(products: page.items),
+        ),
+        if (page.totalPages > 1) ...<Widget>[
+          const SizedBox(height: 24),
+          _ExplorePagination(page: page, onChanged: onPageChanged),
+        ],
+      ],
+    );
+  }
+}
+
 class _ProductGrid extends StatelessWidget {
-  const _ProductGrid();
+  const _ProductGrid({required this.products});
+
+  final List<ShopProductEntity> products;
 
   @override
   Widget build(BuildContext context) {
     return GridView.builder(
-      itemCount: _products.length,
+      itemCount: products.length,
       shrinkWrap: true,
       padding: EdgeInsets.zero,
       physics: const NeverScrollableScrollPhysics(),
@@ -232,7 +540,7 @@ class _ProductGrid extends StatelessWidget {
         childAspectRatio: _Responsive.productAspectRatio(context),
       ),
       itemBuilder: (context, index) {
-        return _ProductCard(product: _products[index]);
+        return _ProductCard(product: products[index]);
       },
     );
   }
@@ -241,7 +549,7 @@ class _ProductGrid extends StatelessWidget {
 class _ProductCard extends StatelessWidget {
   const _ProductCard({required this.product});
 
-  final _Product product;
+  final ShopProductEntity product;
 
   @override
   Widget build(BuildContext context) {
@@ -253,11 +561,13 @@ class _ProductCard extends StatelessWidget {
         MaterialPageRoute(
           builder: (_) => ScreenProductDetails(
             product: ProductDetailsData(
+              id: product.id,
               name: product.name,
-              image: product.image,
-              description: product.description,
-              brand: product.brand,
-              price: product.price,
+              image: product.primaryImageUrl,
+              description: product.displayDescription,
+              brand: product.displayCompanyName,
+              price: product.sellingPrice.round(),
+              prescriptionRequired: product.prescriptionRequired,
             ),
           ),
         ),
@@ -288,17 +598,19 @@ class _ProductCard extends StatelessWidget {
                   Container(
                     width: double.infinity,
                     decoration: BoxDecoration(
-                      color: product.fallbackColor,
+                      color: const Color(0xFFF1F5F9),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: _ExploreColors.border),
                     ),
                     clipBehavior: Clip.antiAlias,
-                    child: Image.asset(
-                      product.image,
+                    child: Image.network(
+                      product.primaryImageUrl,
                       fit: BoxFit.cover,
+                      cacheWidth: 420,
+                      filterQuality: FilterQuality.low,
                       errorBuilder: (_, _, _) {
-                        return Icon(
-                          product.fallbackIcon,
+                        return const Icon(
+                          Icons.medication_outlined,
                           size: 54,
                           color: _ExploreColors.primary,
                         );
@@ -338,7 +650,7 @@ class _ProductCard extends StatelessWidget {
             ),
             SizedBox(height: isSmall ? 18 : 20),
             Text(
-              product.brand,
+              product.displayCompanyName,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -364,7 +676,7 @@ class _ProductCard extends StatelessWidget {
             ),
             const SizedBox(height: 5),
             Text(
-              product.description,
+              product.displayDescription,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -380,9 +692,9 @@ class _ProductCard extends StatelessWidget {
             const SizedBox(height: 8),
             Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'In Stock',
+                    product.isOutOfStock ? 'Out of Stock' : 'In Stock',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -390,13 +702,15 @@ class _ProductCard extends StatelessWidget {
                       fontSize: 10,
                       height: 16 / 10,
                       fontWeight: FontWeight.w400,
-                      color: _ExploreColors.primary,
+                      color: product.isOutOfStock
+                          ? Colors.red
+                          : _ExploreColors.primary,
                     ),
                   ),
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  '৳${product.price}',
+                  _formatPrice(product.sellingPrice),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -416,8 +730,57 @@ class _ProductCard extends StatelessWidget {
   }
 }
 
+class _ExplorePagination extends StatelessWidget {
+  const _ExplorePagination({required this.page, required this.onChanged});
+
+  final PaginatedResult<ShopProductEntity> page;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: <Widget>[
+        IconButton(
+          onPressed: page.hasPreviousPage
+              ? () => onChanged(page.page - 1)
+              : null,
+          icon: const Icon(Icons.chevron_left_rounded),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+          decoration: BoxDecoration(
+            color: _ExploreColors.card,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Text(
+            'Page ${page.page} of ${page.totalPages}',
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          ),
+        ),
+        IconButton(
+          onPressed: page.hasNextPage ? () => onChanged(page.page + 1) : null,
+          icon: const Icon(Icons.chevron_right_rounded),
+        ),
+      ],
+    );
+  }
+}
+
+String _formatPrice(double price) {
+  return price == price.roundToDouble()
+      ? '৳${price.toStringAsFixed(0)}'
+      : '৳${price.toStringAsFixed(2)}';
+}
+
 class _FilterPanel extends StatelessWidget {
-  const _FilterPanel();
+  const _FilterPanel({
+    required this.activeFilterCount,
+    required this.onFilterTap,
+  });
+
+  final int activeFilterCount;
+  final VoidCallback onFilterTap;
 
   @override
   Widget build(BuildContext context) {
@@ -453,8 +816,8 @@ class _FilterPanel extends StatelessWidget {
                 child: _ActionChipButton(
                   icon: Icons.filter_alt_outlined,
                   label: 'More Filters',
-                  badge: '0',
-                  onTap: () => showFloatingExploreFilterScreen(context),
+                  badge: '$activeFilterCount',
+                  onTap: onFilterTap,
                 ),
               ),
             ],
@@ -566,81 +929,6 @@ class _Responsive {
     return 0.57;
   }
 }
-
-class _Product {
-  const _Product({
-    required this.name,
-    required this.description,
-    required this.image,
-    required this.fallbackIcon,
-    required this.fallbackColor,
-    this.brand = 'FreshLife',
-    this.price = 500,
-  });
-
-  final String name;
-  final String description;
-  final String image;
-  final IconData fallbackIcon;
-  final Color fallbackColor;
-  final String brand;
-  final int price;
-}
-
-const List<_Product> _products = [
-  _Product(
-    name: 'Organic Honey 500g',
-    description: 'Pure natural honey.',
-    image: 'assets/images/product_1_opt.jpg',
-    fallbackIcon: Icons.hive_rounded,
-    fallbackColor: Color(0xfffff2d7),
-    brand: "Nature's Own",
-    price: 450,
-  ),
-  _Product(
-    name: 'Hand Sanitizer Gel...',
-    description: 'Kills 99.9% germs.',
-    image: 'assets/images/product_2_opt.jpg',
-    fallbackIcon: Icons.sanitizer_rounded,
-    fallbackColor: Color(0xffeef8ff),
-    brand: 'CleanCare',
-    price: 150,
-  ),
-  _Product(
-    name: 'ORS Oral Saline Sachet',
-    description: 'Helps prevent dehydration',
-    image: 'assets/images/product_3_opt.jpg',
-    fallbackIcon: Icons.water_drop_rounded,
-    fallbackColor: Color(0xfff2fbff),
-    price: 20,
-  ),
-  _Product(
-    name: 'Vitamin D3 60K',
-    description: 'This is a pain energy booster.',
-    image: 'assets/images/product_4_opt.jpg',
-    fallbackIcon: Icons.medication_rounded,
-    fallbackColor: Color(0xfffff7ed),
-    brand: 'HealthPlus',
-    price: 350,
-  ),
-  _Product(
-    name: 'ORS Oral Saline Sachet',
-    description: 'Helps prevent dehydration',
-    image: 'assets/images/product_3_opt.jpg',
-    fallbackIcon: Icons.water_drop_rounded,
-    fallbackColor: Color(0xfff2fbff),
-    price: 20,
-  ),
-  _Product(
-    name: 'Vitamin D3 60K',
-    description: 'This is a pain energy booster.',
-    image: 'assets/images/product_4_opt.jpg',
-    fallbackIcon: Icons.medication_rounded,
-    fallbackColor: Color(0xfffff7ed),
-    brand: 'HealthPlus',
-    price: 350,
-  ),
-];
 
 class _ExploreColors {
   static const Color background = Color(0xffffffff);

@@ -1,37 +1,94 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/routes/app_routes.dart';
+import 'favorite_store.dart';
+import 'favourite_screen.dart';
+import 'floating_order_cart.dart';
+
 class ProductDetailsData {
   const ProductDetailsData({
+    this.id,
     required this.name,
     required this.image,
     this.description =
         'Helps prevent dehydration and restore body fluids quickly.',
     this.brand = 'FreshLife',
     this.price = 500,
+    this.prescriptionRequired = false,
   });
 
+  final String? id;
   final String name;
   final String image;
   final String description;
   final String brand;
   final int price;
+  final bool prescriptionRequired;
 }
 
 class ProductCart extends ChangeNotifier {
   ProductCart._();
   static final ProductCart instance = ProductCart._();
-  final Map<String, int> _items = {};
+  final Map<String, ProductCartItem> _items = <String, ProductCartItem>{};
 
-  int quantityFor(String name) => _items[name] ?? 0;
-  int get totalCount => _items.values.fold(0, (sum, value) => sum + value);
+  int quantityFor(String id) => _items[id]?.quantity ?? 0;
+  int get totalCount => _items.values.fold(0, (int sum, ProductCartItem item) {
+    return sum + item.quantity;
+  });
+  List<ProductCartItem> get items =>
+      List<ProductCartItem>.unmodifiable(_items.values);
 
   void add(ProductDetailsData product, int quantity) {
+    final String id = product.id?.trim().isNotEmpty == true
+        ? product.id!.trim()
+        : product.name.trim();
+
     _items.update(
-      product.name,
-      (value) => value + quantity,
-      ifAbsent: () => quantity,
+      id,
+      (ProductCartItem value) =>
+          value.copyWith(quantity: value.quantity + quantity),
+      ifAbsent: () =>
+          ProductCartItem(id: id, product: product, quantity: quantity),
     );
     notifyListeners();
+  }
+
+  void increase(String id) {
+    final ProductCartItem? item = _items[id];
+    if (item == null) return;
+    _items[id] = item.copyWith(quantity: item.quantity + 1);
+    notifyListeners();
+  }
+
+  void decrease(String id) {
+    final ProductCartItem? item = _items[id];
+    if (item == null || item.quantity <= 1) return;
+    _items[id] = item.copyWith(quantity: item.quantity - 1);
+    notifyListeners();
+  }
+
+  void remove(String id) {
+    if (_items.remove(id) != null) notifyListeners();
+  }
+}
+
+class ProductCartItem {
+  const ProductCartItem({
+    required this.id,
+    required this.product,
+    required this.quantity,
+  });
+
+  final String id;
+  final ProductDetailsData product;
+  final int quantity;
+
+  ProductCartItem copyWith({int? quantity}) {
+    return ProductCartItem(
+      id: id,
+      product: product,
+      quantity: quantity ?? this.quantity,
+    );
   }
 }
 
@@ -45,16 +102,91 @@ class ScreenProductDetails extends StatefulWidget {
 
 class _ScreenProductDetailsState extends State<ScreenProductDetails> {
   int quantity = 1;
-  bool favourite = false;
 
   ProductDetailsData get product => widget.product;
+  String get productId => product.id?.trim().isNotEmpty == true
+      ? product.id!.trim()
+      : product.name.trim();
+
+  void _toggleFavourite() {
+    FavoriteStore.instance.toggle(
+      FavoriteProduct(
+        id: productId,
+        name: product.name,
+        image: product.image,
+        description: product.description,
+        brand: product.brand,
+        price: product.price,
+      ),
+    );
+  }
+
+  Future<void> _openFloatingCart() async {
+    if (ProductCart.instance.totalCount == 0) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Your cart is empty.')));
+      return;
+    }
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: .55),
+      builder: (BuildContext sheetContext) {
+        return AnimatedBuilder(
+          animation: ProductCart.instance,
+          builder: (BuildContext context, _) {
+            final List<ProductCartItem> items = ProductCart.instance.items;
+
+            if (items.isEmpty) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (sheetContext.mounted) Navigator.pop(sheetContext);
+              });
+              return const SizedBox.shrink();
+            }
+
+            return FloatingOrderCart(
+              items: items
+                  .map((ProductCartItem item) {
+                    return FloatingCartItem(
+                      id: item.id,
+                      productName: item.product.name,
+                      manufacturerName: item.product.brand,
+                      productImage: item.product.image,
+                      unitPrice: item.product.price.toDouble(),
+                      quantity: item.quantity,
+                    );
+                  })
+                  .toList(growable: false),
+              currencySymbol: '৳',
+              onIncreaseQuantity: ProductCart.instance.increase,
+              onDecreaseQuantity: ProductCart.instance.decrease,
+              onRemoveItem: ProductCart.instance.remove,
+              onContinueShopping: () => Navigator.pop(sheetContext),
+              onViewFullCart: () {
+                Navigator.pop(sheetContext);
+                Navigator.of(context).pushNamed(AppRoutes.cart);
+              },
+            );
+          },
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: ProductCart.instance,
+      animation: Listenable.merge(<Listenable>[
+        ProductCart.instance,
+        FavoriteStore.instance,
+      ]),
       builder: (context, _) {
-        final added = ProductCart.instance.quantityFor(product.name) > 0;
+        final added = ProductCart.instance.quantityFor(productId) > 0;
+        final bool favourite = FavoriteStore.instance.contains(productId);
         return Scaffold(
           backgroundColor: Colors.white,
           appBar: AppBar(
@@ -71,15 +203,23 @@ class _ScreenProductDetailsState extends State<ScreenProductDetails> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
             ),
             actions: [
-              _RoundIcon(
-                icon: favourite ? Icons.favorite : Icons.favorite_border,
-                color: favourite ? Colors.red : null,
-                onTap: () => setState(() => favourite = !favourite),
+              _FavouriteShortcut(
+                count: FavoriteStore.instance.count,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const FavouriteScreen(),
+                    ),
+                  );
+                },
               ),
               Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  _RoundIcon(icon: Icons.shopping_cart_outlined, onTap: () {}),
+                  _RoundIcon(
+                    icon: Icons.shopping_cart_outlined,
+                    onTap: _openFloatingCart,
+                  ),
                   if (ProductCart.instance.totalCount > 0)
                     Positioned(
                       right: 2,
@@ -232,7 +372,7 @@ class _ScreenProductDetailsState extends State<ScreenProductDetails> {
                         icon: favourite
                             ? Icons.favorite
                             : Icons.favorite_border,
-                        onTap: () => setState(() => favourite = !favourite),
+                        onTap: _toggleFavourite,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -393,6 +533,7 @@ const _border = Color(0xFFE1E2E6);
 class _HeroImage extends StatelessWidget {
   const _HeroImage({required this.image});
   final String image;
+
   @override
   Widget build(BuildContext context) => Column(
     children: [
@@ -403,7 +544,7 @@ class _HeroImage extends StatelessWidget {
             Positioned.fill(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: Image.asset(image, fit: BoxFit.cover),
+                child: _ProductImage(image: image),
               ),
             ),
             Positioned(
@@ -432,6 +573,98 @@ class _HeroImage extends StatelessWidget {
       ),
     ],
   );
+}
+
+class _ProductImage extends StatelessWidget {
+  const _ProductImage({required this.image});
+
+  final String image;
+
+  bool get _isNetworkImage {
+    final Uri? uri = Uri.tryParse(image.trim());
+
+    return uri != null &&
+        (uri.scheme == 'http' || uri.scheme == 'https') &&
+        uri.host.isNotEmpty;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final String source = image.trim();
+
+    if (source.isEmpty) {
+      return const _ProductImageFallback();
+    }
+
+    if (!_isNetworkImage) {
+      return Image.asset(
+        source,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => const _ProductImageFallback(),
+      );
+    }
+
+    final double logicalWidth = MediaQuery.sizeOf(context).width - 40;
+    final double pixelRatio = MediaQuery.devicePixelRatioOf(context);
+    final int decodeWidth = (logicalWidth * pixelRatio)
+        .round()
+        .clamp(320, 1440)
+        .toInt();
+
+    return Image.network(
+      source,
+      fit: BoxFit.cover,
+      cacheWidth: decodeWidth,
+      filterQuality: FilterQuality.medium,
+      gaplessPlayback: true,
+      frameBuilder:
+          (
+            BuildContext context,
+            Widget child,
+            int? frame,
+            bool wasSynchronouslyLoaded,
+          ) {
+            if (wasSynchronouslyLoaded || frame != null) {
+              return child;
+            }
+
+            return const _ProductImageLoading();
+          },
+      errorBuilder: (_, _, _) => const _ProductImageFallback(),
+    );
+  }
+}
+
+class _ProductImageLoading extends StatelessWidget {
+  const _ProductImageLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    return const ColoredBox(
+      color: Color(0xFFF1F5F9),
+      child: Center(
+        child: SizedBox(
+          width: 24,
+          height: 24,
+          child: CircularProgressIndicator(strokeWidth: 2, color: _blue),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProductImageFallback extends StatelessWidget {
+  const _ProductImageFallback();
+
+  @override
+  Widget build(BuildContext context) {
+    return const ColoredBox(
+      color: Color(0xFFF1F5F9),
+      child: Center(
+        child: Icon(Icons.medication_outlined, size: 56, color: _blue),
+      ),
+    );
+  }
 }
 
 class _Dot extends StatelessWidget {
@@ -465,6 +698,50 @@ class _RoundIcon extends StatelessWidget {
       elevation: 2,
     ),
   );
+}
+
+class _FavouriteShortcut extends StatelessWidget {
+  const _FavouriteShortcut({required this.count, required this.onTap});
+
+  final int count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: <Widget>[
+        _RoundIcon(
+          icon: count > 0 ? Icons.favorite : Icons.favorite_border,
+          color: count > 0 ? Colors.red : null,
+          onTap: onTap,
+        ),
+        if (count > 0)
+          Positioned(
+            right: 0,
+            top: -2,
+            child: Container(
+              constraints: const BoxConstraints(minWidth: 17),
+              height: 17,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                count > 99 ? '99+' : '$count',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
 }
 
 class _Badge extends StatelessWidget {

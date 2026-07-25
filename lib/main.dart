@@ -7,6 +7,7 @@ import 'core/di/injection_container.dart';
 import 'core/network/backend_smoke_tester.dart';
 import 'core/routes/app_routes.dart';
 import 'features/auth/presentation/pages/cart_screen.dart';
+import 'features/auth/presentation/pages/checkout_screen.dart';
 import 'features/auth/presentation/pages/explore_screen.dart';
 import 'features/auth/presentation/pages/home_screen.dart';
 import 'features/auth/presentation/pages/login_screen.dart';
@@ -102,6 +103,10 @@ class AtPharmaApp extends StatelessWidget {
 
         AppRoutes.cart: (BuildContext context) {
           return const CartScreen();
+        },
+
+        AppRoutes.checkout: (BuildContext context) {
+          return const CheckoutScreen();
         },
 
         AppRoutes.productDetails: (BuildContext context) {

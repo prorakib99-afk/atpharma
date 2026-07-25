@@ -4,10 +4,9 @@ import '../storage/token_storage.dart';
 
 final class SessionManager {
   SessionManager({
-    required TokenStorage tokenStorage,
-    required LocalStorageService localStorageService,
-  }) : _tokenStorage = tokenStorage,
-       _localStorageService = localStorageService;
+    required this._tokenStorage,
+    required this._localStorageService,
+  });
 
   final TokenStorage _tokenStorage;
   final LocalStorageService _localStorageService;

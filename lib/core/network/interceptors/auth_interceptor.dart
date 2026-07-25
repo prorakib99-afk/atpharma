@@ -8,11 +8,7 @@ import '../api_request_options.dart';
 typedef UnauthorizedCallback = Future<void> Function();
 
 final class AuthInterceptor extends Interceptor {
-  AuthInterceptor({
-    required SessionManager sessionManager,
-    UnauthorizedCallback? onUnauthorized,
-  }) : _sessionManager = sessionManager,
-       _onUnauthorized = onUnauthorized;
+  AuthInterceptor({required this._sessionManager, this._onUnauthorized});
 
   static const String _authorizationHeader = 'Authorization';
 

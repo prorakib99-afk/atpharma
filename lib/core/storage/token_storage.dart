@@ -12,8 +12,7 @@ abstract interface class TokenStorage {
 }
 
 final class GetStorageTokenStorage implements TokenStorage {
-  GetStorageTokenStorage({required LocalStorageService localStorageService})
-    : _localStorageService = localStorageService;
+  GetStorageTokenStorage({required this._localStorageService});
 
   final LocalStorageService _localStorageService;
 

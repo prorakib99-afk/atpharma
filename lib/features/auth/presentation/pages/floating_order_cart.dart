@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class FloatingOrderCart extends StatelessWidget {
   const FloatingOrderCart({
     super.key,
-    required this.productName,
-    required this.manufacturerName,
-    required this.productImage,
-    required this.unitPrice,
-    required this.quantity,
+    required this.items,
     required this.onIncreaseQuantity,
     required this.onDecreaseQuantity,
     required this.onRemoveItem,
@@ -17,17 +14,13 @@ class FloatingOrderCart extends StatelessWidget {
     this.taxLabel = 'Taxes Included',
   });
 
-  final String productName;
-  final String manufacturerName;
-  final String productImage;
-  final double unitPrice;
-  final int quantity;
+  final List<FloatingCartItem> items;
   final String currencySymbol;
   final String taxLabel;
 
-  final VoidCallback onIncreaseQuantity;
-  final VoidCallback onDecreaseQuantity;
-  final VoidCallback onRemoveItem;
+  final ValueChanged<String> onIncreaseQuantity;
+  final ValueChanged<String> onDecreaseQuantity;
+  final ValueChanged<String> onRemoveItem;
   final VoidCallback onContinueShopping;
   final VoidCallback onViewFullCart;
 
@@ -36,11 +29,18 @@ class FloatingOrderCart extends StatelessWidget {
   static const Color _textPrimary = Color(0xFF131314);
   static const Color _textSecondary = Color(0xFF666E80);
   static const Color _border = Color(0xFFE1E2E6);
-  static const Color _quantityBorder = Color(0xFF98A1B3);
-  static const Color _deleteBackground = Color(0xFFFFEEEE);
-  static const Color _deleteColor = Color(0xFFFF3029);
 
-  double get _subtotal => unitPrice * quantity;
+  int get _totalQuantity {
+    return items.fold<int>(0, (int sum, FloatingCartItem item) {
+      return sum + item.quantity;
+    });
+  }
+
+  double get _subtotal {
+    return items.fold<double>(0, (double sum, FloatingCartItem item) {
+      return sum + (item.unitPrice * item.quantity);
+    });
+  }
 
   String _formatPrice(double price) {
     final bool isWholeNumber = price == price.roundToDouble();
@@ -54,44 +54,48 @@ class FloatingOrderCart extends StatelessWidget {
   Widget build(BuildContext context) {
     final Size screenSize = MediaQuery.sizeOf(context);
 
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      insetPadding: const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: 24,
-      ),
+    return Align(
+      alignment: Alignment.bottomCenter,
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: 440,
-          maxHeight: screenSize.height * 0.90,
+          maxHeight: screenSize.height * .78,
         ),
         child: Material(
           color: Colors.white,
           clipBehavior: Clip.antiAlias,
-          borderRadius: BorderRadius.circular(28),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            keyboardDismissBehavior:
-            ScrollViewKeyboardDismissBehavior.onDrag,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildHeader(context),
-                const SizedBox(height: 24),
-                _buildProductSection(),
-                const SizedBox(height: 24),
-                const Divider(
-                  height: 1,
-                  thickness: 1,
-                  color: _border,
-                ),
-                const SizedBox(height: 20),
-                _buildSubtotalSection(),
-                const SizedBox(height: 32),
-                _buildActionButtons(),
-              ],
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          child: SafeArea(
+            top: false,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildHeader(context),
+                  const SizedBox(height: 16),
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: items.length,
+                    separatorBuilder: (_, _) => const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Divider(height: 1, color: _border),
+                    ),
+                    itemBuilder: (_, int index) {
+                      return _buildProductSection(items[index]);
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                  const Divider(height: 1, thickness: 1, color: _border),
+                  const SizedBox(height: 20),
+                  _buildSubtotalSection(),
+                  const SizedBox(height: 28),
+                  _buildActionButtons(),
+                ],
+              ),
             ),
           ),
         ),
@@ -119,7 +123,7 @@ class FloatingOrderCart extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                '$quantity ${quantity == 1 ? 'Item' : 'Items'}',
+                '$_totalQuantity ${_totalQuantity == 1 ? 'Item' : 'Items'}',
                 style: const TextStyle(
                   fontFamily: 'Poppins',
                   fontSize: 14,
@@ -134,17 +138,13 @@ class FloatingOrderCart extends StatelessWidget {
           tooltip: 'Close cart',
           visualDensity: VisualDensity.compact,
           onPressed: () => Navigator.of(context).pop(),
-          icon: const Icon(
-            Icons.close_rounded,
-            size: 30,
-            color: _textPrimary,
-          ),
+          icon: const Icon(Icons.close_rounded, size: 30, color: _textPrimary),
         ),
       ],
     );
   }
 
-  Widget _buildProductSection() {
+  Widget _buildProductSection(FloatingCartItem item) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final bool useCompactLayout = constraints.maxWidth < 345;
@@ -153,9 +153,9 @@ class FloatingOrderCart extends StatelessWidget {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _ProductImage(imagePath: productImage),
+              _ProductImage(imagePath: item.productImage),
               const SizedBox(height: 16),
-              _buildProductDetails(),
+              _buildProductDetails(item),
             ],
           );
         }
@@ -166,22 +166,22 @@ class FloatingOrderCart extends StatelessWidget {
             SizedBox(
               width: 130,
               height: 134,
-              child: _ProductImage(imagePath: productImage),
+              child: _ProductImage(imagePath: item.productImage),
             ),
             const SizedBox(width: 16),
-            Expanded(child: _buildProductDetails()),
+            Expanded(child: _buildProductDetails(item)),
           ],
         );
       },
     );
   }
 
-  Widget _buildProductDetails() {
+  Widget _buildProductDetails(FloatingCartItem item) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          manufacturerName,
+          item.manufacturerName,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(
@@ -193,7 +193,7 @@ class FloatingOrderCart extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          productName,
+          item.productName,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(
@@ -206,7 +206,7 @@ class FloatingOrderCart extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          _formatPrice(unitPrice),
+          _formatPrice(item.unitPrice),
           style: const TextStyle(
             fontFamily: 'Poppins',
             fontSize: 24,
@@ -218,12 +218,14 @@ class FloatingOrderCart extends StatelessWidget {
         Row(
           children: [
             _QuantitySelector(
-              quantity: quantity,
-              onDecrease: quantity > 1 ? onDecreaseQuantity : null,
-              onIncrease: onIncreaseQuantity,
+              quantity: item.quantity,
+              onDecrease: item.quantity > 1
+                  ? () => onDecreaseQuantity(item.id)
+                  : null,
+              onIncrease: () => onIncreaseQuantity(item.id),
             ),
             const Spacer(),
-            _DeleteButton(onPressed: onRemoveItem),
+            _DeleteButton(onPressed: () => onRemoveItem(item.id)),
           ],
         ),
       ],
@@ -312,34 +314,73 @@ class FloatingOrderCart extends StatelessWidget {
   }
 }
 
-class _ProductImage extends StatelessWidget {
-  const _ProductImage({
-    required this.imagePath,
+class FloatingCartItem {
+  const FloatingCartItem({
+    required this.id,
+    required this.productName,
+    required this.manufacturerName,
+    required this.productImage,
+    required this.unitPrice,
+    required this.quantity,
   });
+
+  final String id;
+  final String productName;
+  final String manufacturerName;
+  final String productImage;
+  final double unitPrice;
+  final int quantity;
+}
+
+class _ProductImage extends StatelessWidget {
+  const _ProductImage({required this.imagePath});
 
   final String imagePath;
 
   @override
   Widget build(BuildContext context) {
+    final Uri? uri = Uri.tryParse(imagePath.trim());
+    final bool isNetworkImage =
+        uri != null &&
+        (uri.scheme == 'http' || uri.scheme == 'https') &&
+        uri.host.isNotEmpty;
+
     return AspectRatio(
       aspectRatio: 1,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
-        child: Image.asset(
-          imagePath,
-          fit: BoxFit.cover,
-          filterQuality: FilterQuality.medium,
-          errorBuilder: (context, error, stackTrace) {
-            return Container(
-              color: const Color(0xFFF3F4F6),
-              alignment: Alignment.center,
-              child: const Icon(
-                Icons.medication_outlined,
-                size: 42,
-                color: Color(0xFF98A1B3),
+        child: isNetworkImage
+            ? Image.network(
+                imagePath,
+                fit: BoxFit.cover,
+                cacheWidth: 360,
+                filterQuality: FilterQuality.medium,
+                errorBuilder: (_, _, _) => const _CartImageFallback(),
+              )
+            : Image.asset(
+                imagePath,
+                fit: BoxFit.cover,
+                cacheWidth: 360,
+                filterQuality: FilterQuality.medium,
+                errorBuilder: (_, _, _) => const _CartImageFallback(),
               ),
-            );
-          },
+      ),
+    );
+  }
+}
+
+class _CartImageFallback extends StatelessWidget {
+  const _CartImageFallback();
+
+  @override
+  Widget build(BuildContext context) {
+    return const ColoredBox(
+      color: Color(0xFFF3F4F6),
+      child: Center(
+        child: Icon(
+          Icons.medication_outlined,
+          size: 42,
+          color: Color(0xFF98A1B3),
         ),
       ),
     );
@@ -365,24 +406,14 @@ class _QuantitySelector extends StatelessWidget {
     return Container(
       height: 44,
       decoration: BoxDecoration(
-        border: Border.all(
-          color: _borderColor,
-          width: 1.2,
-        ),
+        border: Border.all(color: _borderColor, width: 1.2),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _QuantityButton(
-            icon: Icons.remove_rounded,
-            onPressed: onDecrease,
-          ),
-          const VerticalDivider(
-            width: 1,
-            thickness: 1,
-            color: _borderColor,
-          ),
+          _QuantityButton(icon: Icons.remove_rounded, onPressed: onDecrease),
+          const VerticalDivider(width: 1, thickness: 1, color: _borderColor),
           SizedBox(
             width: 48,
             child: Center(
@@ -397,15 +428,8 @@ class _QuantitySelector extends StatelessWidget {
               ),
             ),
           ),
-          const VerticalDivider(
-            width: 1,
-            thickness: 1,
-            color: _borderColor,
-          ),
-          _QuantityButton(
-            icon: Icons.add_rounded,
-            onPressed: onIncrease,
-          ),
+          const VerticalDivider(width: 1, thickness: 1, color: _borderColor),
+          _QuantityButton(icon: Icons.add_rounded, onPressed: onIncrease),
         ],
       ),
     );
@@ -413,10 +437,7 @@ class _QuantitySelector extends StatelessWidget {
 }
 
 class _QuantityButton extends StatelessWidget {
-  const _QuantityButton({
-    required this.icon,
-    required this.onPressed,
-  });
+  const _QuantityButton({required this.icon, required this.onPressed});
 
   final IconData icon;
   final VoidCallback? onPressed;
@@ -442,9 +463,7 @@ class _QuantityButton extends StatelessWidget {
 }
 
 class _DeleteButton extends StatelessWidget {
-  const _DeleteButton({
-    required this.onPressed,
-  });
+  const _DeleteButton({required this.onPressed});
 
   final VoidCallback onPressed;
 
@@ -456,13 +475,15 @@ class _DeleteButton extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: onPressed,
-        child: const SizedBox(
+        child: SizedBox(
           width: 48,
           height: 48,
-          child: Icon(
-            Icons.delete_outline_rounded,
-            size: 22,
-            color: Color(0xFFFF3029),
+          child: Center(
+            child: SvgPicture.asset(
+              'assets/icons/delete_icon.svg',
+              width: 20,
+              height: 20,
+            ),
           ),
         ),
       ),
@@ -492,10 +513,7 @@ class _CartActionButton extends StatelessWidget {
           onPressed: onPressed,
           style: OutlinedButton.styleFrom(
             foregroundColor: _primary,
-            side: const BorderSide(
-              color: _primary,
-              width: 1.6,
-            ),
+            side: const BorderSide(color: _primary, width: 1.6),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
