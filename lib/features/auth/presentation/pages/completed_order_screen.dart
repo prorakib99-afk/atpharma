@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/routes/app_routes.dart';
+import '../../../../shared/widgets/navigation_page_scaffold.dart';
+
 class CompletedOrderScreen extends StatelessWidget {
   const CompletedOrderScreen({super.key});
 
@@ -10,10 +13,11 @@ class CompletedOrderScreen extends StatelessWidget {
     final bottomSafe = MediaQuery.paddingOf(context).bottom;
 
     return MediaQuery(
-      data: MediaQuery.of(context).copyWith(
-        textScaler: const TextScaler.linear(1),
-      ),
-      child: Scaffold(
+      data: MediaQuery.of(
+        context,
+      ).copyWith(textScaler: const TextScaler.linear(1)),
+      child: NavigationPageScaffold(
+        currentPage: NavigationPage.cart,
         backgroundColor: _CompletedColors.white,
         body: SafeArea(
           bottom: false,
@@ -25,32 +29,36 @@ class CompletedOrderScreen extends StatelessWidget {
                   _CompletedResponsive.pagePadding(context),
                   18,
                   _CompletedResponsive.pagePadding(context),
-                  24 + bottomSafe,
+                  120 + bottomSafe,
                 ),
                 sliver: SliverList(
-                  delegate: SliverChildListDelegate(
-                    [
-                      const _AtPharmaLogo(),
-                      const SizedBox(height: 58),
-                      const _SuccessIllustration(),
-                      const SizedBox(height: 28),
-                      const _SuccessTitle(),
-                      const SizedBox(height: 34),
-                      const _OrderInfoCard(),
-                      const SizedBox(height: 26),
-                      const _CancelNotice(),
-                      const SizedBox(height: 34),
-                      _CancelOrderButton(onTap: () {}),
-                      const SizedBox(height: 16),
-                      _ContinueShoppingButton(onTap: () {}),
-                    ],
-                  ),
+                  delegate: SliverChildListDelegate([
+                    const _AtPharmaLogo(),
+                    const SizedBox(height: 58),
+                    const _SuccessIllustration(),
+                    const SizedBox(height: 28),
+                    const _SuccessTitle(),
+                    const SizedBox(height: 34),
+                    const _OrderInfoCard(),
+                    const SizedBox(height: 26),
+                    const _CancelNotice(),
+                    const SizedBox(height: 34),
+                    _CancelOrderButton(onTap: () {}),
+                    const SizedBox(height: 16),
+                    _ContinueShoppingButton(
+                      onTap: () {
+                        Navigator.of(context).pushNamedAndRemoveUntil(
+                          AppRoutes.home,
+                          (Route<dynamic> route) => false,
+                        );
+                      },
+                    ),
+                  ]),
                 ),
               ),
             ],
           ),
         ),
-        bottomNavigationBar: const _CompletedBottomNavigation(),
       ),
     );
   }
@@ -64,15 +72,15 @@ class _AtPharmaLogo extends StatelessWidget {
     return Column(
       children: [
         Image.asset(
-          'assets/images/atpharma_icon.png',
-          width: 54,
-          height: 54,
+          'assets/images/at_pharma_icon.png',
+          width: 32,
+          height: 32,
           fit: BoxFit.contain,
         ),
         const SizedBox(height: 8),
         Image.asset(
           'assets/images/atpharma_font.png',
-          height: 28,
+          height: 20,
           fit: BoxFit.contain,
           errorBuilder: (_, __, ___) {
             return const Text.rich(
@@ -91,8 +99,8 @@ class _AtPharmaLogo extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'Poppins',
-                fontSize: 24,
-                height: 28 / 24,
+                fontSize: 20,
+                height: 24 / 20,
                 fontWeight: FontWeight.w700,
               ),
             );
@@ -138,7 +146,10 @@ class _SuccessIllustration extends StatelessWidget {
             const Positioned(
               right: 38,
               top: 54,
-              child: _ConfettiDiamond(color: _CompletedColors.success, size: 10),
+              child: _ConfettiDiamond(
+                color: _CompletedColors.success,
+                size: 10,
+              ),
             ),
             const Positioned(
               right: 54,
@@ -153,7 +164,10 @@ class _SuccessIllustration extends StatelessWidget {
             const Positioned(
               right: 20,
               bottom: 58,
-              child: _ConfettiDiamond(color: _CompletedColors.primary, size: 10),
+              child: _ConfettiDiamond(
+                color: _CompletedColors.primary,
+                size: 10,
+              ),
             ),
             const Positioned(
               right: 18,
@@ -185,10 +199,7 @@ class _SuccessIllustration extends StatelessWidget {
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xff41df63),
-                    Color(0xff05a83d),
-                  ],
+                  colors: [Color(0xff41df63), Color(0xff05a83d)],
                 ),
                 boxShadow: [
                   BoxShadow(
@@ -212,10 +223,7 @@ class _SuccessIllustration extends StatelessWidget {
 }
 
 class _ConfettiDot extends StatelessWidget {
-  const _ConfettiDot({
-    required this.color,
-    required this.size,
-  });
+  const _ConfettiDot({required this.color, required this.size});
 
   final Color color;
   final double size;
@@ -225,19 +233,13 @@ class _ConfettiDot extends StatelessWidget {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-      ),
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
     );
   }
 }
 
 class _ConfettiDiamond extends StatelessWidget {
-  const _ConfettiDiamond({
-    required this.color,
-    required this.size,
-  });
+  const _ConfettiDiamond({required this.color, required this.size});
 
   final Color color;
   final double size;
@@ -384,11 +386,7 @@ class _InfoRow extends StatelessWidget {
             color: iconBackground,
             shape: BoxShape.circle,
           ),
-          child: Icon(
-            icon,
-            size: 25,
-            color: iconColor,
-          ),
+          child: Icon(icon, size: 25, color: iconColor),
         ),
         const SizedBox(width: 16),
         Expanded(
@@ -487,10 +485,7 @@ class _CancelOrderButton extends StatelessWidget {
           ),
         ),
         style: OutlinedButton.styleFrom(
-          side: const BorderSide(
-            color: _CompletedColors.danger,
-            width: 1.8,
-          ),
+          side: const BorderSide(color: _CompletedColors.danger, width: 1.8),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
@@ -524,10 +519,7 @@ class _ContinueShoppingButton extends StatelessWidget {
         child: Ink(
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [
-                _CompletedColors.primary,
-                Color(0xff0968c3),
-              ],
+              colors: [_CompletedColors.primary, Color(0xff0968c3)],
             ),
             borderRadius: BorderRadius.circular(16),
           ),
@@ -544,140 +536,6 @@ class _ContinueShoppingButton extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _CompletedBottomNavigation extends StatelessWidget {
-  const _CompletedBottomNavigation();
-
-  @override
-  Widget build(BuildContext context) {
-    final bottomSafe = MediaQuery.paddingOf(context).bottom;
-
-    return Container(
-      height: 122 + bottomSafe,
-      padding: EdgeInsets.fromLTRB(26, 8, 26, bottomSafe + 8),
-      color: _CompletedColors.white,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const _NavPill(
-                children: [
-                  _NavIcon(icon: Icons.home_outlined),
-                  _NavIcon(icon: Icons.explore_outlined),
-                ],
-              ),
-              const SizedBox(width: 10),
-              Container(
-                width: 78,
-                height: 78,
-                decoration: BoxDecoration(
-                  color: _CompletedColors.primary,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: _CompletedColors.white, width: 3),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x3f0b83d9),
-                      blurRadius: 28,
-                      offset: Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: const Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.upload_rounded,
-                      size: 30,
-                      color: _CompletedColors.white,
-                    ),
-                    Text(
-                      'Rx.',
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 14,
-                        height: 20 / 14,
-                        fontWeight: FontWeight.w600,
-                        color: _CompletedColors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              const _NavPill(
-                children: [
-                  _NavIcon(icon: Icons.search_rounded),
-                  _NavIcon(icon: Icons.shopping_cart_outlined),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Container(
-            width: 136,
-            height: 4,
-            decoration: BoxDecoration(
-              color: _CompletedColors.homeIndicator,
-              borderRadius: BorderRadius.circular(100),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NavPill extends StatelessWidget {
-  const _NavPill({required this.children});
-
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 58,
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: _CompletedColors.white,
-        borderRadius: BorderRadius.circular(32),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x14000000),
-            blurRadius: 28,
-            offset: Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(children: children),
-    );
-  }
-}
-
-class _NavIcon extends StatelessWidget {
-  const _NavIcon({required this.icon});
-
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 42,
-      height: 42,
-      alignment: Alignment.center,
-      decoration: const BoxDecoration(
-        color: _CompletedColors.white,
-        shape: BoxShape.circle,
-      ),
-      child: Icon(
-        icon,
-        size: 25,
-        color: _CompletedColors.title,
       ),
     );
   }
@@ -710,6 +568,4 @@ class _CompletedColors {
 
   static const Color brandBlue = Color(0xff204a8e);
   static const Color brandGreen = Color(0xff159447);
-
-  static const Color homeIndicator = Color(0xff858585);
 }

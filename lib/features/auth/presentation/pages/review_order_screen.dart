@@ -1,9 +1,17 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/routes/app_routes.dart';
+
 class ReviewOrderScreen extends StatefulWidget {
-  const ReviewOrderScreen({super.key});
+  const ReviewOrderScreen({
+    super.key,
+    this.embedded = false,
+    this.onBack,
+  });
 
   static const String routeName = '/review-order';
+  final bool embedded;
+  final VoidCallback? onBack;
 
   @override
   State<ReviewOrderScreen> createState() => _ReviewOrderScreenState();
@@ -48,7 +56,7 @@ class _ReviewOrderScreenState extends State<ReviewOrderScreen> {
   double get _subtotal {
     return _items.fold<double>(
       0,
-          (previousValue, item) => previousValue + item.totalPrice,
+      (previousValue, item) => previousValue + item.totalPrice,
     );
   }
 
@@ -61,11 +69,42 @@ class _ReviewOrderScreenState extends State<ReviewOrderScreen> {
   @override
   Widget build(BuildContext context) {
     final bottomSafe = MediaQuery.paddingOf(context).bottom;
+    final List<Widget> content = <Widget>[
+      Align(
+        alignment: Alignment.centerRight,
+        child: _BackButton(
+          onTap: widget.onBack ?? () => Navigator.maybePop(context),
+        ),
+      ),
+      const SizedBox(height: 24),
+      _OrderItemsCard(items: _items),
+      const SizedBox(height: 22),
+      _OrderSummaryCard(
+        subtotal: _subtotal,
+        deliveryCharge: _deliveryCharge,
+        discount: _discount,
+        totalPayable: _totalPayable,
+      ),
+      const SizedBox(height: 22),
+      const _ShippingAddressCard(),
+      const SizedBox(height: 22),
+      const _PaymentMethodCard(),
+      const SizedBox(height: 22),
+      const _NeedHelpCard(),
+      const SizedBox(height: 28),
+      const _TermsText(),
+      const SizedBox(height: 22),
+      const _PlaceOrderButton(total: 12.00),
+    ];
+
+    if (widget.embedded) {
+      return Column(children: content);
+    }
 
     return MediaQuery(
-      data: MediaQuery.of(context).copyWith(
-        textScaler: const TextScaler.linear(1),
-      ),
+      data: MediaQuery.of(
+        context,
+      ).copyWith(textScaler: const TextScaler.linear(1)),
       child: Scaffold(
         backgroundColor: _ReviewColors.white,
         resizeToAvoidBottomInset: true,
@@ -82,297 +121,10 @@ class _ReviewOrderScreenState extends State<ReviewOrderScreen> {
                   24 + bottomSafe,
                 ),
                 sliver: SliverList(
-                  delegate: SliverChildListDelegate(
-                    [
-                      const _CheckoutHeader(itemCount: 4),
-                      const SizedBox(height: 34),
-                      const _CheckoutStepCard(),
-                      const SizedBox(height: 26),
-
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: _BackButton(
-                          onTap: () => Navigator.maybePop(context),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      _OrderItemsCard(items: _items),
-                      const SizedBox(height: 22),
-
-                      _OrderSummaryCard(
-                        subtotal: _subtotal,
-                        deliveryCharge: _deliveryCharge,
-                        discount: _discount,
-                        totalPayable: _totalPayable,
-                      ),
-                      const SizedBox(height: 22),
-
-                      const _ShippingAddressCard(),
-                      const SizedBox(height: 22),
-
-                      const _PaymentMethodCard(),
-                      const SizedBox(height: 22),
-
-                      const _NeedHelpCard(),
-                      const SizedBox(height: 28),
-
-                      const _TermsText(),
-                      const SizedBox(height: 22),
-
-                      _PlaceOrderButton(total: 12.00),
-                    ],
-                  ),
+                  delegate: SliverChildListDelegate(content),
                 ),
               ),
             ],
-          ),
-        ),
-        bottomNavigationBar: const _ReviewBottomNavigation(),
-      ),
-    );
-  }
-}
-
-class _CheckoutHeader extends StatelessWidget {
-  const _CheckoutHeader({required this.itemCount});
-
-  final int itemCount;
-
-  @override
-  Widget build(BuildContext context) {
-    final compact = MediaQuery.sizeOf(context).width <= 360;
-
-    return Row(
-      children: [
-        Expanded(
-          child: Row(
-            children: [
-              const Flexible(
-                child: Text(
-                  'Checkout',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 24,
-                    height: 1.15,
-                    fontWeight: FontWeight.w700,
-                    color: _ReviewColors.title,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 11,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: _ReviewColors.primaryLight,
-                  borderRadius: BorderRadius.circular(100),
-                ),
-                child: Text(
-                  '${itemCount.toString().padLeft(2, '0')} Items',
-                  maxLines: 1,
-                  style: const TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 14,
-                    height: 1,
-                    fontWeight: FontWeight.w600,
-                    color: _ReviewColors.primary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        SizedBox(width: compact ? 8 : 12),
-        const _RoundIconButton(icon: Icons.notifications_none_rounded),
-        SizedBox(width: compact ? 6 : 8),
-        const _RoundIconButton(icon: Icons.favorite_border_rounded),
-        SizedBox(width: compact ? 6 : 8),
-        const _ProfileAvatar(),
-      ],
-    );
-  }
-}
-
-class _RoundIconButton extends StatelessWidget {
-  const _RoundIconButton({required this.icon});
-
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context).width <= 360 ? 40.0 : 44.0;
-
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: _ReviewColors.white,
-        shape: BoxShape.circle,
-        border: Border.all(color: _ReviewColors.card),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x14000000),
-            blurRadius: 28,
-            offset: Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Icon(
-        icon,
-        size: 23,
-        color: _ReviewColors.title,
-      ),
-    );
-  }
-}
-
-class _ProfileAvatar extends StatelessWidget {
-  const _ProfileAvatar();
-
-  @override
-  Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context).width <= 360 ? 40.0 : 44.0;
-
-    return Container(
-      width: size,
-      height: size,
-      clipBehavior: Clip.antiAlias,
-      decoration: const BoxDecoration(
-        color: _ReviewColors.primaryLight,
-        shape: BoxShape.circle,
-      ),
-      child: Image.network(
-        _ReviewImages.avatar,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) {
-          return const Icon(
-            Icons.person_rounded,
-            color: _ReviewColors.primary,
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _CheckoutStepCard extends StatelessWidget {
-  const _CheckoutStepCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final isSmall = MediaQuery.sizeOf(context).width <= 360;
-
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.symmetric(
-        horizontal: isSmall ? 14 : 18,
-        vertical: 18,
-      ),
-      decoration: BoxDecoration(
-        color: _ReviewColors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _ReviewColors.white, width: 2),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0A000000),
-            blurRadius: 24,
-            offset: Offset(0, 8),
-          ),
-        ],
-      ),
-      child: const Row(
-        children: [
-          _StepItem(
-            icon: Icons.local_shipping_outlined,
-            label: 'Shipping',
-          ),
-          _StepLine(),
-          _StepItem(
-            icon: Icons.credit_card_rounded,
-            label: 'Payment',
-          ),
-          _StepLine(),
-          _StepItem(
-            icon: Icons.receipt_long_rounded,
-            label: 'Review',
-            active: true,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StepItem extends StatelessWidget {
-  const _StepItem({
-    required this.icon,
-    required this.label,
-    this.active = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool active;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 64,
-      child: Column(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: active ? _ReviewColors.primary : _ReviewColors.white,
-              shape: BoxShape.circle,
-              border: active
-                  ? null
-                  : Border.all(color: _ReviewColors.body, width: 1.6),
-            ),
-            child: Icon(
-              icon,
-              size: 22,
-              color: active ? _ReviewColors.white : _ReviewColors.body,
-            ),
-          ),
-          const SizedBox(height: 9),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 13,
-              height: 16 / 13,
-              fontWeight: FontWeight.w600,
-              color: active ? _ReviewColors.primary : _ReviewColors.body,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StepLine extends StatelessWidget {
-  const _StepLine();
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 24),
-        child: Container(
-          height: 2,
-          decoration: BoxDecoration(
-            color: _ReviewColors.border,
-            borderRadius: BorderRadius.circular(100),
           ),
         ),
       ),
@@ -444,10 +196,7 @@ class _OrderItemsCard extends StatelessWidget {
                   ),
                 ),
               ),
-              _SmallOutlineIconButton(
-                icon: Icons.edit_outlined,
-                onTap: () {},
-              ),
+              _SmallOutlineIconButton(icon: Icons.edit_outlined, onTap: () {}),
             ],
           ),
           const SizedBox(height: 22),
@@ -642,10 +391,7 @@ class _OrderSummaryCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          _SummaryRow(
-            label: 'Subtotal',
-            value: _ReviewMoney.format(subtotal),
-          ),
+          _SummaryRow(label: 'Subtotal', value: _ReviewMoney.format(subtotal)),
           const SizedBox(height: 12),
           _SummaryRow(
             label: 'Delivery charge',
@@ -712,7 +458,8 @@ class _SummaryRow extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          child: labelWidget ??
+          child:
+              labelWidget ??
               Text(
                 label ?? '',
                 style: TextStyle(
@@ -828,10 +575,7 @@ class _ShippingAddressCard extends StatelessWidget {
             decoration: BoxDecoration(
               color: _ReviewColors.card,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: _ReviewColors.primaryLight,
-                width: 1.5,
-              ),
+              border: Border.all(color: _ReviewColors.primaryLight, width: 1.5),
             ),
             child: Row(
               children: [
@@ -901,10 +645,7 @@ class _ShippingAddressCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 10),
-                _SmallOutlineIconButton(
-                  icon: Icons.edit_outlined,
-                  onTap: null,
-                ),
+                _SmallOutlineIconButton(icon: Icons.edit_outlined, onTap: null),
               ],
             ),
           ),
@@ -920,10 +661,7 @@ class _DefaultBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 7,
-        vertical: 3,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
         color: _ReviewColors.primaryLight,
         borderRadius: BorderRadius.circular(40),
@@ -968,10 +706,7 @@ class _PaymentMethodCard extends StatelessWidget {
             decoration: BoxDecoration(
               color: _ReviewColors.card,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: _ReviewColors.primaryLight,
-                width: 1.5,
-              ),
+              border: Border.all(color: _ReviewColors.primaryLight, width: 1.5),
             ),
             child: Row(
               children: [
@@ -1028,10 +763,7 @@ class _PaymentMethodCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 10),
-                _SmallOutlineIconButton(
-                  icon: Icons.edit_outlined,
-                  onTap: null,
-                ),
+                _SmallOutlineIconButton(icon: Icons.edit_outlined, onTap: null),
               ],
             ),
           ),
@@ -1089,17 +821,11 @@ class _NeedHelpCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 13,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
               decoration: BoxDecoration(
                 color: _ReviewColors.white,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: _ReviewColors.border,
-                  width: 0.8,
-                ),
+                border: Border.all(color: _ReviewColors.border, width: 0.8),
               ),
               child: const Row(
                 children: [
@@ -1187,7 +913,11 @@ class _PlaceOrderButton extends StatelessWidget {
       height: 56,
       width: double.infinity,
       child: ElevatedButton(
-        onPressed: () {},
+        onPressed: () {
+          Navigator.of(context).pushReplacementNamed(
+            AppRoutes.completedOrder,
+          );
+        },
         style: ElevatedButton.styleFrom(
           elevation: 0,
           shadowColor: Colors.transparent,
@@ -1200,10 +930,7 @@ class _PlaceOrderButton extends StatelessWidget {
         child: Ink(
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [
-                _ReviewColors.primary,
-                Color(0xff0968c3),
-              ],
+              colors: [_ReviewColors.primary, Color(0xff0968c3)],
             ),
             borderRadius: BorderRadius.circular(16),
           ),
@@ -1244,162 +971,6 @@ class _PlaceOrderButton extends StatelessWidget {
   }
 }
 
-class _ReviewBottomNavigation extends StatelessWidget {
-  const _ReviewBottomNavigation();
-
-  @override
-  Widget build(BuildContext context) {
-    final bottomSafe = MediaQuery.paddingOf(context).bottom;
-
-    return Container(
-      height: 122 + bottomSafe,
-      padding: EdgeInsets.fromLTRB(26, 8, 26, bottomSafe + 8),
-      decoration: const BoxDecoration(
-        color: _ReviewColors.white,
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const _NavPill(
-                children: [
-                  _NavIcon(icon: Icons.home_outlined),
-                  _NavIcon(icon: Icons.explore_outlined),
-                ],
-              ),
-              const SizedBox(width: 10),
-              Container(
-                width: 78,
-                height: 78,
-                decoration: BoxDecoration(
-                  color: _ReviewColors.primary,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: _ReviewColors.white, width: 3),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x3f0b83d9),
-                      blurRadius: 28,
-                      offset: Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: const Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.upload_rounded,
-                      size: 30,
-                      color: _ReviewColors.white,
-                    ),
-                    Text(
-                      'Rx.',
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 14,
-                        height: 20 / 14,
-                        fontWeight: FontWeight.w600,
-                        color: _ReviewColors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              const _NavPill(
-                children: [
-                  _NavIcon(icon: Icons.search_rounded),
-                  _CartNavIcon(),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Container(
-            width: 136,
-            height: 4,
-            decoration: BoxDecoration(
-              color: _ReviewColors.homeIndicator,
-              borderRadius: BorderRadius.circular(100),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NavPill extends StatelessWidget {
-  const _NavPill({required this.children});
-
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 58,
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: _ReviewColors.white,
-        borderRadius: BorderRadius.circular(32),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x14000000),
-            blurRadius: 28,
-            offset: Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(children: children),
-    );
-  }
-}
-
-class _NavIcon extends StatelessWidget {
-  const _NavIcon({required this.icon});
-
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 42,
-      height: 42,
-      decoration: const BoxDecoration(
-        color: _ReviewColors.white,
-        shape: BoxShape.circle,
-      ),
-      child: Icon(
-        icon,
-        size: 24,
-        color: _ReviewColors.title,
-      ),
-    );
-  }
-}
-
-class _CartNavIcon extends StatelessWidget {
-  const _CartNavIcon();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 42,
-      height: 42,
-      decoration: const BoxDecoration(
-        color: _ReviewColors.white,
-        shape: BoxShape.circle,
-      ),
-      child: const Icon(
-        Icons.shopping_cart_outlined,
-        size: 26,
-        color: _ReviewColors.title,
-      ),
-    );
-  }
-}
-
 class _ReviewCard extends StatelessWidget {
   const _ReviewCard({
     required this.child,
@@ -1432,10 +1003,7 @@ class _ReviewCard extends StatelessWidget {
 }
 
 class _SmallOutlineIconButton extends StatelessWidget {
-  const _SmallOutlineIconButton({
-    required this.icon,
-    required this.onTap,
-  });
+  const _SmallOutlineIconButton({required this.icon, required this.onTap});
 
   final IconData icon;
   final VoidCallback? onTap;
@@ -1452,16 +1020,9 @@ class _SmallOutlineIconButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: _ReviewColors.white,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: _ReviewColors.border,
-            width: 1.5,
-          ),
+          border: Border.all(color: _ReviewColors.border, width: 1.5),
         ),
-        child: Icon(
-          icon,
-          size: 18,
-          color: _ReviewColors.primary,
-        ),
+        child: Icon(icon, size: 18, color: _ReviewColors.primary),
       ),
     );
   }
@@ -1523,9 +1084,6 @@ class _ReviewResponsive {
 }
 
 class _ReviewImages {
-  static const String avatar =
-      'https://www.figma.com/api/mcp/asset/283cd9e5-83ca-4caf-b945-053b10a69639';
-
   static const String paracetamol =
       'https://www.figma.com/api/mcp/asset/4a27d7f8-265e-434f-b42a-0cbb90de97df';
 
@@ -1552,6 +1110,4 @@ class _ReviewColors {
 
   static const Color success = Color(0xff05972c);
   static const Color successLight = Color(0x1405972c);
-
-  static const Color homeIndicator = Color(0xff858585);
 }

@@ -5,12 +5,41 @@ import 'package:flutter/material.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/error/app_result.dart';
 import '../../../../core/pagination/paginated_result.dart';
+import '../../../../core/utils/currency_display.dart';
+import '../../../../shared/widgets/fly_to_cart.dart';
 import '../../../../shared/widgets/navigation_page_scaffold.dart';
 import '../../../shop/domain/entities/shop_product_entity.dart';
 import '../../../shop/domain/entities/shop_product_query.dart';
 import '../../../shop/domain/usecases/cancel_shop_products_request_use_case.dart';
 import '../../../shop/domain/usecases/get_shop_products_use_case.dart';
 import 'screen_product_details.dart';
+import 'favorite_header_button.dart';
+
+void _addSearchProductToCart(
+  BuildContext context,
+  ShopProductEntity product,
+) {
+  if (product.isOutOfStock) return;
+
+  flyToCart(
+    context,
+    imageUrl: product.primaryImageUrl,
+    onArrived: () => ProductCart.instance.add(
+      ProductDetailsData(
+        id: product.id,
+        name: product.name,
+        image: product.primaryImageUrl,
+        description: product.displayDescription,
+        brand: product.displayCompanyName,
+        price: product.sellingPrice.round(),
+        prescriptionRequired: product.prescriptionRequired,
+        currencyCode: product.currencyCode,
+        countryCode: product.countryCode,
+      ),
+      1,
+    ),
+  );
+}
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -33,6 +62,7 @@ class _SearchScreenState extends State<SearchScreen> {
   String _query = '';
   bool _submitted = false;
   bool _loading = true;
+  bool _scrollToBottomAfterInitialLoad = true;
   String? _error;
   int _requestVersion = 0;
 
@@ -44,10 +74,6 @@ class _SearchScreenState extends State<SearchScreen> {
     _getProducts = sl<GetShopProductsUseCase>();
     _cancelProducts = sl<CancelShopProductsRequestUseCase>();
     _loadProducts(page: 1);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_scrollController.hasClients) return;
-      _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
-    });
   }
 
   List<String> get _suggestions {
@@ -91,6 +117,14 @@ class _SearchScreenState extends State<SearchScreen> {
         _error = result.failureOrNull?.message ?? 'Unable to load products.';
       }
     });
+
+    if (_scrollToBottomAfterInitialLoad && result.dataOrNull != null) {
+      _scrollToBottomAfterInitialLoad = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollController.hasClients) return;
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      });
+    }
   }
 
   void _onQueryChanged(String value) {
@@ -278,7 +312,7 @@ class _Header extends StatelessWidget {
       ),
       const _RoundIcon(Icons.notifications_none_rounded),
       const SizedBox(width: 4),
-      const _RoundIcon(Icons.favorite_border_rounded),
+      const FavoriteHeaderButton(inactiveColor: _Colors.text),
       const SizedBox(width: 4),
       ClipOval(
         child: Image.asset(
@@ -793,6 +827,8 @@ class _HorizontalCard extends StatelessWidget {
             brand: product.displayCompanyName,
             price: product.sellingPrice.round(),
             prescriptionRequired: product.prescriptionRequired,
+            currencyCode: product.currencyCode,
+            countryCode: product.countryCode,
           ),
         ),
       ),
@@ -864,17 +900,40 @@ class _HorizontalCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      _formatPrice(product.sellingPrice),
+                      _formatPrice(
+                        product.sellingPrice,
+                        currencyCode: product.currencyCode,
+                        countryCode: product.countryCode,
+                      ),
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(width: 12),
-                    CircleAvatar(
-                      radius: 16,
-                      backgroundColor: _Colors.blue,
-                      child: Icon(Icons.add_rounded, color: Colors.white),
+                    Builder(
+                      builder: (BuildContext buttonContext) {
+                        return InkWell(
+                          onTap: product.isOutOfStock
+                              ? null
+                              : () => _addSearchProductToCart(
+                                  buttonContext,
+                                  product,
+                                ),
+                          customBorder: const CircleBorder(),
+                          child: CircleAvatar(
+                            radius: 20,
+                            backgroundColor: product.isOutOfStock
+                                ? _Colors.border
+                                : _Colors.blue,
+                            child: const Icon(
+                              Icons.add_rounded,
+                              size: 30,
+                              color: Colors.white,
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -904,6 +963,8 @@ class _GridCard extends StatelessWidget {
             brand: product.displayCompanyName,
             price: product.sellingPrice.round(),
             prescriptionRequired: product.prescriptionRequired,
+            currencyCode: product.currencyCode,
+            countryCode: product.countryCode,
           ),
         ),
       ),
@@ -933,13 +994,32 @@ class _GridCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                const Positioned(
+                Positioned(
                   right: -1,
-                  bottom: -14,
-                  child: CircleAvatar(
-                    radius: 16,
-                    backgroundColor: _Colors.blue,
-                    child: Icon(Icons.add_rounded, color: Colors.white),
+                  bottom: -18,
+                  child: Builder(
+                    builder: (BuildContext buttonContext) {
+                      return InkWell(
+                        onTap: product.isOutOfStock
+                            ? null
+                            : () => _addSearchProductToCart(
+                                buttonContext,
+                                product,
+                              ),
+                        customBorder: const CircleBorder(),
+                        child: CircleAvatar(
+                          radius: 20,
+                          backgroundColor: product.isOutOfStock
+                              ? _Colors.border
+                              : _Colors.blue,
+                          child: const Icon(
+                            Icons.add_rounded,
+                            size: 30,
+                            color: Colors.white,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ],
@@ -988,7 +1068,11 @@ class _GridCard extends StatelessWidget {
                 ),
               ),
               Text(
-                _formatPrice(product.sellingPrice),
+                _formatPrice(
+                  product.sellingPrice,
+                  currencyCode: product.currencyCode,
+                  countryCode: product.countryCode,
+                ),
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -1085,10 +1169,16 @@ class _SearchError extends StatelessWidget {
   }
 }
 
-String _formatPrice(double price) {
-  return price == price.roundToDouble()
-      ? '৳${price.toStringAsFixed(0)}'
-      : '৳${price.toStringAsFixed(2)}';
+String _formatPrice(
+  double price, {
+  String? currencyCode,
+  String? countryCode,
+}) {
+  return CurrencyDisplay.format(
+    price,
+    currencyCode: currencyCode,
+    countryCode: countryCode,
+  );
 }
 
 class _Pagination extends StatelessWidget {

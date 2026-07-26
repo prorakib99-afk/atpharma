@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/error/app_result.dart';
 import '../../../../core/pagination/paginated_result.dart';
+import '../../../../core/utils/currency_display.dart';
+import '../../../../shared/widgets/fly_to_cart.dart';
 import '../../../shop/domain/entities/shop_product_entity.dart';
 import '../../../shop/domain/entities/shop_product_query.dart';
 import '../../../shop/domain/usecases/cancel_shop_products_request_use_case.dart';
@@ -262,6 +264,29 @@ class _ProductCard extends StatelessWidget {
 
   final ShopProductEntity product;
 
+  void _addToCart(BuildContext context) {
+    if (product.isOutOfStock) return;
+
+    flyToCart(
+      context,
+      imageUrl: product.primaryImageUrl,
+      onArrived: () => ProductCart.instance.add(
+        ProductDetailsData(
+          id: product.id,
+          name: product.name,
+          image: product.primaryImageUrl,
+          description: product.displayDescription,
+          brand: product.displayCompanyName,
+          price: product.sellingPrice.round(),
+          prescriptionRequired: product.prescriptionRequired,
+          currencyCode: product.currencyCode,
+          countryCode: product.countryCode,
+        ),
+        1,
+      ),
+    );
+  }
+
   void _openDetails(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -274,6 +299,8 @@ class _ProductCard extends StatelessWidget {
             brand: product.displayCompanyName,
             price: product.sellingPrice.round(),
             prescriptionRequired: product.prescriptionRequired,
+            currencyCode: product.currencyCode,
+            countryCode: product.countryCode,
           ),
         ),
       ),
@@ -317,20 +344,30 @@ class _ProductCard extends StatelessWidget {
                   ),
                   Positioned(
                     right: -1,
-                    bottom: -14,
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
+                    bottom: -18,
+                    child: Builder(
+                      builder: (BuildContext buttonContext) => Material(
                         color: product.isOutOfStock
                             ? const Color(0xFF98A1B3)
                             : _Colors.blue,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.add_rounded,
-                        color: Colors.white,
-                        size: 24,
+                        elevation: 7,
+                        shadowColor: const Color(0x300B83D9),
+                        shape: const CircleBorder(),
+                        child: InkWell(
+                          onTap: product.isOutOfStock
+                              ? null
+                              : () => _addToCart(buttonContext),
+                          customBorder: const CircleBorder(),
+                          child: const SizedBox(
+                            width: 40,
+                            height: 40,
+                            child: Icon(
+                              Icons.add_rounded,
+                              color: Colors.white,
+                              size: 30,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -385,7 +422,11 @@ class _ProductCard extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  _formatPrice(product.sellingPrice),
+                  _formatPrice(
+                    product.sellingPrice,
+                    currencyCode: product.currencyCode,
+                    countryCode: product.countryCode,
+                  ),
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -641,10 +682,16 @@ class _CloseButton extends StatelessWidget {
   }
 }
 
-String _formatPrice(double price) {
-  return price == price.roundToDouble()
-      ? '৳${price.toStringAsFixed(0)}'
-      : '৳${price.toStringAsFixed(2)}';
+String _formatPrice(
+  double price, {
+  String? currencyCode,
+  String? countryCode,
+}) {
+  return CurrencyDisplay.format(
+    price,
+    currencyCode: currencyCode,
+    countryCode: countryCode,
+  );
 }
 
 abstract final class _Colors {

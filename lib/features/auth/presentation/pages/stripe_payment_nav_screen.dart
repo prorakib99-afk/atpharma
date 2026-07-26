@@ -1,4 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+
+import '../../../../shared/widgets/navigation_page_scaffold.dart';
+import 'cod_payment_screen.dart';
+import 'favorite_header_button.dart';
+import 'mada_ payment_screen.dart';
+import 'review_order_screen.dart';
 
 class StripePaymentNavScreen extends StatefulWidget {
   const StripePaymentNavScreen({super.key});
@@ -12,106 +19,245 @@ class StripePaymentNavScreen extends StatefulWidget {
 class _StripePaymentNavScreenState extends State<StripePaymentNavScreen> {
   String _selectedPaymentMethod = 'Stripe';
   bool _saveCard = true;
+  bool _showReview = false;
 
   @override
   Widget build(BuildContext context) {
     final bottomSafe = MediaQuery.paddingOf(context).bottom;
+    final pagePadding = _PaymentResponsive.pagePadding(context);
 
     return MediaQuery(
       data: MediaQuery.of(context).copyWith(
         textScaler: const TextScaler.linear(1),
       ),
-      child: Scaffold(
+      child: NavigationPageScaffold(
+        currentPage: NavigationPage.cart,
         resizeToAvoidBottomInset: true,
         backgroundColor: _PaymentColors.white,
         body: SafeArea(
           bottom: false,
-          child: CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              SliverPadding(
-                padding: EdgeInsets.fromLTRB(
-                  _PaymentResponsive.pagePadding(context),
-                  18,
-                  _PaymentResponsive.pagePadding(context),
-                  24 + bottomSafe,
+          child: Column(
+            children: <Widget>[
+              Padding(
+                padding: EdgeInsets.fromLTRB(pagePadding, 18, pagePadding, 0),
+                child: const _CheckoutHeader(itemCount: 4),
+              ),
+              Expanded(
+                child: CustomScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  slivers: <Widget>[
+                    SliverPadding(
+                      padding: EdgeInsets.fromLTRB(
+                        pagePadding,
+                        24,
+                        pagePadding,
+                        120 + bottomSafe,
+                      ),
+                      sliver: SliverList(
+                        delegate: SliverChildListDelegate(<Widget>[
+                          _CheckoutStepCard(reviewActive: _showReview),
+                          const SizedBox(height: 32),
+                          if (_showReview)
+                            ReviewOrderScreen(
+                              embedded: true,
+                              onBack: () {
+                                setState(() {
+                                  _showReview = false;
+                                });
+                              },
+                            )
+                          else ...[
+                            _SectionHeader(
+                              title: 'Payment Method',
+                              onBack: () => Navigator.maybePop(context),
+                            ),
+                            const SizedBox(height: 20),
+                            _PaymentMethodSelector(
+                              selectedPaymentMethod: _selectedPaymentMethod,
+                              onChanged: (value) {
+                                setState(() {
+                                  _selectedPaymentMethod = value;
+                                });
+                              },
+                            ),
+                            const SizedBox(height: 24),
+                            if (_selectedPaymentMethod == 'Mada')
+                              MadaPaymentContent(
+                                onContinue: () {
+                                  setState(() {
+                                    _showReview = true;
+                                  });
+                                },
+                              )
+                            else if (_selectedPaymentMethod == 'COD')
+                              CodPaymentContent(
+                                onContinue: () {
+                                  setState(() {
+                                    _showReview = true;
+                                  });
+                                },
+                              )
+                            else ...[
+                              const _SecurePaymentCard(),
+                              const SizedBox(height: 24),
+                              _CardInformationCard(
+                                saveCard: _saveCard,
+                                onSaveChanged: (value) {
+                                  setState(() {
+                                    _saveCard = value;
+                                  });
+                                },
+                              ),
+                              const SizedBox(height: 32),
+                              const _DividerText(text: 'Or pay faster with'),
+                              const SizedBox(height: 24),
+                              const _FastPaymentButtons(),
+                              const SizedBox(height: 24),
+                              const _TermsAndPrivacyText(),
+                              const SizedBox(height: 24),
+                              _ContinueToReviewButton(
+                                total: 12.00,
+                                onPressed: () {
+                                  setState(() {
+                                    _showReview = true;
+                                  });
+                                },
+                              ),
+                            ],
+                          ],
+                        ]),
+                      ),
+                    ),
+                  ],
                 ),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate(
-                    [
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
-                      const _CheckoutStepCard(),
-                      const SizedBox(height: 34),
+class _CheckoutHeader extends StatelessWidget {
+  const _CheckoutHeader({required this.itemCount});
 
-                      _SectionHeader(
-                        title: 'Payment Method',
-                        onBack: () => Navigator.maybePop(context),
-                      ),
-                      const SizedBox(height: 24),
+  final int itemCount;
 
-                      _PaymentMethodSelector(
-                        selectedPaymentMethod: _selectedPaymentMethod,
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedPaymentMethod = value;
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 24),
-
-                      const _SecurePaymentCard(),
-                      const SizedBox(height: 24),
-
-                      _CardInformationCard(
-                        saveCard: _saveCard,
-                        onSaveChanged: (value) {
-                          setState(() {
-                            _saveCard = value;
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 32),
-
-                      const _DividerText(text: 'Or pay faster with'),
-                      const SizedBox(height: 32),
-
-                      const _FastPaymentButtons(),
-                      const SizedBox(height: 24),
-
-                      const _TermsAndPrivacyText(),
-                      const SizedBox(height: 24),
-
-                      const _ContinueToReviewButton(total: 12.00),
-                    ],
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: Row(
+            children: <Widget>[
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Checkout',
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 18,
+                      height: 22 / 18,
+                      fontWeight: FontWeight.w700,
+                      color: _PaymentColors.title,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: _PaymentColors.primaryLight,
+                  borderRadius: BorderRadius.circular(100),
+                ),
+                child: Text(
+                  '${itemCount.toString().padLeft(2, '0')} Items',
+                  style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 12,
+                    height: 16 / 12,
+                    fontWeight: FontWeight.w500,
+                    color: _PaymentColors.primary,
                   ),
                 ),
               ),
             ],
           ),
         ),
+        const SizedBox(width: 16),
+        const _HeaderIcon(icon: Icons.notifications_none_rounded),
+        const SizedBox(width: 4),
+        const FavoriteHeaderButton(
+          inactiveColor: _PaymentColors.title,
+        ),
+        const SizedBox(width: 4),
+        const _HeaderAvatar(),
+      ],
+    );
+  }
+}
 
+class _HeaderIcon extends StatelessWidget {
+  const _HeaderIcon({required this.icon});
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        boxShadow: <BoxShadow>[
+          BoxShadow(color: Color(0x14000000), blurRadius: 28),
+        ],
+      ),
+      child: Icon(
+        icon,
+        size: 20,
+        color: _PaymentColors.title,
       ),
     );
   }
 }
 
-
-class _CheckoutStepCard extends StatelessWidget {
-  const _CheckoutStepCard();
+class _HeaderAvatar extends StatelessWidget {
+  const _HeaderAvatar();
 
   @override
   Widget build(BuildContext context) {
-    final isSmall = MediaQuery.sizeOf(context).width <= 360;
+    return ClipOval(
+      child: Image.asset(
+        'assets/images/at_pharma_icon.png',
+        width: 40,
+        height: 40,
+        fit: BoxFit.cover,
+        cacheWidth: 88,
+      ),
+    );
+  }
+}
 
+class _CheckoutStepCard extends StatelessWidget {
+  const _CheckoutStepCard({required this.reviewActive});
+
+  final bool reviewActive;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.symmetric(
-        horizontal: isSmall ? 14 : 18,
-        vertical: 18,
-      ),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: _PaymentColors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: _PaymentColors.white, width: 2),
         boxShadow: const [
           BoxShadow(
@@ -121,22 +267,26 @@ class _CheckoutStepCard extends StatelessWidget {
           ),
         ],
       ),
-      child: const Row(
+      child: Row(
         children: [
           _StepItem(
-            icon: Icons.local_shipping_outlined,
+            icon: reviewActive
+                ? Icons.local_shipping_outlined
+                : Icons.check_rounded,
             label: 'Shipping',
+            completed: !reviewActive,
           ),
-          _StepLine(),
+          const _StepLine(),
           _StepItem(
             icon: Icons.credit_card_rounded,
             label: 'Payment',
-            active: true,
+            active: !reviewActive,
           ),
-          _StepLine(),
+          const _StepLine(),
           _StepItem(
             icon: Icons.receipt_long_rounded,
             label: 'Review',
+            active: reviewActive,
           ),
         ],
       ),
@@ -149,45 +299,53 @@ class _StepItem extends StatelessWidget {
     required this.icon,
     required this.label,
     this.active = false,
+    this.completed = false,
   });
 
   final IconData icon;
   final String label;
   final bool active;
+  final bool completed;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 64,
+      width: 56,
       child: Column(
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: 32,
+            height: 32,
             decoration: BoxDecoration(
-              color: active ? _PaymentColors.primary : _PaymentColors.white,
+              color: active || completed
+                  ? _PaymentColors.primary
+                  : _PaymentColors.white,
               shape: BoxShape.circle,
-              border: active
+              border: active || completed
                   ? null
                   : Border.all(color: _PaymentColors.body, width: 1.6),
             ),
             child: Icon(
               icon,
-              size: 22,
-              color: active ? _PaymentColors.white : _PaymentColors.body,
+              size: 16,
+              color: active || completed
+                  ? _PaymentColors.white
+                  : _PaymentColors.body,
             ),
           ),
-          const SizedBox(height: 9),
+          const SizedBox(height: 8),
           Text(
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontFamily: 'Poppins',
-              fontSize: 13,
-              height: 16 / 13,
-              fontWeight: FontWeight.w600,
-              color: active ? _PaymentColors.primary : _PaymentColors.body,
+              fontSize: 12,
+              height: 16 / 12,
+              fontWeight: FontWeight.w500,
+              color: active || completed
+                  ? _PaymentColors.primary
+                  : _PaymentColors.body,
             ),
           ),
         ],
@@ -203,7 +361,7 @@ class _StepLine extends StatelessWidget {
   Widget build(BuildContext context) {
     return Expanded(
       child: Padding(
-        padding: const EdgeInsets.only(bottom: 24),
+        padding: const EdgeInsets.only(bottom: 22),
         child: Container(
           height: 2,
           decoration: BoxDecoration(
@@ -236,9 +394,9 @@ class _SectionHeader extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               fontFamily: 'Poppins',
-              fontSize: 20,
-              height: 26 / 20,
-              fontWeight: FontWeight.w700,
+              fontSize: 16,
+              height: 22 / 16,
+              fontWeight: FontWeight.w600,
               color: _PaymentColors.title,
             ),
           ),
@@ -252,17 +410,17 @@ class _SectionHeader extends StatelessWidget {
               children: [
                 Icon(
                   Icons.arrow_back_rounded,
-                  size: 20,
+                  size: 18,
                   color: _PaymentColors.title,
                 ),
-                SizedBox(width: 6),
+                SizedBox(width: 2),
                 Text(
                   'Back',
                   style: TextStyle(
                     fontFamily: 'Poppins',
-                    fontSize: 16,
-                    height: 22 / 16,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    height: 24 / 14,
+                    fontWeight: FontWeight.w500,
                     color: _PaymentColors.title,
                   ),
                 ),
@@ -286,22 +444,22 @@ class _PaymentMethodSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final methods = [
+    const List<_PaymentMethodData> methods = <_PaymentMethodData>[
       const _PaymentMethodData(
         name: 'Stripe',
-        iconText: 'S',
-        iconColor: Color(0xff6865e8),
+        asset: 'assets/icons/stripe_icon.svg',
+        logoBackgroundColor: Color(0xff635bff),
+        logoPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       ),
       const _PaymentMethodData(
         name: 'Mada',
-        iconText: '',
-        iconColor: Color(0xff2097d3),
-        secondaryColor: Color(0xff87bf3f),
+        asset: 'assets/icons/mada_icon.svg',
       ),
       const _PaymentMethodData(
         name: 'COD',
-        iconText: '﷼',
-        iconColor: Color(0xfff59e0b),
+        asset: 'assets/icons/cod_icon.png',
+        logoBackgroundColor: Color(0xfff59e0b),
+        logoPadding: EdgeInsets.all(6),
       ),
     ];
 
@@ -335,22 +493,16 @@ class _PaymentMethodCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    final isSmall = width <= 360;
-
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(8),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        height: isSmall ? 58 : 64,
-        padding: EdgeInsets.symmetric(
-          horizontal: isSmall ? 5 : 7,
-          vertical: 8,
-        ),
+        height: 56,
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 8),
         decoration: BoxDecoration(
           color: selected ? _PaymentColors.primaryLight : _PaymentColors.white,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: selected
                 ? const Color(0xff71b7e9)
@@ -366,27 +518,27 @@ class _PaymentMethodCard extends StatelessWidget {
               children: [
                 _PaymentLogo(
                   data: data,
-                  size: isSmall ? 26 : 30,
+                  size: 24,
                 ),
-                SizedBox(width: isSmall ? 5 : 7),
+                const SizedBox(width: 4),
                 Text(
                   data.name,
                   maxLines: 1,
                   softWrap: false,
                   style: TextStyle(
                     fontFamily: 'Poppins',
-                    fontSize: isSmall ? 12 : 14,
+                    fontSize: 12,
                     height: 1,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                     color: _PaymentColors.title,
                   ),
                 ),
-                SizedBox(width: isSmall ? 5 : 7),
+                const SizedBox(width: 4),
                 Icon(
                   selected
                       ? Icons.radio_button_checked_rounded
                       : Icons.radio_button_off_rounded,
-                  size: isSmall ? 18 : 21,
+                  size: 20,
                   color: selected
                       ? _PaymentColors.primary
                       : _PaymentColors.muted,
@@ -411,52 +563,25 @@ class _PaymentLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (data.name == 'Mada') {
-      return SizedBox(
-        width: size + 4,
-        height: size,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              height: size * 0.42,
-              decoration: BoxDecoration(
-                color: data.iconColor,
-                borderRadius: BorderRadius.circular(1),
-              ),
-            ),
-            SizedBox(height: size * 0.14),
-            Container(
-              height: size * 0.18,
-              decoration: BoxDecoration(
-                color: data.secondaryColor,
-                borderRadius: BorderRadius.circular(1),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
     return Container(
       width: size,
       height: size,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: data.iconColor,
-        borderRadius: BorderRadius.circular(9),
-      ),
-      child: Text(
-        data.iconText,
-        maxLines: 1,
-        style: TextStyle(
-          fontFamily: 'Poppins',
-          fontSize: size * 0.52,
-          height: 1,
-          fontWeight: FontWeight.w800,
-          color: _PaymentColors.white,
-        ),
-      ),
+      padding: data.logoBackgroundColor == null
+          ? EdgeInsets.zero
+          : data.logoPadding,
+      decoration: data.logoBackgroundColor == null
+          ? null
+          : BoxDecoration(
+              color: data.logoBackgroundColor,
+              borderRadius: BorderRadius.circular(7),
+            ),
+      child: data.asset.endsWith('.svg')
+          ? SvgPicture.asset(data.asset, fit: BoxFit.contain)
+          : Image.asset(
+              data.asset,
+              fit: BoxFit.contain,
+              cacheWidth: 40,
+            ),
     );
   }
 }
@@ -466,14 +591,12 @@ class _SecurePaymentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isSmall = MediaQuery.sizeOf(context).width <= 360;
-
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: _PaymentColors.card,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         children: [
@@ -481,7 +604,7 @@ class _SecurePaymentCard extends StatelessWidget {
             children: [
               const Icon(
                 Icons.verified_user_rounded,
-                size: 22,
+                size: 20,
                 color: _PaymentColors.success,
               ),
               const SizedBox(width: 8),
@@ -492,25 +615,37 @@ class _SecurePaymentCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontFamily: 'Poppins',
-                    fontSize: isSmall ? 12 : 14,
-                    height: 20 / 14,
-                    fontWeight: FontWeight.w500,
+                    fontSize: 12,
+                    height: 16 / 12,
+                    fontWeight: FontWeight.w400,
                     color: _PaymentColors.title,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           Row(
             children: const [
-              Expanded(child: _PaymentBrandBox(label: 'VISA')),
+              Expanded(
+                child: _PaymentBrandBox(asset: 'assets/icons/visa_icon.svg'),
+              ),
               SizedBox(width: 8),
-              Expanded(child: _PaymentBrandBox(label: 'G Pay')),
+              Expanded(
+                child: _PaymentBrandBox(asset: 'assets/icons/google_logo.svg'),
+              ),
               SizedBox(width: 8),
-              Expanded(child: _PaymentBrandBox(label: ' Pay')),
+              Expanded(
+                child: _PaymentBrandBox(
+                  asset: 'assets/icons/apple_pay_icon.svg',
+                ),
+              ),
               SizedBox(width: 8),
-              Expanded(child: _PaymentBrandBox(label: '●●')),
+              Expanded(
+                child: _PaymentBrandBox(
+                  asset: 'assets/icons/mastercard_icon.svg',
+                ),
+              ),
             ],
           ),
         ],
@@ -520,33 +655,25 @@ class _SecurePaymentCard extends StatelessWidget {
 }
 
 class _PaymentBrandBox extends StatelessWidget {
-  const _PaymentBrandBox({required this.label});
+  const _PaymentBrandBox({required this.asset});
 
-  final String label;
+  final String asset;
 
   @override
   Widget build(BuildContext context) {
-    final isSmall = MediaQuery.sizeOf(context).width <= 360;
-
     return Container(
-      height: 38,
+      height: 36,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: _PaymentColors.white,
         borderRadius: BorderRadius.circular(5),
         border: Border.all(color: _PaymentColors.border),
       ),
-      child: Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          fontFamily: 'Poppins',
-          fontSize: isSmall ? 12 : 15,
-          height: 20 / 15,
-          fontWeight: FontWeight.w700,
-          color: _PaymentColors.title,
-        ),
+      child: SvgPicture.asset(
+        asset,
+        height: 18,
+        fit: BoxFit.contain,
       ),
     );
   }
@@ -565,15 +692,15 @@ class _CardInformationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: _PaymentColors.card,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         children: [
           const _CardNumberField(),
-          const SizedBox(height: 22),
+          const SizedBox(height: 24),
           const _ResponsiveTwoColumn(
             left: _InputField(
               label: 'Expiry Date',
@@ -587,13 +714,13 @@ class _CardInformationCard extends StatelessWidget {
               suffixIcon: Icons.info_outline_rounded,
             ),
           ),
-          const SizedBox(height: 22),
+          const SizedBox(height: 24),
           const _InputField(
             label: 'Card Holder Name',
             hint: 'AH JOY',
             textInputAction: TextInputAction.done,
           ),
-          const SizedBox(height: 26),
+          const SizedBox(height: 24),
           _SaveCardOption(
             value: saveCard,
             onChanged: onSaveChanged,
@@ -648,20 +775,20 @@ class _InputField extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(
             fontFamily: 'Poppins',
-            fontSize: 16,
-            height: 22 / 16,
-            fontWeight: FontWeight.w600,
+            fontSize: 14,
+            height: 20 / 14,
+            fontWeight: FontWeight.w500,
             color: _PaymentColors.title,
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         TextFormField(
           keyboardType: keyboardType,
           textInputAction: textInputAction,
           style: const TextStyle(
             fontFamily: 'Poppins',
-            fontSize: 14,
-            height: 20 / 14,
+            fontSize: 12,
+            height: 16 / 12,
             fontWeight: FontWeight.w400,
             color: _PaymentColors.title,
           ),
@@ -757,21 +884,21 @@ class _SaveCardOption extends StatelessWidget {
                   'Save this card for faster checkout',
                   style: TextStyle(
                     fontFamily: 'Poppins',
-                    fontSize: 15,
-                    height: 20 / 15,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    height: 16 / 12,
+                    fontWeight: FontWeight.w500,
                     color: _PaymentColors.title,
                   ),
                 ),
-                SizedBox(height: 3),
+                  SizedBox(height: 2),
                 Text(
                   'Your card details will be securely saved by Stripe',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontFamily: 'Poppins',
-                    fontSize: 14,
-                    height: 18 / 14,
+                    fontSize: 12,
+                    height: 16 / 12,
                     fontWeight: FontWeight.w400,
                     color: _PaymentColors.body,
                   ),
@@ -798,14 +925,14 @@ class _DividerText extends StatelessWidget {
           child: Divider(height: 1, color: _PaymentColors.border),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 18),
+          padding: const EdgeInsets.symmetric(horizontal: 21),
           child: Text(
             text,
             style: const TextStyle(
               fontFamily: 'Poppins',
-              fontSize: 14,
-              height: 20 / 14,
-              fontWeight: FontWeight.w600,
+              fontSize: 12,
+              height: 16 / 12,
+              fontWeight: FontWeight.w500,
               color: _PaymentColors.body,
             ),
           ),
@@ -827,7 +954,7 @@ class _FastPaymentButtons extends StatelessWidget {
       children: [
         Expanded(
           child: _FastPaymentButton(
-            iconText: 'G',
+            asset: 'assets/icons/google_logo.svg',
             label: 'Google Pay',
             textColor: _PaymentColors.title,
             backgroundColor: _PaymentColors.white,
@@ -837,8 +964,9 @@ class _FastPaymentButtons extends StatelessWidget {
         SizedBox(width: 12),
         Expanded(
           child: _FastPaymentButton(
-            iconText: '',
-            label: 'Apple Pay',
+            asset: 'assets/icons/apple_pay_icon.svg',
+            label: '',
+            semanticLabel: 'Apple Pay',
             textColor: _PaymentColors.white,
             backgroundColor: _PaymentColors.title,
             borderColor: _PaymentColors.title,
@@ -851,58 +979,61 @@ class _FastPaymentButtons extends StatelessWidget {
 
 class _FastPaymentButton extends StatelessWidget {
   const _FastPaymentButton({
-    required this.iconText,
+    required this.asset,
     required this.label,
     required this.textColor,
     required this.backgroundColor,
     required this.borderColor,
+    this.semanticLabel,
   });
 
-  final String iconText;
+  final String asset;
   final String label;
   final Color textColor;
   final Color backgroundColor;
   final Color borderColor;
+  final String? semanticLabel;
 
   @override
   Widget build(BuildContext context) {
-    final isSmall = MediaQuery.sizeOf(context).width <= 360;
-
     return Container(
-      height: 54,
+      height: 48,
       decoration: BoxDecoration(
         color: backgroundColor,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: borderColor, width: 1.5),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(
-            iconText,
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: isSmall ? 16 : 18,
-              height: 1,
-              fontWeight: FontWeight.w800,
-              color: textColor,
+          Semantics(
+            label: semanticLabel,
+            child: SvgPicture.asset(
+              asset,
+              width: label.isEmpty ? 64 : 18,
+              height: 18,
+              colorFilter: backgroundColor == _PaymentColors.title
+                  ? const ColorFilter.mode(Colors.white, BlendMode.srcIn)
+                  : null,
             ),
           ),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: isSmall ? 14 : 16,
-                height: 22 / 16,
-                fontWeight: FontWeight.w700,
-                color: textColor,
+          if (label.isNotEmpty) ...[
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 14,
+                  height: 24 / 14,
+                  fontWeight: FontWeight.w500,
+                  color: textColor,
+                ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -919,8 +1050,8 @@ class _TermsAndPrivacyText extends StatelessWidget {
       text: const TextSpan(
         style: TextStyle(
           fontFamily: 'Poppins',
-          fontSize: 14,
-          height: 24 / 14,
+          fontSize: 12,
+          height: 16 / 12,
           fontWeight: FontWeight.w400,
           color: _PaymentColors.body,
         ),
@@ -929,7 +1060,7 @@ class _TermsAndPrivacyText extends StatelessWidget {
           TextSpan(
             text: 'Terms & Conditions',
             style: TextStyle(
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w500,
               color: _PaymentColors.primary,
             ),
           ),
@@ -937,7 +1068,7 @@ class _TermsAndPrivacyText extends StatelessWidget {
           TextSpan(
             text: 'Privacy Policy',
             style: TextStyle(
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w500,
               color: _PaymentColors.primary,
             ),
           ),
@@ -948,19 +1079,23 @@ class _TermsAndPrivacyText extends StatelessWidget {
 }
 
 class _ContinueToReviewButton extends StatelessWidget {
-  const _ContinueToReviewButton({required this.total});
+  const _ContinueToReviewButton({
+    required this.total,
+    required this.onPressed,
+  });
 
   final double total;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
     final isSmall = MediaQuery.sizeOf(context).width <= 360;
 
     return SizedBox(
-      height: 56,
+      height: 48,
       width: double.infinity,
       child: ElevatedButton(
-        onPressed: () {},
+        onPressed: onPressed,
         style: ElevatedButton.styleFrom(
           elevation: 0,
           backgroundColor: Colors.transparent,
@@ -1001,9 +1136,9 @@ class _ContinueToReviewButton extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontFamily: 'Poppins',
-                      fontSize: 16,
-                      height: 24 / 16,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      height: 20 / 14,
+                      fontWeight: FontWeight.w500,
                       color: _PaymentColors.white,
                     ),
                   ),
@@ -1029,23 +1164,23 @@ class _PaymentInputDecoration {
       hintText: hint,
       hintStyle: const TextStyle(
         fontFamily: 'Poppins',
-        fontSize: 14,
-        height: 20 / 14,
+        fontSize: 12,
+        height: 16 / 12,
         fontWeight: FontWeight.w400,
         color: _PaymentColors.muted,
       ),
       prefixIcon: prefixIcon == null
           ? null
-          : Icon(prefixIcon, size: 24, color: _PaymentColors.body),
+          : Icon(prefixIcon, size: 20, color: _PaymentColors.body),
       suffixIcon: suffixIcon == null
           ? null
-          : Icon(suffixIcon, size: 22, color: _PaymentColors.body),
+          : Icon(suffixIcon, size: 20, color: _PaymentColors.body),
       filled: true,
       fillColor: _PaymentColors.white,
       isDense: true,
       contentPadding: const EdgeInsets.symmetric(
         horizontal: 16,
-        vertical: 18,
+        vertical: 15,
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
@@ -1070,20 +1205,15 @@ class _PaymentInputDecoration {
 class _PaymentMethodData {
   const _PaymentMethodData({
     required this.name,
-    required this.iconText,
-    required this.iconColor,
-    this.secondaryColor = _PaymentColors.white,
+    required this.asset,
+    this.logoBackgroundColor,
+    this.logoPadding = EdgeInsets.zero,
   });
 
   final String name;
-  final String iconText;
-  final Color iconColor;
-  final Color secondaryColor;
-}
-
-class _PaymentImages {
-  static const String avatar =
-      'https://www.figma.com/api/mcp/asset/d6696194-5131-46cf-8269-3a2c5c545da2';
+  final String asset;
+  final Color? logoBackgroundColor;
+  final EdgeInsets logoPadding;
 }
 
 class _PaymentResponsive {

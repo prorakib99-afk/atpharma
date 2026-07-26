@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/routes/app_routes.dart';
+import '../../../../core/utils/currency_display.dart';
 import 'favorite_store.dart';
 import 'favourite_screen.dart';
 import 'floating_order_cart.dart';
@@ -15,6 +16,8 @@ class ProductDetailsData {
     this.brand = 'FreshLife',
     this.price = 500,
     this.prescriptionRequired = false,
+    this.currencyCode = '',
+    this.countryCode = '',
   });
 
   final String? id;
@@ -24,6 +27,13 @@ class ProductDetailsData {
   final String brand;
   final int price;
   final bool prescriptionRequired;
+  final String currencyCode;
+  final String countryCode;
+
+  String get currencySymbol => CurrencyDisplay.symbol(
+    currencyCode: currencyCode,
+    countryCode: countryCode,
+  );
 }
 
 class ProductCart extends ChangeNotifier {
@@ -161,7 +171,7 @@ class _ScreenProductDetailsState extends State<ScreenProductDetails> {
                     );
                   })
                   .toList(growable: false),
-              currencySymbol: '৳',
+              currencySymbol: product.currencySymbol,
               onIncreaseQuantity: ProductCart.instance.increase,
               onDecreaseQuantity: ProductCart.instance.decrease,
               onRemoveItem: ProductCart.instance.remove,
@@ -306,7 +316,7 @@ class _ScreenProductDetailsState extends State<ScreenProductDetails> {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      '৳${product.price}',
+                      '${product.currencySymbol}${product.price}',
                       style: const TextStyle(
                         color: _blue,
                         fontSize: 30,
@@ -315,7 +325,7 @@ class _ScreenProductDetailsState extends State<ScreenProductDetails> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      '৳${product.price + 150}',
+                      '${product.currencySymbol}${product.price + 150}',
                       style: const TextStyle(
                         color: _body,
                         decoration: TextDecoration.lineThrough,
@@ -1053,7 +1063,7 @@ class _RelatedProducts extends StatelessWidget {
                     const Text('4.8', style: TextStyle(fontSize: 10)),
                     const Spacer(),
                     Text(
-                      '৳${item.price}',
+                      '\$${item.price}',
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                   ],

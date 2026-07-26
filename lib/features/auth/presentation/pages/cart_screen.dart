@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../shared/widgets/navigation_page_scaffold.dart';
 import 'screen_product_details.dart';
+import 'favorite_header_button.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -31,6 +32,9 @@ class _CartScreenState extends State<CartScreen> {
       builder: (BuildContext context, _) {
         final List<ProductCartItem> items = ProductCart.instance.items;
         final double subtotal = _subtotal(items);
+        final String currencySymbol = items.isEmpty
+            ? '\$'
+            : items.first.product.currencySymbol;
 
         return NavigationPageScaffold(
           currentPage: NavigationPage.cart,
@@ -75,9 +79,15 @@ class _CartScreenState extends State<CartScreen> {
                                     color: _CartColors.border,
                                   ),
                                   const SizedBox(height: 24),
-                                  _CartSubtotal(total: subtotal),
+                                  _CartSubtotal(
+                                    total: subtotal,
+                                    currencySymbol: currencySymbol,
+                                  ),
                                   const SizedBox(height: 24),
-                                  _CheckoutButton(total: subtotal),
+                                  _CheckoutButton(
+                                    total: subtotal,
+                                    currencySymbol: currencySymbol,
+                                  ),
                                 ]),
                               ),
                             ),
@@ -170,7 +180,12 @@ class _CartHeader extends StatelessWidget {
         SizedBox(width: compact ? 8 : 12),
         const _RoundIconButton(icon: Icons.notifications_none_rounded),
         SizedBox(width: compact ? 6 : 8),
-        const _RoundIconButton(icon: Icons.favorite_border_rounded),
+        FavoriteHeaderButton(
+          size: MediaQuery.sizeOf(context).width <= 360 ? 40 : 44,
+          iconSize: 23,
+          borderColor: _CartColors.card,
+          inactiveColor: _CartColors.title,
+        ),
         SizedBox(width: compact ? 6 : 8),
         const _ProfileAvatar(),
       ],
@@ -264,67 +279,69 @@ class _CartItemView extends StatelessWidget {
               ),
               SizedBox(width: isSmall ? 10 : 12),
               Expanded(
-                child: SizedBox(
-                  height: imageSize,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.product.brand,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 14,
-                          height: 24 / 14,
-                          fontWeight: FontWeight.w600,
-                          color: _CartColors.success,
-                        ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.product.brand,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 14,
+                        height: 24 / 14,
+                        fontWeight: FontWeight.w600,
+                        color: _CartColors.success,
                       ),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              item.product.name,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: isSmall ? 15 : 16,
-                                height: 22 / 16,
-                                fontWeight: FontWeight.w700,
-                                color: _CartColors.title,
-                              ),
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.product.name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: isSmall ? 15 : 16,
+                              height: 22 / 16,
+                              fontWeight: FontWeight.w700,
+                              color: _CartColors.title,
                             ),
                           ),
-                          if (item.product.prescriptionRequired) ...[
-                            const SizedBox(width: 8),
-                            const _RxBadge(),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      _PriceLine(item: item),
-                      const Spacer(),
-                      Row(
-                        children: [
-                          _QuantityStepper(
-                            quantity: item.quantity,
-                            onDecrease: () =>
-                                ProductCart.instance.decrease(item.id),
-                            onIncrease: () =>
-                                ProductCart.instance.increase(item.id),
-                          ),
-                          const Spacer(),
-                          _DeleteButton(
-                            onPressed: () =>
-                                ProductCart.instance.remove(item.id),
+                        ),
+                        if (item.product.prescriptionRequired) ...[
+                          const SizedBox(width: 8),
+                          const Padding(
+                            padding: EdgeInsets.only(top: 2),
+                            child: _RxBadge(),
                           ),
                         ],
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    _PriceLine(item: item),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        _QuantityStepper(
+                          quantity: item.quantity,
+                          onDecrease: () =>
+                              ProductCart.instance.decrease(item.id),
+                          onIncrease: () =>
+                              ProductCart.instance.increase(item.id),
+                        ),
+                        const Spacer(),
+                        _DeleteButton(
+                          onPressed: () =>
+                              ProductCart.instance.remove(item.id),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -347,7 +364,7 @@ class _PriceLine extends StatelessWidget {
     return Row(
       children: [
         Text(
-          '৳${item.product.price}',
+          '${item.product.currencySymbol}${item.product.price}',
           style: const TextStyle(
             fontFamily: 'Poppins',
             fontSize: 20,
@@ -530,9 +547,10 @@ class _RxBadge extends StatelessWidget {
 }
 
 class _CartSubtotal extends StatelessWidget {
-  const _CartSubtotal({required this.total});
+  const _CartSubtotal({required this.total, required this.currencySymbol});
 
   final double total;
+  final String currencySymbol;
 
   @override
   Widget build(BuildContext context) {
@@ -573,7 +591,7 @@ class _CartSubtotal extends StatelessWidget {
         ),
         SizedBox(width: isSmall ? 10 : 16),
         Text(
-          '৳${total.toStringAsFixed(2)}',
+          '$currencySymbol${total.toStringAsFixed(2)}',
           style: TextStyle(
             fontFamily: 'Poppins',
             fontSize: isSmall ? 22 : 26,
@@ -588,9 +606,10 @@ class _CartSubtotal extends StatelessWidget {
 }
 
 class _CheckoutButton extends StatelessWidget {
-  const _CheckoutButton({required this.total});
+  const _CheckoutButton({required this.total, required this.currencySymbol});
 
   final double total;
+  final String currencySymbol;
 
   @override
   Widget build(BuildContext context) {
@@ -618,7 +637,7 @@ class _CheckoutButton extends StatelessWidget {
           child: Container(
             alignment: Alignment.center,
             child: Text(
-              'Proceed to Checkout  •  ৳${total.toStringAsFixed(2)}',
+              'Proceed to Checkout  •  $currencySymbol${total.toStringAsFixed(2)}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(

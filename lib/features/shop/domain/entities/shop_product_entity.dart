@@ -33,6 +33,8 @@ final class ShopProductEntity extends Equatable {
     this.category,
     this.type,
     this.company,
+    this.currencyCode = '',
+    this.countryCode = '',
   });
 
   final String id;
@@ -71,6 +73,8 @@ final class ShopProductEntity extends Equatable {
   final ShopProductCategoryEntity? category;
   final ShopProductTypeEntity? type;
   final ShopProductCompanyEntity? company;
+  final String currencyCode;
+  final String countryCode;
 
   bool get isPublished {
     return publicationStatus == ShopProductPublicationStatus.published;
@@ -209,6 +213,8 @@ final class ShopProductEntity extends Equatable {
     category,
     type,
     company,
+    currencyCode,
+    countryCode,
   ];
 }
 

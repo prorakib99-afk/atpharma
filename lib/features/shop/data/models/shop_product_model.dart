@@ -31,6 +31,8 @@ final class ShopProductModel {
     this.category,
     this.type,
     this.company,
+    this.currencyCode = '',
+    this.countryCode = '',
   });
 
   final String id;
@@ -69,6 +71,8 @@ final class ShopProductModel {
   final ShopProductCategoryModel? category;
   final ShopProductTypeModel? type;
   final ShopProductCompanyModel? company;
+  final String currencyCode;
+  final String countryCode;
 
   factory ShopProductModel.fromJson(Map<String, dynamic> json) {
     final String publicImageUrl = JsonValueParser.string(json['imageSrc']);
@@ -147,6 +151,12 @@ final class ShopProductModel {
             JsonValueParser.map(json['company']),
           ) ??
           ShopProductCompanyModel.fromBrand(json['brand']),
+      currencyCode: JsonValueParser.string(
+        json['currencyCode'] ?? json['currency'],
+      ),
+      countryCode: JsonValueParser.string(
+        json['countryCode'] ?? json['country'],
+      ),
     );
   }
 
@@ -183,6 +193,8 @@ final class ShopProductModel {
       category: category?.toEntity(),
       type: type?.toEntity(),
       company: company?.toEntity(),
+      currencyCode: currencyCode,
+      countryCode: countryCode,
     );
   }
 

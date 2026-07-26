@@ -5,13 +5,16 @@ import 'package:flutter/material.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/error/app_result.dart';
 import '../../../../core/pagination/paginated_result.dart';
+import '../../../../core/utils/currency_display.dart';
 import '../../../../shared/widgets/navigation_page_scaffold.dart';
+import '../../../../shared/widgets/fly_to_cart.dart';
 import '../../../shop/domain/entities/shop_product_entity.dart';
 import '../../../shop/domain/entities/shop_product_query.dart';
 import '../../../shop/domain/usecases/cancel_shop_products_request_use_case.dart';
 import '../../../shop/domain/usecases/get_shop_products_use_case.dart';
 import 'floating_explore_filter_screen.dart';
 import 'screen_product_details.dart';
+import 'favorite_header_button.dart';
 
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key});
@@ -185,6 +188,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     return NavigationPageScaffold(
       currentPage: NavigationPage.explore,
       backgroundColor: _ExploreColors.background,
+      resizeToAvoidBottomInset: false,
       body: SafeArea(
         bottom: false,
         child: Stack(
@@ -297,7 +301,10 @@ class _ExploreHeader extends StatelessWidget {
         SizedBox(width: compact ? 8 : 12),
         const _RoundIconButton(icon: Icons.notifications_none_rounded),
         SizedBox(width: compact ? 6 : 8),
-        const _RoundIconButton(icon: Icons.favorite_border_rounded),
+        const FavoriteHeaderButton(
+          borderColor: _ExploreColors.card,
+          inactiveColor: _ExploreColors.title,
+        ),
         SizedBox(width: compact ? 6 : 8),
         const _ProfileAvatar(),
       ],
@@ -551,6 +558,29 @@ class _ProductCard extends StatelessWidget {
 
   final ShopProductEntity product;
 
+  void _addToCart(BuildContext context) {
+    if (product.isOutOfStock) return;
+
+    flyToCart(
+      context,
+      imageUrl: product.primaryImageUrl,
+      onArrived: () => ProductCart.instance.add(
+        ProductDetailsData(
+          id: product.id,
+          name: product.name,
+          image: product.primaryImageUrl,
+          description: product.displayDescription,
+          brand: product.displayCompanyName,
+          price: product.sellingPrice.round(),
+          prescriptionRequired: product.prescriptionRequired,
+          currencyCode: product.currencyCode,
+          countryCode: product.countryCode,
+        ),
+        1,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isSmall = MediaQuery.sizeOf(context).width <= 360;
@@ -568,6 +598,8 @@ class _ProductCard extends StatelessWidget {
               brand: product.displayCompanyName,
               price: product.sellingPrice.round(),
               prescriptionRequired: product.prescriptionRequired,
+              currencyCode: product.currencyCode,
+              countryCode: product.countryCode,
             ),
           ),
         ),
@@ -620,27 +652,33 @@ class _ProductCard extends StatelessWidget {
                   Positioned(
                     right: -2,
                     bottom: -16,
-                    child: InkWell(
-                      onTap: () {},
-                      customBorder: const CircleBorder(),
-                      child: Container(
-                        width: isSmall ? 36 : 40,
-                        height: isSmall ? 36 : 40,
-                        decoration: const BoxDecoration(
-                          color: _ExploreColors.primary,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Color(0x300b83d9),
-                              blurRadius: 16,
-                              offset: Offset(0, 7),
-                            ),
-                          ],
-                        ),
-                        child: Icon(
-                          Icons.add_rounded,
-                          size: isSmall ? 28 : 31,
-                          color: Colors.white,
+                    child: Builder(
+                      builder: (BuildContext buttonContext) => InkWell(
+                        onTap: product.isOutOfStock
+                            ? null
+                            : () => _addToCart(buttonContext),
+                        customBorder: const CircleBorder(),
+                        child: Container(
+                          width: isSmall ? 42 : 46,
+                          height: isSmall ? 42 : 46,
+                          decoration: BoxDecoration(
+                            color: product.isOutOfStock
+                                ? _ExploreColors.placeholder
+                                : _ExploreColors.primary,
+                            shape: BoxShape.circle,
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x300b83d9),
+                                blurRadius: 16,
+                                offset: Offset(0, 7),
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            Icons.add_rounded,
+                            size: isSmall ? 32 : 35,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),
@@ -710,7 +748,11 @@ class _ProductCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  _formatPrice(product.sellingPrice),
+                  _formatPrice(
+                    product.sellingPrice,
+                    currencyCode: product.currencyCode,
+                    countryCode: product.countryCode,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -767,10 +809,16 @@ class _ExplorePagination extends StatelessWidget {
   }
 }
 
-String _formatPrice(double price) {
-  return price == price.roundToDouble()
-      ? '৳${price.toStringAsFixed(0)}'
-      : '৳${price.toStringAsFixed(2)}';
+String _formatPrice(
+  double price, {
+  String? currencyCode,
+  String? countryCode,
+}) {
+  return CurrencyDisplay.format(
+    price,
+    currencyCode: currencyCode,
+    countryCode: countryCode,
+  );
 }
 
 class _FilterPanel extends StatelessWidget {

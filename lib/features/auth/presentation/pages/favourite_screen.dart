@@ -130,7 +130,7 @@ class _FavouriteCard extends StatelessWidget {
                   ),
                   const Spacer(),
                   Text(
-                    '৳${product.price}',
+                    '\$${product.price}',
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,

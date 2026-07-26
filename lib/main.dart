@@ -8,15 +8,18 @@ import 'core/network/backend_smoke_tester.dart';
 import 'core/routes/app_routes.dart';
 import 'features/auth/presentation/pages/cart_screen.dart';
 import 'features/auth/presentation/pages/checkout_screen.dart';
+import 'features/auth/presentation/pages/completed_order_screen.dart';
 import 'features/auth/presentation/pages/explore_screen.dart';
 import 'features/auth/presentation/pages/home_screen.dart';
 import 'features/auth/presentation/pages/login_screen.dart';
 import 'features/auth/presentation/pages/prescription_screen.dart';
 import 'features/auth/presentation/pages/register_screen.dart';
+import 'features/auth/presentation/pages/review_order_screen.dart';
 import 'features/auth/presentation/pages/screen_product_details.dart';
 import 'features/auth/presentation/pages/search_screen.dart';
 import 'features/auth/presentation/pages/splash_screen.dart';
 import 'features/auth/presentation/pages/start_page.dart';
+import 'features/auth/presentation/pages/stripe_payment_nav_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,7 +29,11 @@ Future<void> main() async {
   /// Runs only in debug mode because assert statements are removed
   /// automatically from profile and release builds.
   assert(() {
-    unawaited(BackendSmokeTester.run());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future<void>.delayed(const Duration(seconds: 3), () {
+        unawaited(BackendSmokeTester.run());
+      });
+    });
     return true;
   }());
 
@@ -107,6 +114,15 @@ class AtPharmaApp extends StatelessWidget {
 
         AppRoutes.checkout: (BuildContext context) {
           return const CheckoutScreen();
+        },
+        AppRoutes.stripePayment: (BuildContext context) {
+          return const StripePaymentNavScreen();
+        },
+        AppRoutes.reviewOrder: (BuildContext context) {
+          return const ReviewOrderScreen();
+        },
+        AppRoutes.completedOrder: (BuildContext context) {
+          return const CompletedOrderScreen();
         },
 
         AppRoutes.productDetails: (BuildContext context) {

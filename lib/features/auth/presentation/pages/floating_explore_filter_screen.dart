@@ -203,12 +203,12 @@ class _FloatingExploreFilterScreenState
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    Expanded(child: _PriceBox('৳${_price.start.round()}')),
+                    Expanded(child: _PriceBox('\$${_price.start.round()}')),
                     const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 16),
                       child: Text('—', style: TextStyle(fontSize: 20)),
                     ),
-                    Expanded(child: _PriceBox('৳${_price.end.round()}')),
+                    Expanded(child: _PriceBox('\$${_price.end.round()}')),
                   ],
                 ),
                 RangeSlider(

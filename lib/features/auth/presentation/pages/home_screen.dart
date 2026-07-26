@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geocoding/geocoding.dart';
@@ -5,7 +7,9 @@ import 'package:geolocator/geolocator.dart';
 
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/routes/app_routes.dart';
+import '../../../../core/utils/currency_display.dart';
 import '../../../../shared/widgets/navigation_page_scaffold.dart';
+import '../../../../shared/widgets/fly_to_cart.dart';
 import '../../../shop/domain/entities/shop_product_entity.dart';
 import '../../../shop/presentation/bloc/home_products/home_products_bloc.dart';
 import '../../../shop/presentation/bloc/home_products/home_products_event.dart';
@@ -62,7 +66,11 @@ class _HomeBodyState extends State<_HomeBody> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadLocation());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future<void>.delayed(const Duration(milliseconds: 600), () {
+        if (mounted) unawaited(_loadLocation());
+      });
+    });
   }
 
   @override
@@ -653,8 +661,6 @@ class _BackendProductContent extends StatelessWidget {
               isChangingPage: state.isPageChanging,
               onSeeAll: () => showFloatingBuyAgainScreen(context),
             ),
-            const SizedBox(height: 16),
-            _PaginationBar(state: state),
             if (state.hasFeaturedProducts) ...<Widget>[
               const SizedBox(height: 32),
               _ProductSection(
@@ -736,6 +742,27 @@ class _ProductCard extends StatelessWidget {
   final ShopProductEntity product;
   final bool compact;
 
+  void _addToCart(BuildContext context) {
+    flyToCart(
+      context,
+      imageUrl: product.primaryImageUrl,
+      onArrived: () => ProductCart.instance.add(
+        ProductDetailsData(
+          id: product.id,
+          name: product.name,
+          image: product.primaryImageUrl,
+          description: product.displayDescription,
+          brand: product.displayCompanyName,
+          price: product.sellingPrice.round(),
+          prescriptionRequired: product.prescriptionRequired,
+          currencyCode: product.currencyCode,
+          countryCode: product.countryCode,
+        ),
+        1,
+      ),
+    );
+  }
+
   void _openDetails(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -749,6 +776,8 @@ class _ProductCard extends StatelessWidget {
               brand: product.displayCompanyName,
               price: product.sellingPrice.round(),
               prescriptionRequired: product.prescriptionRequired,
+              currencyCode: product.currencyCode,
+              countryCode: product.countryCode,
             ),
           );
         },
@@ -759,6 +788,7 @@ class _ProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool outOfStock = product.isOutOfStock;
+    final bool isSmall = MediaQuery.sizeOf(context).width <= 360;
 
     return InkWell(
       onTap: () => _openDetails(context),
@@ -791,36 +821,29 @@ class _ProductCard extends StatelessWidget {
                     ),
                   ),
                   Positioned(
-                    right: -1,
-                    bottom: -14,
-                    child: Material(
-                      color: outOfStock
-                          ? const Color(0xFF98A1B3)
-                          : _Colors.blue,
-                      shape: const CircleBorder(),
-                      child: InkWell(
-                        onTap: outOfStock
-                            ? null
-                            : () {
-                                ScaffoldMessenger.of(context)
-                                  ..hideCurrentSnackBar()
-                                  ..showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Cart connection will be added in the next step.',
-                                      ),
-                                      duration: Duration(seconds: 1),
-                                    ),
-                                  );
-                              },
-                        customBorder: const CircleBorder(),
-                        child: const SizedBox(
-                          width: 32,
-                          height: 32,
-                          child: Icon(
-                            Icons.add_rounded,
-                            color: Colors.white,
-                            size: 23,
+                    right: -2,
+                    bottom: -16,
+                    child: Builder(
+                      builder: (BuildContext buttonContext) => Material(
+                        color: outOfStock
+                            ? const Color(0xFF98A1B3)
+                            : _Colors.blue,
+                        elevation: 7,
+                        shadowColor: const Color(0x300B83D9),
+                        shape: const CircleBorder(),
+                        child: InkWell(
+                          onTap: outOfStock
+                              ? null
+                              : () => _addToCart(buttonContext),
+                          customBorder: const CircleBorder(),
+                          child: SizedBox(
+                            width: isSmall ? 42 : 46,
+                            height: isSmall ? 42 : 46,
+                            child: Icon(
+                              Icons.add_rounded,
+                              color: Colors.white,
+                              size: isSmall ? 32 : 35,
+                            ),
                           ),
                         ),
                       ),
@@ -876,7 +899,14 @@ class _ProductCard extends StatelessWidget {
                         : _Text.stock10,
                   ),
                 ),
-                Text(_formatPrice(product.sellingPrice), style: _Text.price16),
+                Text(
+                  _formatPrice(
+                    product.sellingPrice,
+                    currencyCode: product.currencyCode,
+                    countryCode: product.countryCode,
+                  ),
+                  style: _Text.price16,
+                ),
               ],
             ),
           ],
@@ -946,58 +976,6 @@ class _ImageFallback extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Center(
       child: Icon(Icons.medication_outlined, size: 42, color: _Colors.blue),
-    );
-  }
-}
-
-class _PaginationBar extends StatelessWidget {
-  const _PaginationBar({required this.state});
-
-  final HomeProductsState state;
-
-  @override
-  Widget build(BuildContext context) {
-    if (state.totalPages <= 1) {
-      return const SizedBox.shrink();
-    }
-
-    final HomeProductsBloc bloc = context.read<HomeProductsBloc>();
-
-    return Row(
-      children: <Widget>[
-        IconButton(
-          onPressed: state.hasPreviousPage && !state.isPageChanging
-              ? () => bloc.add(const HomeProductsPreviousPageRequested())
-              : null,
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 17),
-        ),
-        Expanded(
-          child: Text(
-            'Page ${state.currentPage} of ${state.totalPages}'
-            '  •  ${state.totalProducts} products',
-            textAlign: TextAlign.center,
-            style: _Text.body12,
-          ),
-        ),
-        state.isPageChanging
-            ? const SizedBox(
-                width: 40,
-                height: 40,
-                child: Padding(
-                  padding: EdgeInsets.all(11),
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: _Colors.blue,
-                  ),
-                ),
-              )
-            : IconButton(
-                onPressed: state.hasNextPage
-                    ? () => bloc.add(const HomeProductsNextPageRequested())
-                    : null,
-                icon: const Icon(Icons.arrow_forward_ios_rounded, size: 17),
-              ),
-      ],
     );
   }
 }
@@ -1193,10 +1171,16 @@ class _ArticleCard extends StatelessWidget {
   }
 }
 
-String _formatPrice(double price) {
-  return price == price.roundToDouble()
-      ? '৳${price.toStringAsFixed(0)}'
-      : '৳${price.toStringAsFixed(2)}';
+String _formatPrice(
+  double price, {
+  String? currencyCode,
+  String? countryCode,
+}) {
+  return CurrencyDisplay.format(
+    price,
+    currencyCode: currencyCode,
+    countryCode: countryCode,
+  );
 }
 
 class _Article {

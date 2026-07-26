@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:atpharma/features/shop/domain/repositories/shop_product_repository_impl.dart';
 import 'package:dio/dio.dart';
 import 'package:get_it/get_it.dart';
 import '../../features/shop/data/datasources/shop_product_remote_data_source.dart';
+import '../../features/shop/data/services/offline_order_service.dart';
 import '../../features/shop/domain/repositories/shop_product_repository.dart';
 import '../../features/shop/domain/usecases/cancel_shop_product_details_request_use_case.dart';
 import '../../features/shop/domain/usecases/cancel_shop_products_request_use_case.dart';
@@ -14,6 +17,7 @@ import '../network/interceptors/retry_interceptor.dart';
 import '../session/session_expiry_notifier.dart';
 import '../session/session_manager.dart';
 import '../storage/local_storage_service.dart';
+import '../storage/app_database.dart';
 import '../storage/token_storage.dart';
 
 final GetIt sl = GetIt.instance;
@@ -71,6 +75,11 @@ Future<void> configureDependencies() async {
   dio.interceptors.addAll(<Interceptor>[authInterceptor, retryInterceptor]);
 
   final DioClient dioClient = DioClient(dio: dio);
+  final AppDatabase appDatabase = AppDatabase();
+  final OfflineOrderService offlineOrderService = OfflineOrderService(
+    database: appDatabase,
+    dioClient: dioClient,
+  );
 
   /*
    * Core singleton registrations
@@ -81,7 +90,11 @@ Future<void> configureDependencies() async {
     ..registerSingleton<SessionManager>(sessionManager)
     ..registerSingleton<SessionExpiryNotifier>(sessionExpiryNotifier)
     ..registerSingleton<Dio>(dio)
-    ..registerSingleton<DioClient>(dioClient);
+    ..registerSingleton<DioClient>(dioClient)
+    ..registerSingleton<AppDatabase>(appDatabase)
+    ..registerSingleton<OfflineOrderService>(offlineOrderService);
+
+  unawaited(offlineOrderService.initialize());
 
   /*
    * Shop Product DataSource
@@ -142,6 +155,12 @@ Future<void> configureDependencies() async {
 }
 
 Future<void> resetDependencies() async {
+  if (sl.isRegistered<OfflineOrderService>()) {
+    sl<OfflineOrderService>().dispose();
+  }
+  if (sl.isRegistered<AppDatabase>()) {
+    await sl<AppDatabase>().close();
+  }
   if (sl.isRegistered<SessionExpiryNotifier>()) {
     sl<SessionExpiryNotifier>().dispose();
   }

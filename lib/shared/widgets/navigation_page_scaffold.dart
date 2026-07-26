@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/routes/app_routes.dart';
+import '../../features/auth/presentation/pages/screen_product_details.dart';
+import 'fly_to_cart.dart';
 
 enum NavigationPage { home, explore, prescription, search, cart }
 
@@ -13,6 +15,7 @@ class NavigationPageScaffold extends StatelessWidget {
     this.backgroundColor = Colors.white,
     this.appBar,
     this.extendBody = true,
+    this.resizeToAvoidBottomInset = true,
   });
 
   final Widget body;
@@ -20,11 +23,13 @@ class NavigationPageScaffold extends StatelessWidget {
   final Color backgroundColor;
   final PreferredSizeWidget? appBar;
   final bool extendBody;
+  final bool resizeToAvoidBottomInset;
 
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: backgroundColor,
     extendBody: extendBody,
+    resizeToAvoidBottomInset: resizeToAvoidBottomInset,
     appBar: appBar,
     body: body,
     bottomNavigationBar: _NavigationBar(currentPage: currentPage),
@@ -115,10 +120,35 @@ class _NavigationBar extends StatelessWidget {
                 active: currentPage == NavigationPage.search,
                 onTap: () => _open(context, NavigationPage.search),
               ),
-              _NavIcon(
-                asset: 'assets/icons/cart_icon.svg',
-                active: currentPage == NavigationPage.cart,
-                onTap: () => _open(context, NavigationPage.cart),
+              AnimatedBuilder(
+                animation: ProductCart.instance,
+                builder: (BuildContext context, _) => ValueListenableBuilder<int>(
+                  valueListenable: CartFlyTarget.arrivals,
+                  builder: (BuildContext context, int arrivals, _) =>
+                      TweenAnimationBuilder<double>(
+                    key: ValueKey<int>(arrivals),
+                    tween: Tween<double>(begin: 0, end: 1),
+                    duration: const Duration(milliseconds: 420),
+                    builder: (BuildContext context, double value, Widget? child) {
+                      final double wave = Curves.elasticOut.transform(value);
+                      return Transform.rotate(
+                        angle: (1 - wave) * .22,
+                        child: Transform.scale(
+                          scale: 1 + ((1 - wave).abs() * .18),
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: CartFlyTargetMarker(
+                      child: _NavIcon(
+                        asset: 'assets/icons/cart_icon.svg',
+                        active: currentPage == NavigationPage.cart,
+                        badgeCount: ProductCart.instance.totalCount,
+                        onTap: () => _open(context, NavigationPage.cart),
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
@@ -150,27 +180,58 @@ class _NavGroup extends StatelessWidget {
 
 class _NavIcon extends StatelessWidget {
   const _NavIcon({
+    super.key,
     required this.asset,
     required this.active,
     required this.onTap,
+    this.badgeCount = 0,
   });
   final String asset;
   final bool active;
   final VoidCallback onTap;
+  final int badgeCount;
 
   @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    customBorder: const CircleBorder(),
-    child: Container(
-      width: 40,
-      height: 40,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: active ? const Color(0xFFE7F3FB) : Colors.white,
-        shape: BoxShape.circle,
+  Widget build(BuildContext context) => Stack(
+    clipBehavior: Clip.none,
+    children: <Widget>[
+      InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Container(
+          width: 40,
+          height: 40,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: active ? const Color(0xFFE7F3FB) : Colors.white,
+            shape: BoxShape.circle,
+          ),
+          child: SvgPicture.asset(asset, width: 24, height: 24),
+        ),
       ),
-      child: SvgPicture.asset(asset, width: 24, height: 24),
-    ),
+      if (badgeCount > 0)
+        Positioned(
+          right: -5,
+          top: -6,
+          child: Container(
+            constraints: const BoxConstraints(minWidth: 18),
+            height: 18,
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              color: Color(0xFFE71C05),
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              badgeCount > 99 ? '99+' : '$badgeCount',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ),
+    ],
   );
 }

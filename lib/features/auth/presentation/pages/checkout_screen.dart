@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/routes/app_routes.dart';
 import '../../../../shared/widgets/navigation_page_scaffold.dart';
+import 'favorite_header_button.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -137,32 +139,35 @@ class _CheckoutHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final compact = MediaQuery.sizeOf(context).width <= 360;
+    final compact = MediaQuery.sizeOf(context).width <= 390;
 
     return Row(
       children: [
         Expanded(
           child: Row(
             children: [
-              const Flexible(
-                child: Text(
-                  'Checkout',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 24,
-                    height: 1.15,
-                    fontWeight: FontWeight.w700,
-                    color: _CheckoutColors.title,
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Checkout',
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: compact ? 20 : 24,
+                      height: 1.15,
+                      fontWeight: FontWeight.w700,
+                      color: _CheckoutColors.title,
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
+              SizedBox(width: compact ? 6 : 10),
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 11,
-                  vertical: 8,
+                padding: EdgeInsets.symmetric(
+                  horizontal: compact ? 8 : 11,
+                  vertical: compact ? 6 : 8,
                 ),
                 decoration: BoxDecoration(
                   color: _CheckoutColors.primaryLight,
@@ -170,9 +175,9 @@ class _CheckoutHeader extends StatelessWidget {
                 ),
                 child: Text(
                   '${itemCount.toString().padLeft(2, '0')} Items',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'Poppins',
-                    fontSize: 14,
+                    fontSize: compact ? 11 : 14,
                     height: 1,
                     fontWeight: FontWeight.w600,
                     color: _CheckoutColors.primary,
@@ -185,7 +190,12 @@ class _CheckoutHeader extends StatelessWidget {
         SizedBox(width: compact ? 8 : 12),
         const _RoundIconButton(icon: Icons.notifications_none_rounded),
         SizedBox(width: compact ? 6 : 8),
-        const _RoundIconButton(icon: Icons.favorite_border_rounded),
+        FavoriteHeaderButton(
+          size: compact ? 36 : 44,
+          iconSize: compact ? 20 : 24,
+          borderColor: _CheckoutColors.card,
+          inactiveColor: _CheckoutColors.title,
+        ),
         SizedBox(width: compact ? 6 : 8),
         const _ProfileAvatar(),
       ],
@@ -200,7 +210,8 @@ class _RoundIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context).width <= 360 ? 40.0 : 44.0;
+    final compact = MediaQuery.sizeOf(context).width <= 390;
+    final size = compact ? 36.0 : 44.0;
 
     return Container(
       width: size,
@@ -219,7 +230,7 @@ class _RoundIconButton extends StatelessWidget {
       ),
       child: Icon(
         icon,
-        size: 23,
+        size: compact ? 20 : 23,
         color: _CheckoutColors.title,
       ),
     );
@@ -231,7 +242,7 @@ class _ProfileAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context).width <= 360 ? 40.0 : 44.0;
+    final size = MediaQuery.sizeOf(context).width <= 390 ? 36.0 : 44.0;
 
     return Container(
       width: size,
@@ -732,7 +743,8 @@ class _ContinueButton extends StatelessWidget {
       height: 56,
       width: double.infinity,
       child: ElevatedButton(
-        onPressed: () {},
+        onPressed: () =>
+            Navigator.of(context).pushNamed(AppRoutes.stripePayment),
         style: ElevatedButton.styleFrom(
           elevation: 0,
           backgroundColor: Colors.transparent,
