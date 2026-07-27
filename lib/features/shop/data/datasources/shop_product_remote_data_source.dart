@@ -213,4 +213,5 @@ final class ShopProductRemoteDataSourceImpl
 
     return normalizedValue.isEmpty ? 'shop-products' : normalizedValue;
   }
+
 }

@@ -1,13 +1,12 @@
+import 'dart:math' as math;
+
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/routes/app_routes.dart';
 
 class ReviewOrderScreen extends StatefulWidget {
-  const ReviewOrderScreen({
-    super.key,
-    this.embedded = false,
-    this.onBack,
-  });
+  const ReviewOrderScreen({super.key, this.embedded = false, this.onBack});
 
   static const String routeName = '/review-order';
   final bool embedded;
@@ -18,7 +17,10 @@ class ReviewOrderScreen extends StatefulWidget {
 }
 
 class _ReviewOrderScreenState extends State<ReviewOrderScreen> {
-  final List<_ReviewOrderItem> _items = const [
+  final TextEditingController _couponController = TextEditingController();
+  String? _couponError;
+  bool _couponApplied = false;
+  final List<_ReviewOrderItem> _items = const <_ReviewOrderItem>[
     _ReviewOrderItem(
       index: 1,
       title: 'Paracetamol 500mg',
@@ -62,9 +64,29 @@ class _ReviewOrderScreenState extends State<ReviewOrderScreen> {
 
   double get _deliveryCharge => 10;
 
-  double get _discount => 0;
+  double get _discount => _couponApplied ? _subtotal * 0.10 : 0;
 
   double get _totalPayable => _subtotal + _deliveryCharge - _discount;
+
+  @override
+  void dispose() {
+    _couponController.dispose();
+    super.dispose();
+  }
+
+  void _applyCoupon() {
+    FocusScope.of(context).unfocus();
+    final code = _couponController.text.trim().toUpperCase();
+
+    setState(() {
+      _couponApplied = code == 'SAVE10';
+      _couponError = code.isEmpty
+          ? 'Please enter a coupon code'
+          : _couponApplied
+          ? null
+          : 'Coupon code is not valid';
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -78,12 +100,31 @@ class _ReviewOrderScreenState extends State<ReviewOrderScreen> {
       ),
       const SizedBox(height: 24),
       _OrderItemsCard(items: _items),
-      const SizedBox(height: 22),
+      const SizedBox(height: 14),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: _CouponCodeField(
+          controller: _couponController,
+          isApplied: _couponApplied,
+          errorText: _couponError,
+          onApply: _applyCoupon,
+          onChanged: (_) {
+            if (_couponError != null || _couponApplied) {
+              setState(() {
+                _couponError = null;
+                _couponApplied = false;
+              });
+            }
+          },
+        ),
+      ),
+      const SizedBox(height: 14),
       _OrderSummaryCard(
         subtotal: _subtotal,
         deliveryCharge: _deliveryCharge,
         discount: _discount,
         totalPayable: _totalPayable,
+        couponApplied: _couponApplied,
       ),
       const SizedBox(height: 22),
       const _ShippingAddressCard(),
@@ -120,9 +161,7 @@ class _ReviewOrderScreenState extends State<ReviewOrderScreen> {
                   _ReviewResponsive.pagePadding(context),
                   24 + bottomSafe,
                 ),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate(content),
-                ),
+                sliver: SliverList(delegate: SliverChildListDelegate(content)),
               ),
             ],
           ),
@@ -251,8 +290,7 @@ class _OrderItemTile extends StatelessWidget {
             width: imageSize,
             height: imageSize,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) {
-              return Container(
+            errorBuilder: (_, _, _) => Container(
                 width: imageSize,
                 height: imageSize,
                 color: _ReviewColors.primaryLight,
@@ -260,8 +298,7 @@ class _OrderItemTile extends StatelessWidget {
                   Icons.medication_outlined,
                   color: _ReviewColors.primary,
                 ),
-              );
-            },
+              ),
           ),
         ),
         const SizedBox(width: 12),
@@ -361,18 +398,181 @@ class _OrderItemTile extends StatelessWidget {
   }
 }
 
+class _CouponCodeField extends StatelessWidget {
+  const _CouponCodeField({
+    required this.controller,
+    required this.isApplied,
+    required this.errorText,
+    required this.onApply,
+    required this.onChanged,
+  });
+
+  final TextEditingController controller;
+  final bool isApplied;
+  final String? errorText;
+  final VoidCallback onApply;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final borderColor = errorText == null
+        ? const Color(0xff8da2bb)
+        : const Color(0xffd92d20);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CustomPaint(
+          foregroundPainter: _DashedRoundedBorderPainter(
+            color: borderColor,
+            radius: 16,
+          ),
+          child: Container(
+            height: 54,
+            padding: const EdgeInsets.fromLTRB(13, 7, 7, 7),
+            child: Row(
+              children: [
+                Icon(
+                  isApplied
+                      ? Icons.check_circle_outline_rounded
+                      : Icons.sell_outlined,
+                  size: 20,
+                  color: isApplied
+                      ? _ReviewColors.success
+                      : const Color(0xff6b7b91),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: controller,
+                    onChanged: onChanged,
+                    onSubmitted: (_) => onApply(),
+                    textCapitalization: TextCapitalization.characters,
+                    textInputAction: TextInputAction.done,
+                    style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: _ReviewColors.title,
+                    ),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      border: InputBorder.none,
+                      hintText: isApplied ? 'Coupon applied' : 'Enter Coupon Code',
+                      hintStyle: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w400,
+                        color: isApplied
+                            ? _ReviewColors.success
+                            : const Color(0xff57667c),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 72,
+                  height: 38,
+                  child: ElevatedButton(
+                    onPressed: onApply,
+                    style: ElevatedButton.styleFrom(
+                      elevation: 0,
+                      padding: EdgeInsets.zero,
+                      backgroundColor: isApplied
+                          ? _ReviewColors.success
+                          : const Color(0xff86c3ec),
+                      foregroundColor: _ReviewColors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(11),
+                      ),
+                    ),
+                    child: Text(
+                      isApplied ? 'Applied' : 'Apply',
+                      style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (errorText != null)
+          Padding(
+            padding: const EdgeInsets.only(left: 12, top: 6),
+            child: Text(
+              errorText!,
+              style: const TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 11,
+                color: Color(0xffd92d20),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _DashedRoundedBorderPainter extends CustomPainter {
+  const _DashedRoundedBorderPainter({
+    required this.color,
+    required this.radius,
+  });
+
+  final Color color;
+  final double radius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..addRRect(
+        RRect.fromRectAndRadius(
+          Offset.zero & size,
+          Radius.circular(radius),
+        ),
+      );
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+
+    for (final metric in path.computeMetrics()) {
+      var distance = 0.0;
+      while (distance < metric.length) {
+        canvas.drawPath(
+          metric.extractPath(distance, math.min(distance + 4, metric.length)),
+          paint,
+        );
+        distance += 7;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedRoundedBorderPainter oldDelegate) {
+    return oldDelegate.color != color || oldDelegate.radius != radius;
+  }
+}
+
 class _OrderSummaryCard extends StatelessWidget {
   const _OrderSummaryCard({
     required this.subtotal,
     required this.deliveryCharge,
     required this.discount,
     required this.totalPayable,
+    required this.couponApplied,
   });
 
   final double subtotal;
   final double deliveryCharge;
   final double discount;
   final double totalPayable;
+  final bool couponApplied;
 
   @override
   Widget build(BuildContext context) {
@@ -399,17 +599,18 @@ class _OrderSummaryCard extends StatelessWidget {
           ),
           const _ThinDivider(height: 28),
           _SummaryRow(
-            labelWidget: const Text.rich(
+            labelWidget: Text.rich(
               TextSpan(
                 children: [
-                  TextSpan(text: 'Discount '),
-                  TextSpan(
-                    text: '(SAVE 10%)',
-                    style: TextStyle(color: _ReviewColors.success),
-                  ),
+                  const TextSpan(text: 'Discount'),
+                  if (couponApplied)
+                    const TextSpan(
+                      text: ' (SAVE10 · 10%)',
+                      style: TextStyle(color: _ReviewColors.success),
+                    ),
                 ],
               ),
-              style: TextStyle(
+              style: const TextStyle(
                 fontFamily: 'Poppins',
                 fontSize: 14,
                 height: 20 / 14,
@@ -429,7 +630,7 @@ class _OrderSummaryCard extends StatelessWidget {
             valueSize: 22,
           ),
           const SizedBox(height: 20),
-          const _SavingNotice(),
+          _SavingNotice(discount: discount),
         ],
       ),
     );
@@ -488,7 +689,9 @@ class _SummaryRow extends StatelessWidget {
 }
 
 class _SavingNotice extends StatelessWidget {
-  const _SavingNotice();
+  const _SavingNotice({required this.discount});
+
+  final double discount;
 
   @override
   Widget build(BuildContext context) {
@@ -499,10 +702,10 @@ class _SavingNotice extends StatelessWidget {
         color: _ReviewColors.successLight,
         borderRadius: BorderRadius.circular(14),
       ),
-      child: const Row(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
+          const Padding(
             padding: EdgeInsets.only(top: 3),
             child: Icon(
               Icons.check_circle_outline_rounded,
@@ -510,16 +713,16 @@ class _SavingNotice extends StatelessWidget {
               color: _ReviewColors.success,
             ),
           ),
-          SizedBox(width: 14),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'You will save 0.00 on this order',
+                  'You will save ${_ReviewMoney.format(discount)} on this order',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontFamily: 'Poppins',
                     fontSize: 14,
                     height: 22 / 14,
@@ -527,12 +730,14 @@ class _SavingNotice extends StatelessWidget {
                     color: Color(0xff0d542b),
                   ),
                 ),
-                SizedBox(height: 3),
+                const SizedBox(height: 3),
                 Text(
-                  'Special discount applied automatically',
+                  discount > 0
+                      ? 'SAVE10 coupon applied successfully'
+                      : 'Enter a valid coupon to save on this order',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontFamily: 'Poppins',
                     fontSize: 12,
                     height: 16 / 12,
@@ -913,10 +1118,22 @@ class _PlaceOrderButton extends StatelessWidget {
       height: 56,
       width: double.infinity,
       child: ElevatedButton(
-        onPressed: () {
-          Navigator.of(context).pushReplacementNamed(
-            AppRoutes.completedOrder,
+        onPressed: () async {
+          final List<ConnectivityResult> connectivity = await Connectivity()
+              .checkConnectivity();
+          final bool isOffline = connectivity.every(
+            (ConnectivityResult result) => result == ConnectivityResult.none,
           );
+          if (!context.mounted) return;
+          if (isOffline) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Internet connection is required to order.'),
+              ),
+            );
+            return;
+          }
+          Navigator.of(context).pushReplacementNamed(AppRoutes.completedOrder);
         },
         style: ElevatedButton.styleFrom(
           elevation: 0,

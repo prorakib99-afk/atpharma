@@ -19,7 +19,7 @@ class NavigationPageScaffold extends StatelessWidget {
   });
 
   final Widget body;
-  final NavigationPage currentPage;
+  final NavigationPage? currentPage;
   final Color backgroundColor;
   final PreferredSizeWidget? appBar;
   final bool extendBody;
@@ -38,7 +38,7 @@ class NavigationPageScaffold extends StatelessWidget {
 
 class _NavigationBar extends StatelessWidget {
   const _NavigationBar({required this.currentPage});
-  final NavigationPage currentPage;
+  final NavigationPage? currentPage;
 
   void _open(BuildContext context, NavigationPage page) {
     if (page == currentPage) return;
@@ -65,7 +65,9 @@ class _NavigationBar extends StatelessWidget {
           _NavGroup(
             children: [
               _NavIcon(
-                asset: 'assets/icons/home_icon.svg',
+                asset: currentPage == NavigationPage.home
+                    ? 'assets/icons/home_icon.svg'
+                    : 'assets/icons/home_icon_us.svg',
                 active: currentPage == NavigationPage.home,
                 onTap: () => _open(context, NavigationPage.home),
               ),
@@ -84,31 +86,32 @@ class _NavigationBar extends StatelessWidget {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: const Color(0xFF0B83D9),
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white),
                 boxShadow: const [
-                  BoxShadow(color: Color(0x26000000), blurRadius: 28),
+                  BoxShadow(color: Color(0x14000000), blurRadius: 28),
                 ],
               ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SvgPicture.asset(
-                    'assets/icons/upload_icon.svg',
-                    width: 32,
-                    height: 32,
-                  ),
-                  const Text(
-                    'Rx.',
-                    style: TextStyle(
-                      fontSize: 14,
-                      height: 24 / 14,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white,
+              child: CustomPaint(
+                painter: const _RxButtonPainter(),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SvgPicture.asset(
+                      'assets/icons/upload_icon.svg',
+                      width: 32,
+                      height: 32,
                     ),
-                  ),
-                ],
+                    const Text(
+                      'Rx.',
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 24 / 14,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -122,33 +125,41 @@ class _NavigationBar extends StatelessWidget {
               ),
               AnimatedBuilder(
                 animation: ProductCart.instance,
-                builder: (BuildContext context, _) => ValueListenableBuilder<int>(
-                  valueListenable: CartFlyTarget.arrivals,
-                  builder: (BuildContext context, int arrivals, _) =>
-                      TweenAnimationBuilder<double>(
-                    key: ValueKey<int>(arrivals),
-                    tween: Tween<double>(begin: 0, end: 1),
-                    duration: const Duration(milliseconds: 420),
-                    builder: (BuildContext context, double value, Widget? child) {
-                      final double wave = Curves.elasticOut.transform(value);
-                      return Transform.rotate(
-                        angle: (1 - wave) * .22,
-                        child: Transform.scale(
-                          scale: 1 + ((1 - wave).abs() * .18),
-                          child: child,
-                        ),
-                      );
-                    },
-                    child: CartFlyTargetMarker(
-                      child: _NavIcon(
-                        asset: 'assets/icons/cart_icon.svg',
-                        active: currentPage == NavigationPage.cart,
-                        badgeCount: ProductCart.instance.totalCount,
-                        onTap: () => _open(context, NavigationPage.cart),
-                      ),
+                builder: (BuildContext context, _) =>
+                    ValueListenableBuilder<int>(
+                      valueListenable: CartFlyTarget.arrivals,
+                      builder: (BuildContext context, int arrivals, _) =>
+                          TweenAnimationBuilder<double>(
+                            key: ValueKey<int>(arrivals),
+                            tween: Tween<double>(begin: 0, end: 1),
+                            duration: const Duration(milliseconds: 420),
+                            builder:
+                                (
+                                  BuildContext context,
+                                  double value,
+                                  Widget? child,
+                                ) {
+                                  final double wave = Curves.elasticOut
+                                      .transform(value);
+                                  return Transform.rotate(
+                                    angle: (1 - wave) * .22,
+                                    child: Transform.scale(
+                                      scale: 1 + ((1 - wave).abs() * .18),
+                                      child: child,
+                                    ),
+                                  );
+                                },
+                            child: CartFlyTargetMarker(
+                              child: _NavIcon(
+                                asset: 'assets/icons/cart_icon.svg',
+                                active: currentPage == NavigationPage.cart,
+                                badgeCount: ProductCart.instance.totalCount,
+                                onTap: () =>
+                                    _open(context, NavigationPage.cart),
+                              ),
+                            ),
+                          ),
                     ),
-                  ),
-                ),
               ),
             ],
           ),
@@ -156,6 +167,49 @@ class _NavigationBar extends StatelessWidget {
       ),
     );
   }
+}
+
+class _RxButtonPainter extends CustomPainter {
+  const _RxButtonPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Offset center = size.center(Offset.zero);
+    final double radius = size.shortestSide / 2;
+
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()..color = const Color(0xFF0B83D9),
+    );
+
+    canvas.save();
+    canvas.clipPath(
+      Path()..addOval(Rect.fromCircle(center: center, radius: radius)),
+    );
+    canvas.drawCircle(
+      center,
+      radius - 1,
+      Paint()
+        ..color = const Color(0xB3FFFFFF)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+    );
+    canvas.restore();
+
+    canvas.drawCircle(
+      center,
+      radius - 0.5,
+      Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _RxButtonPainter oldDelegate) => false;
 }
 
 class _NavGroup extends StatelessWidget {
@@ -180,7 +234,6 @@ class _NavGroup extends StatelessWidget {
 
 class _NavIcon extends StatelessWidget {
   const _NavIcon({
-    super.key,
     required this.asset,
     required this.active,
     required this.onTap,

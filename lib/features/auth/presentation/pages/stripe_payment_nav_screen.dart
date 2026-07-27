@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../../core/routes/app_routes.dart';
 import '../../../../shared/widgets/navigation_page_scaffold.dart';
 import 'cod_payment_screen.dart';
 import 'favorite_header_button.dart';
+import 'floating_profile_screen.dart';
 import 'mada_ payment_screen.dart';
 import 'review_order_screen.dart';
 
@@ -27,9 +29,9 @@ class _StripePaymentNavScreenState extends State<StripePaymentNavScreen> {
     final pagePadding = _PaymentResponsive.pagePadding(context);
 
     return MediaQuery(
-      data: MediaQuery.of(context).copyWith(
-        textScaler: const TextScaler.linear(1),
-      ),
+      data: MediaQuery.of(
+        context,
+      ).copyWith(textScaler: const TextScaler.linear(1)),
       child: NavigationPageScaffold(
         currentPage: NavigationPage.cart,
         resizeToAvoidBottomInset: true,
@@ -192,9 +194,7 @@ class _CheckoutHeader extends StatelessWidget {
         const SizedBox(width: 16),
         const _HeaderIcon(icon: Icons.notifications_none_rounded),
         const SizedBox(width: 4),
-        const FavoriteHeaderButton(
-          inactiveColor: _PaymentColors.title,
-        ),
+        const FavoriteHeaderButton(inactiveColor: _PaymentColors.title),
         const SizedBox(width: 4),
         const _HeaderAvatar(),
       ],
@@ -219,11 +219,7 @@ class _HeaderIcon extends StatelessWidget {
           BoxShadow(color: Color(0x14000000), blurRadius: 28),
         ],
       ),
-      child: Icon(
-        icon,
-        size: 20,
-        color: _PaymentColors.title,
-      ),
+      child: Icon(icon, size: 20, color: _PaymentColors.title),
     );
   }
 }
@@ -233,13 +229,22 @@ class _HeaderAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipOval(
-      child: Image.asset(
-        'assets/images/at_pharma_icon.png',
-        width: 40,
-        height: 40,
-        fit: BoxFit.cover,
-        cacheWidth: 88,
+    return InkWell(
+      onTap: () => FloatingProfileScreen.show(
+        context,
+        avatarAssetPath: 'assets/images/at_pharma_icon.png',
+        onProfileTap: () => Navigator.of(context).pushNamed(AppRoutes.profile),
+        onSignOutTap: () => signOutFromProfile(context),
+      ),
+      customBorder: const CircleBorder(),
+      child: ClipOval(
+        child: Image.asset(
+          'assets/images/at_pharma_icon.png',
+          width: 40,
+          height: 40,
+          fit: BoxFit.cover,
+          cacheWidth: 80,
+        ),
       ),
     );
   }
@@ -375,10 +380,7 @@ class _StepLine extends StatelessWidget {
 }
 
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({
-    required this.title,
-    required this.onBack,
-  });
+  const _SectionHeader({required this.title, required this.onBack});
 
   final String title;
   final VoidCallback onBack;
@@ -445,17 +447,14 @@ class _PaymentMethodSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const List<_PaymentMethodData> methods = <_PaymentMethodData>[
-      const _PaymentMethodData(
+      _PaymentMethodData(
         name: 'Stripe',
         asset: 'assets/icons/stripe_icon.svg',
         logoBackgroundColor: Color(0xff635bff),
         logoPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       ),
-      const _PaymentMethodData(
-        name: 'Mada',
-        asset: 'assets/icons/mada_icon.svg',
-      ),
-      const _PaymentMethodData(
+      _PaymentMethodData(name: 'Mada', asset: 'assets/icons/mada_icon.svg'),
+      _PaymentMethodData(
         name: 'COD',
         asset: 'assets/icons/cod_icon.png',
         logoBackgroundColor: Color(0xfff59e0b),
@@ -516,10 +515,7 @@ class _PaymentMethodCard extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _PaymentLogo(
-                  data: data,
-                  size: 24,
-                ),
+                _PaymentLogo(data: data, size: 24),
                 const SizedBox(width: 4),
                 Text(
                   data.name,
@@ -553,10 +549,7 @@ class _PaymentMethodCard extends StatelessWidget {
 }
 
 class _PaymentLogo extends StatelessWidget {
-  const _PaymentLogo({
-    required this.data,
-    required this.size,
-  });
+  const _PaymentLogo({required this.data, required this.size});
 
   final _PaymentMethodData data;
   final double size;
@@ -577,11 +570,7 @@ class _PaymentLogo extends StatelessWidget {
             ),
       child: data.asset.endsWith('.svg')
           ? SvgPicture.asset(data.asset, fit: BoxFit.contain)
-          : Image.asset(
-              data.asset,
-              fit: BoxFit.contain,
-              cacheWidth: 40,
-            ),
+          : Image.asset(data.asset, fit: BoxFit.contain, cacheWidth: 40),
     );
   }
 }
@@ -670,11 +659,7 @@ class _PaymentBrandBox extends StatelessWidget {
         borderRadius: BorderRadius.circular(5),
         border: Border.all(color: _PaymentColors.border),
       ),
-      child: SvgPicture.asset(
-        asset,
-        height: 18,
-        fit: BoxFit.contain,
-      ),
+      child: SvgPicture.asset(asset, height: 18, fit: BoxFit.contain),
     );
   }
 }
@@ -721,10 +706,7 @@ class _CardInformationCard extends StatelessWidget {
             textInputAction: TextInputAction.done,
           ),
           const SizedBox(height: 24),
-          _SaveCardOption(
-            value: saveCard,
-            onChanged: onSaveChanged,
-          ),
+          _SaveCardOption(value: saveCard, onChanged: onSaveChanged),
         ],
       ),
     );
@@ -804,10 +786,7 @@ class _InputField extends StatelessWidget {
 }
 
 class _ResponsiveTwoColumn extends StatelessWidget {
-  const _ResponsiveTwoColumn({
-    required this.left,
-    required this.right,
-  });
+  const _ResponsiveTwoColumn({required this.left, required this.right});
 
   final Widget left;
   final Widget right;
@@ -817,13 +796,7 @@ class _ResponsiveTwoColumn extends StatelessWidget {
     final shouldStack = MediaQuery.sizeOf(context).width <= 330;
 
     if (shouldStack) {
-      return Column(
-        children: [
-          left,
-          const SizedBox(height: 20),
-          right,
-        ],
-      );
+      return Column(children: [left, const SizedBox(height: 20), right]);
     }
 
     return Row(
@@ -838,10 +811,7 @@ class _ResponsiveTwoColumn extends StatelessWidget {
 }
 
 class _SaveCardOption extends StatelessWidget {
-  const _SaveCardOption({
-    required this.value,
-    required this.onChanged,
-  });
+  const _SaveCardOption({required this.value, required this.onChanged});
 
   final bool value;
   final ValueChanged<bool> onChanged;
@@ -869,10 +839,10 @@ class _SaveCardOption extends StatelessWidget {
             ),
             child: value
                 ? const Icon(
-              Icons.check_rounded,
-              size: 18,
-              color: _PaymentColors.white,
-            )
+                    Icons.check_rounded,
+                    size: 18,
+                    color: _PaymentColors.white,
+                  )
                 : null,
           ),
           const SizedBox(width: 12),
@@ -890,7 +860,7 @@ class _SaveCardOption extends StatelessWidget {
                     color: _PaymentColors.title,
                   ),
                 ),
-                  SizedBox(height: 2),
+                SizedBox(height: 2),
                 Text(
                   'Your card details will be securely saved by Stripe',
                   maxLines: 2,
@@ -921,9 +891,7 @@ class _DividerText extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const Expanded(
-          child: Divider(height: 1, color: _PaymentColors.border),
-        ),
+        const Expanded(child: Divider(height: 1, color: _PaymentColors.border)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 21),
           child: Text(
@@ -937,9 +905,7 @@ class _DividerText extends StatelessWidget {
             ),
           ),
         ),
-        const Expanded(
-          child: Divider(height: 1, color: _PaymentColors.border),
-        ),
+        const Expanded(child: Divider(height: 1, color: _PaymentColors.border)),
       ],
     );
   }
@@ -1079,10 +1045,7 @@ class _TermsAndPrivacyText extends StatelessWidget {
 }
 
 class _ContinueToReviewButton extends StatelessWidget {
-  const _ContinueToReviewButton({
-    required this.total,
-    required this.onPressed,
-  });
+  const _ContinueToReviewButton({required this.total, required this.onPressed});
 
   final double total;
   final VoidCallback onPressed;
@@ -1108,10 +1071,7 @@ class _ContinueToReviewButton extends StatelessWidget {
         child: Ink(
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [
-                _PaymentColors.primary,
-                Color(0xff0968c3),
-              ],
+              colors: [_PaymentColors.primary, Color(0xff0968c3)],
             ),
             borderRadius: BorderRadius.circular(16),
           ),
@@ -1152,8 +1112,6 @@ class _ContinueToReviewButton extends StatelessWidget {
   }
 }
 
-
-
 class _PaymentInputDecoration {
   static InputDecoration inputDecoration({
     required String hint,
@@ -1178,10 +1136,7 @@ class _PaymentInputDecoration {
       filled: true,
       fillColor: _PaymentColors.white,
       isDense: true,
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: 15,
-      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
         borderSide: const BorderSide(color: _PaymentColors.border, width: 1),

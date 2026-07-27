@@ -5,6 +5,7 @@ import '../../../../core/routes/app_routes.dart';
 import '../../../../shared/widgets/navigation_page_scaffold.dart';
 import 'screen_product_details.dart';
 import 'favorite_header_button.dart';
+import 'floating_profile_screen.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -229,20 +230,21 @@ class _ProfileAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context).width <= 360 ? 40.0 : 44.0;
 
-    return Container(
-      width: size,
-      height: size,
-      decoration: const BoxDecoration(
-        color: _CartColors.primaryLight,
-        shape: BoxShape.circle,
+    return InkWell(
+      onTap: () => FloatingProfileScreen.show(
+        context,
+        avatarAssetPath: 'assets/images/at_pharma_icon.png',
+        onProfileTap: () => Navigator.of(context).pushNamed(AppRoutes.profile),
+        onSignOutTap: () => signOutFromProfile(context),
       ),
-      clipBehavior: Clip.antiAlias,
-      child: Image.asset(
-        'assets/images/at_pharma_icon.png',
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) {
-          return const Icon(Icons.person_rounded, color: _CartColors.primary);
-        },
+      customBorder: const CircleBorder(),
+      child: ClipOval(
+        child: Image.asset(
+          'assets/images/at_pharma_icon.png',
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+        ),
       ),
     );
   }
@@ -401,21 +403,19 @@ class _CartProductImage extends StatelessWidget {
       ),
     );
 
-    if (isNetwork) {
-      return Image.network(
-        source,
-        fit: BoxFit.cover,
-        cacheWidth: 360,
-        errorBuilder: (_, _, _) => fallback,
-      );
-    }
-
-    return Image.asset(
-      source,
-      fit: BoxFit.cover,
-      cacheWidth: 360,
-      errorBuilder: (_, _, _) => fallback,
-    );
+    return isNetwork
+        ? Image.network(
+            source,
+            fit: BoxFit.cover,
+            cacheWidth: 360,
+            errorBuilder: (_, _, _) => fallback,
+          )
+        : Image.asset(
+            source,
+            fit: BoxFit.cover,
+            cacheWidth: 360,
+            errorBuilder: (_, _, _) => fallback,
+          );
   }
 }
 

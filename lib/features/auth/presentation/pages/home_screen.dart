@@ -18,6 +18,8 @@ import 'buy_again_floating_screen.dart';
 import 'favorite_store.dart';
 import 'favourite_screen.dart';
 import 'floating_category_screen.dart';
+import 'floating_profile_screen.dart';
+import 'notification_screen.dart';
 import 'screen_product_details.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -352,17 +354,20 @@ class _Header extends StatelessWidget {
             ),
           ),
         ),
-        const _RoundButton(icon: Icons.notifications_none_rounded),
+        _RoundButton(
+          icon: Icons.notifications_none_rounded,
+          onTap: () => _showNotifications(context),
+        ),
         const SizedBox(width: 4),
         const _FavouriteHeaderButton(),
         const SizedBox(width: 4),
-        ClipOval(
-          child: Image.asset(
-            'assets/images/at_pharma_icon.png',
-            width: 40,
-            height: 40,
-            fit: BoxFit.cover,
-            cacheWidth: 80,
+        _ProfileAvatarButton(
+          onTap: () => FloatingProfileScreen.show(
+            context,
+            avatarAssetPath: 'assets/images/at_pharma_icon.png',
+            onProfileTap: () =>
+                Navigator.of(context).pushNamed(AppRoutes.profile),
+            onSignOutTap: () => signOutFromProfile(context),
           ),
         ),
       ],
@@ -370,25 +375,93 @@ class _Header extends StatelessWidget {
   }
 }
 
-class _RoundButton extends StatelessWidget {
-  const _RoundButton({required this.icon});
+class _ProfileAvatarButton extends StatelessWidget {
+  const _ProfileAvatarButton({required this.onTap});
 
-  final IconData icon;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 40,
-      height: 40,
-      alignment: Alignment.center,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        shape: BoxShape.circle,
-        boxShadow: <BoxShadow>[
-          BoxShadow(color: Color(0x14000000), blurRadius: 18),
-        ],
+    return InkWell(
+      onTap: onTap,
+      customBorder: const CircleBorder(),
+      child: ClipOval(
+        child: Image.asset(
+          'assets/images/at_pharma_icon.png',
+          width: 40,
+          height: 40,
+          fit: BoxFit.cover,
+          cacheWidth: 80,
+        ),
       ),
-      child: Icon(icon, size: 20, color: _Colors.text),
+    );
+  }
+}
+
+void _showNotifications(BuildContext context) {
+  showGeneralDialog<void>(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: 'Close notifications',
+    barrierColor: Colors.black.withOpacity(0.08),
+    transitionDuration: const Duration(milliseconds: 180),
+    pageBuilder: (BuildContext dialogContext, _, __) {
+      return SafeArea(
+        child: Stack(
+          children: <Widget>[
+            Positioned(
+              top: 62,
+              right: 16,
+              left: 28,
+              child: const Align(
+                alignment: Alignment.topRight,
+                child: NotificationScreen(maxHeight: 280, width: 330),
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+    transitionBuilder: (context, animation, secondaryAnimation, child) {
+      final Animation<double> curved = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      );
+      return FadeTransition(
+        opacity: curved,
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.94, end: 1).animate(curved),
+          alignment: Alignment.topRight,
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
+class _RoundButton extends StatelessWidget {
+  const _RoundButton({required this.icon, this.onTap});
+
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      shape: const CircleBorder(),
+      elevation: 2,
+      shadowColor: const Color(0x14000000),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: SizedBox(
+          width: 40,
+          height: 40,
+          child: Icon(icon, size: 20, color: _Colors.text),
+        ),
+      ),
     );
   }
 }
@@ -533,6 +606,17 @@ class _SectionHeader extends StatelessWidget {
 class _CategorySection extends StatelessWidget {
   const _CategorySection();
 
+  void _openCategory(
+    BuildContext context, {
+    required String id,
+    required String name,
+  }) {
+    Navigator.of(context).pushNamed(
+      AppRoutes.explore,
+      arguments: <String, String>{'categoryId': id, 'categoryName': name},
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -542,32 +626,47 @@ class _CategorySection extends StatelessWidget {
           onSeeAll: () => showFloatingCategoryScreen(context),
         ),
         const SizedBox(height: 16),
-        const Row(
+        Row(
           children: <Widget>[
             Expanded(
               child: _CategoryCard(
                 image: 'assets/images/drug_icon_opt.png',
                 title: 'Medicines',
-                count: '2500+',
+                count: '12',
                 color: Color(0xFFF7FBFE),
+                onTap: () => _openCategory(
+                  context,
+                  id: 'cmrdtm3u90000dc06b8txq5c8',
+                  name: 'Medicine',
+                ),
               ),
             ),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Expanded(
               child: _CategoryCard(
                 image: 'assets/images/grocery_icon_opt.png',
                 title: 'Grocery',
-                count: '550',
+                count: '5',
                 color: Color(0xFFECFDFD),
+                onTap: () => _openCategory(
+                  context,
+                  id: 'cmrf7emim0000hkvp20b5ffet',
+                  name: 'Grocery',
+                ),
               ),
             ),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Expanded(
               child: _CategoryCard(
                 image: 'assets/images/skin_care_opt.png',
                 title: 'Personal Care',
-                count: '1000+',
+                count: '35',
                 color: Color(0xFFF8EAFE),
+                onTap: () => _openCategory(
+                  context,
+                  id: 'cmrf6hrf30000ufw7wnco3wy2',
+                  name: 'Personal Care',
+                ),
               ),
             ),
           ],
@@ -583,24 +682,28 @@ class _CategoryCard extends StatelessWidget {
     required this.title,
     required this.count,
     required this.color,
+    required this.onTap,
   });
 
   final String image;
   final String title;
   final String count;
   final Color color;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 104,
-      decoration: BoxDecoration(
-        color: color,
+    return Material(
+      color: color,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: <Widget>[
+        child: SizedBox(
+          height: 104,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
           Image.asset(
             image,
             width: 38,
@@ -616,7 +719,9 @@ class _CategoryCard extends StatelessWidget {
             style: _Text.cardTitle12,
           ),
           Text(count, style: _Text.body12),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -927,43 +1032,16 @@ class _NetworkProductImage extends StatelessWidget {
       borderRadius: BorderRadius.circular(10),
       child: ColoredBox(
         color: const Color(0xFFF1F5F9),
-        child: imageUrl.trim().isEmpty
-            ? const _ImageFallback()
-            : Image.network(
-                imageUrl,
-                width: double.infinity,
-                height: double.infinity,
-                fit: BoxFit.cover,
-                cacheWidth: 360,
-                cacheHeight: 320,
-                filterQuality: FilterQuality.low,
-                gaplessPlayback: true,
-                frameBuilder:
-                    (
-                      BuildContext context,
-                      Widget child,
-                      int? frame,
-                      bool wasSynchronouslyLoaded,
-                    ) {
-                      if (wasSynchronouslyLoaded || frame != null) {
-                        return child;
-                      }
-
-                      return const Center(
-                        child: SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: _Colors.blue,
-                          ),
-                        ),
-                      );
-                    },
-                errorBuilder: (_, _, _) {
-                  return const _ImageFallback();
-                },
-              ),
+        child: Image.network(
+          imageUrl,
+          width: double.infinity,
+          height: double.infinity,
+          fit: BoxFit.cover,
+          cacheWidth: 360,
+          cacheHeight: 320,
+          filterQuality: FilterQuality.low,
+          errorBuilder: (_, _, _) => const _ImageFallback(),
+        ),
       ),
     );
   }

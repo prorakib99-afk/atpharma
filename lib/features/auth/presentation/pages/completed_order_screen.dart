@@ -82,7 +82,7 @@ class _AtPharmaLogo extends StatelessWidget {
           'assets/images/atpharma_font.png',
           height: 20,
           fit: BoxFit.contain,
-          errorBuilder: (_, __, ___) {
+          errorBuilder: (_, _, _) {
             return const Text.rich(
               TextSpan(
                 children: [
@@ -180,7 +180,7 @@ class _SuccessIllustration extends StatelessWidget {
               height: 132,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: _CompletedColors.success.withOpacity(0.08),
+                color: _CompletedColors.success.withValues(alpha: 0.08),
               ),
             ),
             Container(
@@ -188,7 +188,7 @@ class _SuccessIllustration extends StatelessWidget {
               height: 108,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: _CompletedColors.success.withOpacity(0.12),
+                color: _CompletedColors.success.withValues(alpha: 0.12),
               ),
             ),
             Container(

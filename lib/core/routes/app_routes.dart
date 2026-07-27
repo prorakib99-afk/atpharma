@@ -4,8 +4,13 @@ abstract final class AppRoutes {
   static const String splash = '/';
   static const String startpage = '/startpage';
   static const String login = '/login';
+  static const String recovery = '/recovery';
+  static const String otp = '/otp';
+  static const String resetPassword = '/reset-password';
+  static const String resetPasswordSuccess = '/success-reset-password';
   static const String register = '/register';
   static const String home = '/home';
+  static const String profile = '/profile';
   static const String explore = '/explore';
   static const String prescription = '/prescription';
   static const String search = '/search';

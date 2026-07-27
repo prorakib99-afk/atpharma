@@ -6,7 +6,7 @@ final class AppDatabase {
   Future<Database> get instance async {
     return _database ??= await openDatabase(
       'atpharma_offline.db',
-      version: 1,
+      version: 2,
       onCreate: (Database db, int version) async {
         await db.execute(
           'CREATE TABLE storefront_config ('
@@ -42,6 +42,16 @@ final class AppDatabase {
           'updated_at INTEGER NOT NULL'
           ')',
         );
+        await _createCartItemsTable(db);
+      },
+      onUpgrade: (Database db, int oldVersion, int newVersion) async {
+        if (oldVersion < 2) {
+          await _createCartItemsTable(db);
+        }
+      },
+      onDowngrade: (Database db, int oldVersion, int newVersion) async {
+        // Keeps existing user data when rolling back from the temporary
+        // product/image-cache schema. The unused cache tables are harmless.
       },
       onOpen: (Database db) async {
         await db.update(
@@ -51,6 +61,24 @@ final class AppDatabase {
           whereArgs: <Object?>['syncing'],
         );
       },
+    );
+  }
+
+  static Future<void> _createCartItemsTable(Database db) {
+    return db.execute(
+      'CREATE TABLE IF NOT EXISTS cart_items ('
+      'product_id TEXT PRIMARY KEY, '
+      'name TEXT NOT NULL, '
+      'image TEXT NOT NULL, '
+      'description TEXT NOT NULL, '
+      'brand TEXT NOT NULL, '
+      'price INTEGER NOT NULL, '
+      'prescription_required INTEGER NOT NULL DEFAULT 0, '
+      'currency_code TEXT NOT NULL DEFAULT \'\', '
+      'country_code TEXT NOT NULL DEFAULT \'\', '
+      'quantity INTEGER NOT NULL CHECK (quantity > 0), '
+      'updated_at INTEGER NOT NULL'
+      ')',
     );
   }
 

@@ -3,6 +3,12 @@ import 'dart:async';
 import 'package:atpharma/features/shop/domain/repositories/shop_product_repository_impl.dart';
 import 'package:dio/dio.dart';
 import 'package:get_it/get_it.dart';
+import '../../features/auth/data/datasources/auth_remote_data_source.dart';
+import '../../features/auth/data/repositories/auth_repository_impl.dart';
+import '../../features/auth/domain/repositories/auth_repository.dart';
+import '../../features/auth/domain/usecases/login_use_case.dart';
+import '../../features/auth/domain/usecases/logout_use_case.dart';
+import '../../features/auth/presentation/bloc/login/login_bloc.dart';
 import '../../features/shop/data/datasources/shop_product_remote_data_source.dart';
 import '../../features/shop/data/services/offline_order_service.dart';
 import '../../features/shop/domain/repositories/shop_product_repository.dart';
@@ -95,6 +101,26 @@ Future<void> configureDependencies() async {
     ..registerSingleton<OfflineOrderService>(offlineOrderService);
 
   unawaited(offlineOrderService.initialize());
+
+  sl
+    ..registerLazySingleton<AuthRemoteDataSource>(
+      () => AuthRemoteDataSourceImpl(dioClient: sl<DioClient>()),
+    )
+    ..registerLazySingleton<AuthRepository>(
+      () => AuthRepositoryImpl(
+        remoteDataSource: sl<AuthRemoteDataSource>(),
+        sessionManager: sl<SessionManager>(),
+      ),
+    )
+    ..registerLazySingleton<LoginUseCase>(
+      () => LoginUseCase(repository: sl<AuthRepository>()),
+    )
+    ..registerLazySingleton<LogoutUseCase>(
+      () => LogoutUseCase(repository: sl<AuthRepository>()),
+    )
+    ..registerFactory<LoginBloc>(
+      () => LoginBloc(loginUseCase: sl<LoginUseCase>()),
+    );
 
   /*
    * Shop Product DataSource

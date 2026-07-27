@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/error/app_result.dart';
 import '../../../../core/pagination/paginated_result.dart';
+import '../../../../core/routes/app_routes.dart';
 import '../../../../core/utils/currency_display.dart';
 import '../../../../shared/widgets/navigation_page_scaffold.dart';
 import '../../../../shared/widgets/fly_to_cart.dart';
@@ -13,13 +14,21 @@ import '../../../shop/domain/entities/shop_product_query.dart';
 import '../../../shop/domain/usecases/cancel_shop_products_request_use_case.dart';
 import '../../../shop/domain/usecases/get_shop_products_use_case.dart';
 import 'floating_explore_filter_screen.dart';
+import 'floating_profile_screen.dart';
 import 'screen_product_details.dart';
 import 'favorite_header_button.dart';
 
 class ExploreScreen extends StatefulWidget {
-  const ExploreScreen({super.key});
+  const ExploreScreen({
+    super.key,
+    this.initialCategoryId,
+    this.initialCategoryName,
+  });
 
   static const String routeName = '/explore';
+
+  final String? initialCategoryId;
+  final String? initialCategoryName;
 
   @override
   State<ExploreScreen> createState() => _ExploreScreenState();
@@ -43,7 +52,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   bool _loading = true;
   String? _error;
   int _version = 0;
-  ExploreFilter _filter = const ExploreFilter();
+  late ExploreFilter _filter;
 
   ShopProductQuery _query(int page) {
     return ShopProductQuery(
@@ -71,6 +80,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
   @override
   void initState() {
     super.initState();
+    final String categoryId = widget.initialCategoryId?.trim() ?? '';
+    _filter = ExploreFilter(
+      categoryIds: categoryId.isEmpty ? const <String>[] : <String>[categoryId],
+    );
     _getProducts = sl<GetShopProductsUseCase>();
     _cancelProducts = sl<CancelShopProductsRequestUseCase>();
     _loadPage(1);
@@ -204,7 +217,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   ),
                   child: Column(
                     children: [
-                      const _ExploreHeader(),
+                      _ExploreHeader(categoryName: widget.initialCategoryName),
                       const SizedBox(height: 24),
                       _ExploreSearchBar(
                         controller: _searchController,
@@ -258,7 +271,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
 }
 
 class _ExploreHeader extends StatelessWidget {
-  const _ExploreHeader();
+  const _ExploreHeader({this.categoryName});
+
+  final String? categoryName;
 
   @override
   Widget build(BuildContext context) {
@@ -266,12 +281,14 @@ class _ExploreHeader extends StatelessWidget {
 
     return Row(
       children: [
-        const Expanded(
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Explore All',
+                categoryName?.trim().isNotEmpty == true
+                    ? categoryName!.trim()
+                    : 'Explore All',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -283,7 +300,7 @@ class _ExploreHeader extends StatelessWidget {
                 ),
               ),
               SizedBox(height: 4),
-              Text(
+              const Text(
                 'Find the right product quickly.',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -348,23 +365,21 @@ class _ProfileAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: const BoxDecoration(
-        color: Color(0xffe7f3fb),
-        shape: BoxShape.circle,
+    return InkWell(
+      onTap: () => FloatingProfileScreen.show(
+        context,
+        avatarAssetPath: 'assets/images/at_pharma_icon.png',
+        onProfileTap: () => Navigator.of(context).pushNamed(AppRoutes.profile),
+        onSignOutTap: () => signOutFromProfile(context),
       ),
-      clipBehavior: Clip.antiAlias,
-      child: Image.asset(
-        'assets/images/at_pharma_icon.png',
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) {
-          return const Icon(
-            Icons.person_rounded,
-            color: _ExploreColors.primary,
-          );
-        },
+      customBorder: const CircleBorder(),
+      child: ClipOval(
+        child: Image.asset(
+          'assets/images/at_pharma_icon.png',
+          width: 40,
+          height: 40,
+          fit: BoxFit.cover,
+        ),
       ),
     );
   }
@@ -640,13 +655,11 @@ class _ProductCard extends StatelessWidget {
                       fit: BoxFit.cover,
                       cacheWidth: 420,
                       filterQuality: FilterQuality.low,
-                      errorBuilder: (_, _, _) {
-                        return const Icon(
+                      errorBuilder: (_, _, _) => const Icon(
                           Icons.medication_outlined,
                           size: 54,
                           color: _ExploreColors.primary,
-                        );
-                      },
+                        ),
                     ),
                   ),
                   Positioned(

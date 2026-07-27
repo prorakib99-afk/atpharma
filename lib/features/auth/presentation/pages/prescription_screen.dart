@@ -1,20 +1,26 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../shared/widgets/navigation_page_scaffold.dart';
-import 'favorite_store.dart';
-import 'favourite_screen.dart';
 
-/// AI Prescription Assistant upload screen.
-///
-/// Layout: scrollable info section (badge, title, subtitle, disclaimer,
-/// empty-state card) on top, with a chat-style input bar pinned to the
-/// bottom (paperclip attach + text field + send button) — the input bar
-/// never scrolls away, matching common chat/assistant UI patterns.
 class PrescriptionScreen extends StatefulWidget {
-  const PrescriptionScreen({super.key, this.onAttachTap, this.onSendMessage});
+  const PrescriptionScreen({
+    super.key,
+    this.onAttachTap,
+    this.onCameraTap,
+    this.onSendMessage,
+    this.answerQuestion,
+  });
 
   final VoidCallback? onAttachTap;
+  final VoidCallback? onCameraTap;
   final ValueChanged<String>? onSendMessage;
+  final Future<String> Function(String question)? answerQuestion;
+
+  static const String routeName = '/prescription';
 
   @override
   State<PrescriptionScreen> createState() => _PrescriptionScreenState();
@@ -22,282 +28,447 @@ class PrescriptionScreen extends StatefulWidget {
 
 class _PrescriptionScreenState extends State<PrescriptionScreen> {
   final _messageController = TextEditingController();
+  final _scrollController = ScrollController();
+  final List<_ChatMessage> _messages = <_ChatMessage>[];
+  bool _isAnswering = false;
 
-  static const _textDark = Color(0xff14181f);
-  static const _textMuted = Color(0xff6b7280);
+  static const _suggestions = <_SuggestionItem>[
+    _SuggestionItem(Icons.medication_outlined, 'Paracetamol 500mg'),
+    _SuggestionItem(Icons.wb_sunny_outlined, 'Vitamin D3'),
+    _SuggestionItem(Icons.water_drop_outlined, 'Cough syrup'),
+  ];
 
   @override
   void dispose() {
     _messageController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  void _send() {
-    final text = _messageController.text.trim();
-    if (text.isEmpty) return;
+  Future<void> _send([String? suggestion]) async {
+    final text = (suggestion ?? _messageController.text).trim();
+    if (text.isEmpty || _isAnswering) return;
     widget.onSendMessage?.call(text);
     _messageController.clear();
+    setState(() {
+      _messages.add(_ChatMessage(text, isUser: true));
+      _isAnswering = true;
+    });
+    _scrollToBottom();
+
+    try {
+      final answer = await (widget.answerQuestion?.call(text) ??
+          _MedicalKnowledgeBase.answer(text));
+      if (!mounted) return;
+      setState(() => _messages.add(_ChatMessage(answer)));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _messages.add(
+          const _ChatMessage(
+            'I could not answer that right now. Please try again, or ask a pharmacist for help.',
+            isError: true,
+          ),
+        );
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isAnswering = false);
+        _scrollToBottom();
+      }
+    }
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) return;
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOut,
+      );
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return NavigationPageScaffold(
-      currentPage: NavigationPage.prescription,
-      backgroundColor: Colors.white,
-      extendBody: false,
-      appBar: const _PrescriptionAppBar(),
-      body: SafeArea(
-        top: false,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final width = constraints.maxWidth;
-            final isTablet = width >= 600;
-            final contentMaxWidth = isTablet ? 640.0 : double.infinity;
-            final horizontalPadding = width <= 340 ? 16.0 : 20.0;
-
-            return Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: contentMaxWidth),
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        horizontalPadding,
-                        8,
-                        horizontalPadding,
-                        6,
-                      ),
-                      child: const _AssistantBadge(),
-                    ),
-                    Expanded(
-                      child: SingleChildScrollView(
-                        padding: EdgeInsets.fromLTRB(
-                          horizontalPadding,
-                          12,
-                          horizontalPadding,
-                          16,
-                        ),
-                        child: Column(
-                          children: [
-                            const Text(
-                              'Upload your prescription',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 26,
-                                fontWeight: FontWeight.w800,
-                                color: _textDark,
-                                letterSpacing: -0.5,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.dark.copyWith(
+        statusBarColor: Colors.transparent,
+        systemNavigationBarColor: Colors.white,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+      child: NavigationPageScaffold(
+        currentPage: NavigationPage.prescription,
+        backgroundColor: Colors.white,
+        extendBody: false,
+        body: SafeArea(
+          bottom: false,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final horizontalPadding = constraints.maxWidth <= 340 ? 16.0 : 20.0;
+              return Stack(
+                children: [
+                  const _BackgroundGlow(),
+                  Column(
+                    children: [
+                      Expanded(
+                        child: CustomScrollView(
+                          controller: _scrollController,
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
+                          physics: const BouncingScrollPhysics(),
+                          slivers: [
+                            SliverPadding(
+                              padding: EdgeInsets.fromLTRB(
+                                horizontalPadding,
+                                constraints.maxHeight <= 650 ? 10 : 24,
+                                horizontalPadding,
+                                12,
                               ),
-                            ),
-                            const SizedBox(height: 14),
-                            const Text.rich(
-                              TextSpan(
+                              sliver: SliverList.list(
                                 children: [
-                                  TextSpan(
-                                    text:
-                                        'Upload a photo or PDF of your prescription and I\u2019ll find the matching medicines from ',
+                                  const _AnimatedAssistantOrb(),
+                                  const SizedBox(height: 12),
+                                  const _AssistantBadge(),
+                                  const SizedBox(height: 24),
+                                  const _HeroText(),
+                                  const SizedBox(height: 28),
+                                  const _DisclaimerCard(),
+                                  const SizedBox(height: 28),
+                                  _SuggestionChips(
+                                    suggestions: _suggestions,
+                                    onSelected: _send,
                                   ),
-                                  TextSpan(
-                                    text: 'AT PHARMA',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      color: _textMuted,
+                                  if (_messages.isNotEmpty) ...[
+                                    const SizedBox(height: 20),
+                                    _ChatHistory(
+                                      messages: _messages,
+                                      isAnswering: _isAnswering,
                                     ),
-                                  ),
-                                  TextSpan(
-                                    text:
-                                        '. Add what you need to your cart and check out.',
-                                  ),
+                                  ],
                                 ],
                               ),
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 14.5,
-                                height: 1.5,
-                                color: _textMuted,
-                              ),
                             ),
-                            const SizedBox(height: 20),
-                            const _DisclaimerBanner(),
-                            const SizedBox(height: 20),
-                            const _EmptyStateCard(),
                           ],
                         ),
                       ),
-                    ),
-                    _ChatInputBar(
-                      controller: _messageController,
-                      onAttachTap: widget.onAttachTap,
-                      onSend: _send,
-                      horizontalPadding: horizontalPadding,
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          horizontalPadding,
+                          8,
+                          horizontalPadding,
+                          12,
+                        ),
+                        child: _MessageComposer(
+                          controller: _messageController,
+                          onCameraTap: widget.onCameraTap,
+                          onAttachTap: widget.onAttachTap,
+                          onSendTap: _send,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
   }
 }
 
-class _PrescriptionAppBar extends StatelessWidget
-    implements PreferredSizeWidget {
-  const _PrescriptionAppBar();
-
-  @override
-  Size get preferredSize => const Size.fromHeight(64);
+class _BackgroundGlow extends StatelessWidget {
+  const _BackgroundGlow();
 
   @override
   Widget build(BuildContext context) {
-    final double horizontalPadding = MediaQuery.sizeOf(context).width <= 340
-        ? 16
-        : 20;
+    return IgnorePointer(
+      child: Stack(
+        children: [
+          Positioned(
+            left: -210,
+            top: -150,
+            child: _glow(380, const Color(0x1F0B83D9)),
+          ),
+          Positioned(
+            right: -245,
+            top: 30,
+            child: _glow(420, const Color(0x1C0B83D9)),
+          ),
+        ],
+      ),
+    );
+  }
 
-    return AppBar(
-      automaticallyImplyLeading: false,
-      backgroundColor: Colors.white,
-      surfaceTintColor: Colors.white,
-      elevation: 0,
-      toolbarHeight: preferredSize.height,
-      titleSpacing: horizontalPadding,
-      title: const _PrescriptionHeader(),
+  Widget _glow(double size, Color color) => Container(
+    width: size,
+    height: size,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      gradient: RadialGradient(
+        colors: [color, color.withValues(alpha: .04), Colors.transparent],
+      ),
+    ),
+  );
+}
+
+class _AnimatedAssistantOrb extends StatefulWidget {
+  const _AnimatedAssistantOrb();
+
+  @override
+  State<_AnimatedAssistantOrb> createState() => _AnimatedAssistantOrbState();
+}
+
+class _AnimatedAssistantOrbState extends State<_AnimatedAssistantOrb>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2800),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context).width <= 340 ? 160.0 : 183.0;
+    return Center(
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) {
+            final wave = (math.sin(_controller.value * math.pi * 2) + 1) / 2;
+            return Stack(
+              alignment: Alignment.center,
+              children: [
+                Container(
+                  width: size * (.82 + wave * .15),
+                  height: size * (.82 + wave * .15),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF168BFF)
+                            .withValues(alpha: .16 + wave * .20),
+                        blurRadius: 24 + wave * 24,
+                        spreadRadius: 2 + wave * 5,
+                      ),
+                    ],
+                  ),
+                ),
+                Transform.rotate(
+                  angle: _controller.value * math.pi * 2,
+                  child: CustomPaint(
+                    size: Size.square(size * .79),
+                    painter: _GlowRingPainter(),
+                  ),
+                ),
+                Transform.rotate(
+                  angle: -_controller.value * math.pi * 2,
+                  child: child,
+                ),
+              ],
+            );
+          },
+          child: SvgPicture.asset(
+            'assets/icons/ai_icon.svg',
+            width: size,
+            height: size,
+            fit: BoxFit.contain,
+          ),
+        ),
+      ),
     );
   }
 }
 
-class _PrescriptionHeader extends StatelessWidget {
-  const _PrescriptionHeader();
+class _GlowRingPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round
+      ..shader = const SweepGradient(
+        colors: [
+          Color(0x00168BFF),
+          Color(0xFF50D9FF),
+          Colors.white,
+          Color(0xFF168BFF),
+          Color(0x00168BFF),
+        ],
+        stops: [0, .25, .48, .7, 1],
+      ).createShader(rect);
+    canvas.drawCircle(size.center(Offset.zero), size.width / 2 - 2, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _AssistantBadge extends StatelessWidget {
+  const _AssistantBadge();
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: <Widget>[
-        const Expanded(
-          child: Text(
-            'Prescription',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF7F8FA),
+          borderRadius: BorderRadius.circular(40),
+          border: Border.all(color: Colors.white, width: 2),
+          boxShadow: const [
+            BoxShadow(color: Color(0x0F000000), blurRadius: 8, offset: Offset(4, 8)),
+          ],
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.auto_awesome_outlined, size: 20, color: Color(0xFF0B83D9)),
+            SizedBox(width: 8),
+            Text(
+              'AI Prescription Assistant',
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 12,
+                height: 16 / 12,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF0B83D9),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HeroText extends StatelessWidget {
+  const _HeroText();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        ShaderMask(
+          blendMode: BlendMode.srcIn,
+          shaderCallback: (bounds) => const LinearGradient(
+            begin: Alignment.bottomLeft,
+            end: Alignment.topRight,
+            colors: [Color(0xFF011556), Color(0xFF0B77CA)],
+          ).createShader(bounds),
+          child: const Text(
+            'How can I help you today?',
+            textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF131415),
+              fontFamily: 'Poppins',
+              fontSize: 24,
+              height: 28 / 24,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
-        const _HeaderIcon(icon: Icons.notifications_none_rounded),
-        const SizedBox(width: 6),
-        const _FavouriteHeaderIcon(),
-        const SizedBox(width: 6),
-        const _ProfileAvatar(),
+        const SizedBox(height: 12),
+        const Text(
+          "Upload a photo or PDF of your prescription and\nI'll find the matching medicines from PHARMA",
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontFamily: 'Poppins',
+            fontSize: 14,
+            height: 24 / 14,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF666E80),
+          ),
+        ),
       ],
     );
   }
 }
 
-class _HeaderIcon extends StatelessWidget {
-  const _HeaderIcon({required this.icon, this.onTap});
-
-  final IconData icon;
-  final VoidCallback? onTap;
+class _DisclaimerCard extends StatelessWidget {
+  const _DisclaimerCard();
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      customBorder: const CircleBorder(),
-      child: Container(
-        width: 40,
-        height: 40,
-        alignment: Alignment.center,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          shape: BoxShape.circle,
-          boxShadow: <BoxShadow>[
-            BoxShadow(color: Color(0x14000000), blurRadius: 18),
-          ],
-        ),
-        child: Icon(icon, size: 20, color: Color(0xFF131415)),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: const Color(0x14F59E0B),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0x66F59E0B)),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.warning_amber_rounded, size: 24, color: Color(0xFFF26C0C)),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'It helps find products—not medical advice. Confirm medicines and dosages with a pharmacist. Prescription-only items are verified before dispatch.',
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 10,
+                height: 16 / 10,
+                color: Color(0xFFA94C08),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _FavouriteHeaderIcon extends StatelessWidget {
-  const _FavouriteHeaderIcon();
+class _SuggestionChips extends StatelessWidget {
+  const _SuggestionChips({required this.suggestions, required this.onSelected});
+
+  final List<_SuggestionItem> suggestions;
+  final ValueChanged<String> onSelected;
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: FavoriteStore.instance,
-      builder: (BuildContext context, _) {
-        final int count = FavoriteStore.instance.count;
-
-        return Stack(
-          clipBehavior: Clip.none,
-          children: <Widget>[
-            _HeaderIcon(
-              icon: count > 0
-                  ? Icons.favorite_rounded
-                  : Icons.favorite_border_rounded,
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const FavouriteScreen(),
-                  ),
-                );
-              },
-            ),
-            if (count > 0)
-              Positioned(
-                right: -2,
-                top: -3,
-                child: Container(
-                  constraints: const BoxConstraints(minWidth: 17),
-                  height: 17,
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  alignment: Alignment.center,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFE71B05),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Text(
-                    count > 99 ? '99+' : '$count',
+    return SizedBox(
+      height: 30,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: suggestions.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 6),
+        itemBuilder: (context, index) {
+          final item = suggestions[index];
+          return InkWell(
+            onTap: () => onSelected(item.label),
+            borderRadius: BorderRadius.circular(999),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: const Color(0xFFE1E2E6)),
+              ),
+              child: Row(
+                children: [
+                  Icon(item.icon, size: 14, color: const Color(0xFF168BFF)),
+                  const SizedBox(width: 5),
+                  Text(
+                    item.label,
                     style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Poppins',
+                      fontSize: 10,
+                      height: 16 / 10,
+                      color: Color(0xFF168BFF),
                     ),
                   ),
-                ),
+                ],
               ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _ProfileAvatar extends StatelessWidget {
-  const _ProfileAvatar();
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipOval(
-      child: Image.asset(
-        'assets/images/at_pharma_icon.png',
-        width: 40,
-        height: 40,
-        fit: BoxFit.cover,
-        cacheWidth: 80,
-        errorBuilder: (_, _, _) {
-          return const SizedBox(
-            width: 40,
-            height: 40,
-            child: ColoredBox(
-              color: Color(0xFFE7F3FB),
-              child: Icon(Icons.person_rounded, color: Color(0xFF0B83D9)),
             ),
           );
         },
@@ -306,140 +477,162 @@ class _ProfileAvatar extends StatelessWidget {
   }
 }
 
-/// ---------------------------------------------------------------------
-/// TOP BADGE PILL
-/// ---------------------------------------------------------------------
-class _AssistantBadge extends StatelessWidget {
-  const _AssistantBadge();
+class _ChatHistory extends StatelessWidget {
+  const _ChatHistory({required this.messages, required this.isAnswering});
+
+  final List<_ChatMessage> messages;
+  final bool isAnswering;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xffe9f1ff),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: const Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.auto_awesome, size: 15, color: Color(0xff2f6fed)),
-          SizedBox(width: 6),
-          Text(
-            'AI Prescription Assistant',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: Color(0xff2f6fed),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// ---------------------------------------------------------------------
-/// DISCLAIMER BANNER
-/// ---------------------------------------------------------------------
-class _DisclaimerBanner extends StatelessWidget {
-  const _DisclaimerBanner();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xfffdf3e2),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xfff3e2b8)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.shield_outlined, size: 18, color: Color(0xff8a6d1f)),
-          const SizedBox(width: 10),
-          Expanded(
-            child: RichText(
-              text: const TextSpan(
-                style: TextStyle(
-                  fontSize: 13,
-                  height: 1.45,
-                  color: Color(0xff8a6d1f),
-                ),
-                children: [
-                  TextSpan(
-                    text:
-                        'This assistant helps you find products \u2014 it is ',
-                  ),
-                  TextSpan(
-                    text: 'not medical advice',
-                    style: TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                  TextSpan(
-                    text:
-                        '. Always confirm medicines and dosages with a qualified pharmacist. Prescription-only items are verified before dispatch.',
-                  ),
-                ],
+    return Column(
+      children: [
+        for (final message in messages) ...[
+          Align(
+            alignment:
+                message.isUser ? Alignment.centerRight : Alignment.centerLeft,
+            child: Container(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.sizeOf(context).width * .78,
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// ---------------------------------------------------------------------
-/// EMPTY STATE CARD
-/// ---------------------------------------------------------------------
-class _EmptyStateCard extends StatelessWidget {
-  const _EmptyStateCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
-      decoration: BoxDecoration(
-        color: const Color(0xfff5f6f8),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xffe7e9ee)),
-      ),
-      child: Column(
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: const BoxDecoration(
-              color: Color(0xffdcebfd),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.description_outlined,
-              size: 26,
-              color: Color(0xff2f6fed),
-            ),
-          ),
-          const SizedBox(height: 18),
-          const Text(
-            'Upload a prescription \u2014 or just type a medicine name',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 15.5,
-              fontWeight: FontWeight.w700,
-              color: Color(0xff14181f),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: message.isUser
+                    ? const Color(0xFF0B83D9)
+                    : message.isError
+                    ? const Color(0xFFFFF2F0)
+                    : const Color(0xFFF2F7FC),
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(16),
+                  topRight: const Radius.circular(16),
+                  bottomLeft: Radius.circular(message.isUser ? 16 : 4),
+                  bottomRight: Radius.circular(message.isUser ? 4 : 16),
+                ),
+                border: message.isUser
+                    ? null
+                    : Border.all(
+                        color: message.isError
+                            ? const Color(0xFFFFCCC7)
+                            : const Color(0xFFD9ECFA),
+                      ),
+              ),
+              child: Text(
+                message.text,
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 12,
+                  height: 1.55,
+                  color: message.isUser
+                      ? Colors.white
+                      : message.isError
+                      ? const Color(0xFFB42318)
+                      : const Color(0xFF25364A),
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 10),
-          const Text(
-            'Tap the clip icon to upload a photo or PDF, or type a medicine like \u201cParacetamol 500mg\u201d. I\u2019ll find it in our catalogue (or suggest a related option) so you can add it to your cart.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 13.5,
-              height: 1.5,
-              color: Color(0xff6b7280),
+        ],
+        if (isAnswering)
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: _TypingIndicator(),
+          ),
+      ],
+    );
+  }
+}
+
+class _TypingIndicator extends StatelessWidget {
+  const _TypingIndicator();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF2F7FC),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: const SizedBox(
+        width: 18,
+        height: 18,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          color: Color(0xFF0B83D9),
+        ),
+      ),
+    );
+  }
+}
+
+class _MessageComposer extends StatelessWidget {
+  const _MessageComposer({
+    required this.controller,
+    required this.onCameraTap,
+    required this.onAttachTap,
+    required this.onSendTap,
+  });
+
+  final TextEditingController controller;
+  final VoidCallback? onCameraTap;
+  final VoidCallback? onAttachTap;
+  final VoidCallback onSendTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 56,
+      padding: const EdgeInsets.only(left: 14, right: 7),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFF0090FF), width: 2),
+        boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 56)],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: controller,
+              textInputAction: TextInputAction.send,
+              onSubmitted: (_) => onSendTap(),
+              style: const TextStyle(fontFamily: 'Poppins', fontSize: 12),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                isDense: true,
+                hintText: 'Ask about a medicine...',
+                hintStyle: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 12,
+                  color: Color(0xFF98A1B3),
+                ),
+              ),
+            ),
+          ),
+          _ComposerButton(icon: Icons.camera_alt_outlined, onTap: onCameraTap),
+          const SizedBox(width: 4),
+          _ComposerButton(icon: Icons.attach_file_rounded, onTap: onAttachTap),
+          const SizedBox(width: 4),
+          Material(
+            color: Colors.transparent,
+            shape: const CircleBorder(),
+            child: InkWell(
+              onTap: onSendTap,
+              customBorder: const CircleBorder(),
+              child: Ink(
+                width: 36,
+                height: 36,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF0187ED), Color(0xFF021E79)],
+                  ),
+                ),
+                child: const Icon(Icons.send_rounded, size: 20, color: Colors.white),
+              ),
             ),
           ),
         ],
@@ -448,105 +641,97 @@ class _EmptyStateCard extends StatelessWidget {
   }
 }
 
-/// ---------------------------------------------------------------------
-/// BOTTOM CHAT INPUT BAR (pinned)
-/// ---------------------------------------------------------------------
-class _ChatInputBar extends StatelessWidget {
-  const _ChatInputBar({
-    required this.controller,
-    required this.onAttachTap,
-    required this.onSend,
-    required this.horizontalPadding,
-  });
+class _ComposerButton extends StatelessWidget {
+  const _ComposerButton({required this.icon, required this.onTap});
 
-  final TextEditingController controller;
-  final VoidCallback? onAttachTap;
-  final VoidCallback onSend;
-  final double horizontalPadding;
+  final IconData icon;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-        horizontalPadding,
-        10,
-        horizontalPadding,
-        14,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey.shade200)),
-      ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: Container(
-                constraints: const BoxConstraints(minHeight: 52),
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(26),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(
-                        Icons.attach_file,
-                        size: 20,
-                        color: Color(0xff6b7280),
-                      ),
-                      onPressed: onAttachTap,
-                    ),
-                    Expanded(
-                      child: TextField(
-                        controller: controller,
-                        minLines: 1,
-                        maxLines: 4,
-                        textInputAction: TextInputAction.send,
-                        onSubmitted: (_) => onSend(),
-                        decoration: const InputDecoration(
-                          hintText:
-                              'Upload a prescription or ask about a medicine\u2026',
-                          hintStyle: TextStyle(
-                            fontSize: 14,
-                            color: Color(0xff9aa1ab),
-                          ),
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(vertical: 14),
-                        ),
-                        style: const TextStyle(fontSize: 14.5),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Material(
-              color: const Color(0xff2f6fed),
-              borderRadius: BorderRadius.circular(14),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(14),
-                onTap: onSend,
-                child: const SizedBox(
-                  width: 52,
-                  child: Center(
-                    child: Icon(
-                      Icons.send_rounded,
-                      size: 20,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
+    return Material(
+      color: Colors.white,
+      shape: CircleBorder(side: BorderSide(color: const Color(0xFFE1E2E6))),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: SizedBox(
+          width: 36,
+          height: 36,
+          child: Icon(icon, size: 18, color: const Color(0xFF131415)),
         ),
       ),
     );
+  }
+}
+
+class _SuggestionItem {
+  const _SuggestionItem(this.icon, this.label);
+
+  final IconData icon;
+  final String label;
+}
+
+class _ChatMessage {
+  const _ChatMessage(this.text, {this.isUser = false, this.isError = false});
+
+  final String text;
+  final bool isUser;
+  final bool isError;
+}
+
+abstract final class _MedicalKnowledgeBase {
+  static Future<String> answer(String question) async {
+    await Future<void>.delayed(const Duration(milliseconds: 450));
+    final query = question.toLowerCase();
+
+    if (_hasAny(query, const [
+      'chest pain',
+      'difficulty breathing',
+      'can’t breathe',
+      "can't breathe",
+      'unconscious',
+      'severe bleeding',
+      'stroke',
+      'suicide',
+      'overdose',
+    ])) {
+      return 'This may be an emergency. Please contact your local emergency service or go to the nearest emergency department now. Do not wait for an online answer.';
+    }
+
+    if (_hasAny(query, const ['paracetamol', 'acetaminophen', 'napa'])) {
+      return 'Paracetamol (acetaminophen) is used for fever and mild-to-moderate pain. Avoid taking it with other products that also contain paracetamol, and do not exceed the label dose. People with liver disease, heavy alcohol use, pregnancy, or children needing a dose should check with a doctor or pharmacist.';
+    }
+    if (_hasAny(query, const ['ibuprofen', 'nurofen', 'advil'])) {
+      return 'Ibuprofen is an NSAID used for pain, fever, and inflammation. It can irritate the stomach and may not be suitable with ulcers, kidney disease, blood thinners, some heart conditions, or during pregnancy. Take only as directed and ask a pharmacist if you use other medicines.';
+    }
+    if (_hasAny(query, const ['antibiotic', 'amoxicillin', 'azithromycin'])) {
+      return 'Antibiotics treat certain bacterial infections—not colds or flu. Use them only when prescribed, follow the exact course, and do not share leftovers. Seek urgent help for breathing difficulty, facial swelling, or a severe rash after a dose.';
+    }
+    if (_hasAny(query, const ['diabetes', 'blood sugar', 'glucose'])) {
+      return 'Diabetes causes blood glucose to stay too high. Common signs include unusual thirst, frequent urination, fatigue, blurred vision, and slow-healing wounds, though some people have no symptoms. Diagnosis needs a blood test. Healthy meals, activity, monitoring, and prescribed medicine help control it.';
+    }
+    if (_hasAny(query, const [
+      'hypertension',
+      'high blood pressure',
+      'blood pressure',
+    ])) {
+      return 'High blood pressure often has no symptoms, so a proper measurement is important. Repeated readings of 180/120 mmHg or higher—especially with chest pain, breathlessness, weakness, confusion, or vision changes—need urgent medical care. Do not stop prescribed pressure medicine suddenly.';
+    }
+    if (_hasAny(query, const ['fever', 'temperature'])) {
+      return 'Fever is commonly caused by infection. Rest, fluids, and a correctly dosed fever medicine may help. Seek medical advice for a fever lasting more than a few days, dehydration, a stiff neck, confusion, breathing trouble, a new rash, or any fever in a very young infant.';
+    }
+    if (_hasAny(query, const ['cold', 'cough', 'flu'])) {
+      return 'Most colds and many coughs are viral and improve with rest, fluids, and symptom care. Antibiotics usually do not help. Get medical advice for breathing difficulty, chest pain, coughing blood, dehydration, symptoms that worsen, or a cough that persists.';
+    }
+    if (_hasAny(query, const ['gastric', 'acidity', 'heartburn', 'reflux'])) {
+      return 'Heartburn or acid reflux can improve with smaller meals, avoiding late-night food, and limiting personal triggers. Frequent symptoms, trouble swallowing, vomiting blood, black stool, weight loss, or chest pressure need medical assessment.';
+    }
+
+    return 'I can provide general information about common diseases and medicines. Please include the medicine or condition name and what you want to know—for example: “What is paracetamol used for?” or “What are common diabetes symptoms?” I cannot diagnose you or choose a prescription; a doctor or pharmacist should confirm personal treatment.';
+  }
+
+  static bool _hasAny(String text, List<String> terms) {
+    return terms.any(text.contains);
   }
 }

@@ -174,20 +174,18 @@ class _FavoriteImage extends StatelessWidget {
       ),
     );
 
-    if (network) {
-      return Image.network(
-        source,
-        fit: BoxFit.cover,
-        cacheWidth: 240,
-        errorBuilder: (_, _, _) => fallback,
-      );
-    }
-
-    return Image.asset(
-      source,
-      fit: BoxFit.cover,
-      cacheWidth: 240,
-      errorBuilder: (_, _, _) => fallback,
-    );
+    return network
+        ? Image.network(
+            source,
+            fit: BoxFit.cover,
+            cacheWidth: 240,
+            errorBuilder: (_, _, _) => fallback,
+          )
+        : Image.asset(
+            source,
+            fit: BoxFit.cover,
+            cacheWidth: 240,
+            errorBuilder: (_, _, _) => fallback,
+          );
   }
 }

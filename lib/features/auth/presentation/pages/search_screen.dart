@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/error/app_result.dart';
 import '../../../../core/pagination/paginated_result.dart';
+import '../../../../core/routes/app_routes.dart';
 import '../../../../core/utils/currency_display.dart';
 import '../../../../shared/widgets/fly_to_cart.dart';
 import '../../../../shared/widgets/navigation_page_scaffold.dart';
@@ -14,6 +15,7 @@ import '../../../shop/domain/usecases/cancel_shop_products_request_use_case.dart
 import '../../../shop/domain/usecases/get_shop_products_use_case.dart';
 import 'screen_product_details.dart';
 import 'favorite_header_button.dart';
+import 'floating_profile_screen.dart';
 
 void _addSearchProductToCart(
   BuildContext context,
@@ -314,13 +316,23 @@ class _Header extends StatelessWidget {
       const SizedBox(width: 4),
       const FavoriteHeaderButton(inactiveColor: _Colors.text),
       const SizedBox(width: 4),
-      ClipOval(
-        child: Image.asset(
-          'assets/images/at_pharma_icon.png',
-          width: 40,
-          height: 40,
-          fit: BoxFit.cover,
-          cacheWidth: 80,
+      InkWell(
+        onTap: () => FloatingProfileScreen.show(
+          context,
+          avatarAssetPath: 'assets/images/at_pharma_icon.png',
+          onProfileTap: () =>
+              Navigator.of(context).pushNamed(AppRoutes.profile),
+          onSignOutTap: () => signOutFromProfile(context),
+        ),
+        customBorder: const CircleBorder(),
+        child: ClipOval(
+          child: Image.asset(
+            'assets/images/at_pharma_icon.png',
+            width: 40,
+            height: 40,
+            fit: BoxFit.cover,
+            cacheWidth: 80,
+          ),
         ),
       ),
     ],
@@ -1112,7 +1124,6 @@ class _SearchProductImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (imageUrl.trim().isEmpty) return const _SearchImageFallback();
-
     return Image.network(
       imageUrl,
       width: width,

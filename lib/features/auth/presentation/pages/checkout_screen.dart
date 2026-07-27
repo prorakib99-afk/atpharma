@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../shared/widgets/navigation_page_scaffold.dart';
 import 'favorite_header_button.dart';
+import 'floating_profile_screen.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -244,23 +245,21 @@ class _ProfileAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context).width <= 390 ? 36.0 : 44.0;
 
-    return Container(
-      width: size,
-      height: size,
-      decoration: const BoxDecoration(
-        color: _CheckoutColors.primaryLight,
-        shape: BoxShape.circle,
+    return InkWell(
+      onTap: () => FloatingProfileScreen.show(
+        context,
+        avatarAssetPath: 'assets/images/at_pharma_icon.png',
+        onProfileTap: () => Navigator.of(context).pushNamed(AppRoutes.profile),
+        onSignOutTap: () => signOutFromProfile(context),
       ),
-      clipBehavior: Clip.antiAlias,
-      child: Image.asset(
-        'assets/images/at_pharma_icon.png',
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) {
-          return const Icon(
-            Icons.person_rounded,
-            color: _CheckoutColors.primary,
-          );
-        },
+      customBorder: const CircleBorder(),
+      child: ClipOval(
+        child: Image.asset(
+          'assets/images/at_pharma_icon.png',
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+        ),
       ),
     );
   }

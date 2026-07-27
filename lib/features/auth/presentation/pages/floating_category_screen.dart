@@ -1,13 +1,23 @@
 import 'package:flutter/material.dart';
 
-Future<void> showFloatingCategoryScreen(BuildContext context) {
-  return showModalBottomSheet<void>(
+import '../../../../core/routes/app_routes.dart';
+
+Future<void> showFloatingCategoryScreen(BuildContext context) async {
+  final _Category? category = await showModalBottomSheet<_Category>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: Colors.transparent,
     barrierColor: Colors.black.withValues(alpha: .18),
     builder: (_) => const FloatingCategoryScreen(),
+  );
+  if (category == null || !context.mounted) return;
+  await Navigator.of(context).pushNamed(
+    AppRoutes.explore,
+    arguments: <String, String>{
+      'categoryId': category.id,
+      'categoryName': category.apiName,
+    },
   );
 }
 
@@ -16,36 +26,46 @@ class FloatingCategoryScreen extends StatelessWidget {
 
   static const _categories = [
     _Category(
+      'cmrdtm3u90000dc06b8txq5c8',
       'Medicines',
-      '2500+',
+      '12',
+      'Medicine',
       'assets/images/drug_icon_opt.png',
       Color(0x52E7F3FB),
       40,
     ),
     _Category(
+      'cmrf7emim0000hkvp20b5ffet',
       'Grocery',
-      '550',
+      '5',
+      'Grocery',
       'assets/images/grocery_icon_opt.png',
       Color(0xFFECFEFF),
       32,
     ),
     _Category(
+      'cmrf6hrf30000ufw7wnco3wy2',
       'Personal Care',
-      '1000+',
+      '35',
+      'Personal Care',
       'assets/images/skin_care_opt.png',
       Color(0xFFF6EAFE),
       32,
     ),
     _Category(
+      'cmrf7emiv0001hkvpccx3pmqe',
       'Baby Care',
-      '330+',
+      '7',
+      'Baby Care',
       'assets/images/baby_care_icon_opt.png',
       Color(0xFFFEF0E7),
       32,
     ),
     _Category(
+      'cmrf7emiy0002hkvp2m4inznz',
       'Ayurvedic & Herbal',
-      '550',
+      '4',
+      'Ayurvedic & Herbal',
       'assets/images/grocery_icon_opt.png',
       Color(0xFFF7FEE7),
       32,
@@ -172,14 +192,17 @@ class _CategoryCard extends StatelessWidget {
   final _Category category;
 
   @override
-  Widget build(BuildContext context) => Container(
-    height: 104,
-    padding: const EdgeInsets.all(10),
-    decoration: BoxDecoration(
-      color: category.color,
+  Widget build(BuildContext context) => Material(
+    color: category.color,
+    borderRadius: BorderRadius.circular(16),
+    child: InkWell(
+      onTap: () => Navigator.of(context).pop(category),
       borderRadius: BorderRadius.circular(16),
-    ),
-    child: Column(
+      child: SizedBox(
+        height: 104,
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Image.asset(
@@ -213,20 +236,30 @@ class _CategoryCard extends StatelessWidget {
             color: Color(0xFF666E80),
           ),
         ),
-      ],
+            ],
+          ),
+        ),
+      ),
     ),
   );
 }
 
 class _Category {
   const _Category(
+    this.id,
     this.title,
     this.count,
+    this.apiName,
     this.icon,
     this.color,
     this.iconWidth,
   );
-  final String title, count, icon;
+
+  final String id;
+  final String title;
+  final String count;
+  final String apiName;
+  final String icon;
   final Color color;
   final double iconWidth;
 }

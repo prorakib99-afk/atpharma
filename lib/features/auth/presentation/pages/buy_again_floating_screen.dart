@@ -449,10 +449,7 @@ class _NetworkProductImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (imageUrl.trim().isEmpty) {
-      return const _ImageFallback();
-    }
-
+    if (imageUrl.trim().isEmpty) return const _ImageFallback();
     return Image.network(
       imageUrl,
       width: double.infinity,
@@ -461,10 +458,6 @@ class _NetworkProductImage extends StatelessWidget {
       cacheWidth: 360,
       cacheHeight: 320,
       filterQuality: FilterQuality.low,
-      gaplessPlayback: true,
-      frameBuilder: (_, Widget child, int? frame, bool synchronous) {
-        return synchronous || frame != null ? child : const _ImageLoading();
-      },
       errorBuilder: (_, _, _) => const _ImageFallback(),
     );
   }

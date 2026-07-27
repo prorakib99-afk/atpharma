@@ -102,12 +102,10 @@ final class OfflineOrderDraft {
 
 final class OfflineOrderService extends ChangeNotifier {
   OfflineOrderService({
-    required AppDatabase database,
-    required DioClient dioClient,
+    required this._database,
+    required this._dioClient,
     Connectivity? connectivity,
-  }) : _database = database,
-       _dioClient = dioClient,
-       _connectivity = connectivity ?? Connectivity();
+  }) : _connectivity = connectivity ?? Connectivity();
 
   final AppDatabase _database;
   final DioClient _dioClient;
@@ -203,17 +201,14 @@ final class OfflineOrderService extends ChangeNotifier {
         taxPercent: JsonValueParser.decimal(data['taxPercent']),
         deliveryCharge: JsonValueParser.decimal(data['deliveryCharge']),
       );
-      await (await _database.instance).insert(
-        'storefront_config',
-        <String, Object?>{
-          'id': 1,
-          'currency': value.currency,
-          'tax_percent': value.taxPercent,
-          'delivery_charge': value.deliveryCharge,
-          'updated_at': DateTime.now().millisecondsSinceEpoch,
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await (await _database.instance)
+          .insert('storefront_config', <String, Object?>{
+            'id': 1,
+            'currency': value.currency,
+            'tax_percent': value.taxPercent,
+            'delivery_charge': value.deliveryCharge,
+            'updated_at': DateTime.now().millisecondsSinceEpoch,
+          }, conflictAlgorithm: ConflictAlgorithm.replace);
     } catch (_) {
       // Cached/fallback config remains available while offline.
     }
@@ -221,8 +216,8 @@ final class OfflineOrderService extends ChangeNotifier {
 
   Future<void> syncPending() async {
     if (!_storageAvailable || _syncing) return;
-    final List<ConnectivityResult> connectivity =
-        await _connectivity.checkConnectivity();
+    final List<ConnectivityResult> connectivity = await _connectivity
+        .checkConnectivity();
     if (connectivity.every(
       (ConnectivityResult result) => result == ConnectivityResult.none,
     )) {
@@ -264,10 +259,7 @@ final class OfflineOrderService extends ChangeNotifier {
     if (rows.isEmpty || rows.first['next_retry'] == null) return;
     final int nextRetry = rows.first['next_retry']! as int;
     final Duration delay = Duration(
-      milliseconds: max(
-        0,
-        nextRetry - DateTime.now().millisecondsSinceEpoch,
-      ),
+      milliseconds: max(0, nextRetry - DateTime.now().millisecondsSinceEpoch),
     );
     _retryTimer = Timer(delay, () => unawaited(syncPending()));
   }
@@ -356,9 +348,9 @@ final class OfflineOrderService extends ChangeNotifier {
   Future<void> _refreshPendingCount() async {
     final List<Map<String, Object?>> rows = await (await _database.instance)
         .rawQuery(
-      "SELECT COUNT(*) AS count FROM offline_orders "
-      "WHERE status IN ('pending', 'retry', 'syncing')",
-    );
+          "SELECT COUNT(*) AS count FROM offline_orders "
+          "WHERE status IN ('pending', 'retry', 'syncing')",
+        );
     _pendingCount = Sqflite.firstIntValue(rows) ?? 0;
     notifyListeners();
   }

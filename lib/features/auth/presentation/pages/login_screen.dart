@@ -10,6 +10,9 @@ class LoginScreen extends StatefulWidget {
     this.onGoogleTap,
     this.onAppleTap,
     this.onFacebookTap,
+    this.initialIdentifier,
+    this.initialRememberMe = false,
+    this.isLoading = false,
   });
 
   final void Function(String email, String password, bool rememberMe)? onSignIn;
@@ -18,6 +21,9 @@ class LoginScreen extends StatefulWidget {
   final VoidCallback? onGoogleTap;
   final VoidCallback? onAppleTap;
   final VoidCallback? onFacebookTap;
+  final String? initialIdentifier;
+  final bool initialRememberMe;
+  final bool isLoading;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -35,6 +41,13 @@ class _LoginScreenState extends State<LoginScreen> {
   static const _subtitleWhite = Color(0xfff7f8fa);
   static const _dividerGray = Color(0xfff0f2f5);
   static const _mutedGray = Color(0xff98a1b3);
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController.text = widget.initialIdentifier ?? '';
+    _rememberMe = widget.initialRememberMe;
+  }
 
   @override
   void dispose() {
@@ -252,19 +265,29 @@ class _LoginScreenState extends State<LoginScreen> {
                                     borderRadius: BorderRadius.circular(16),
                                   ),
                                 ),
-                                onPressed: () => widget.onSignIn?.call(
-                                  _emailController.text,
-                                  _passwordController.text,
-                                  _rememberMe,
-                                ),
-                                child: const Text(
-                                  'Sign In',
-                                  style: TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
+                                onPressed: widget.isLoading
+                                    ? null
+                                    : () => widget.onSignIn?.call(
+                                        _emailController.text,
+                                        _passwordController.text,
+                                        _rememberMe,
+                                      ),
+                                child: widget.isLoading
+                                    ? const SizedBox.square(
+                                        dimension: 22,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.4,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Text(
+                                        'Sign In',
+                                        style: TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
                               ),
                             ),
                             const SizedBox(height: 28),

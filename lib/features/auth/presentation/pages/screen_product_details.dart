@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:sqflite/sqflite.dart';
 
 import '../../../../core/routes/app_routes.dart';
+import '../../../../core/storage/app_database.dart';
 import '../../../../core/utils/currency_display.dart';
 import 'favorite_store.dart';
 import 'favourite_screen.dart';
@@ -40,6 +44,42 @@ class ProductCart extends ChangeNotifier {
   ProductCart._();
   static final ProductCart instance = ProductCart._();
   final Map<String, ProductCartItem> _items = <String, ProductCartItem>{};
+  AppDatabase? _database;
+  Future<void> _pendingWrite = Future<void>.value();
+
+  Future<void> initialize(AppDatabase database) async {
+    _database = database;
+    final Database db = await database.instance;
+    final List<Map<String, Object?>> rows = await db.query(
+      'cart_items',
+      orderBy: 'updated_at ASC',
+    );
+    _items
+      ..clear()
+      ..addEntries(rows.map((Map<String, Object?> row) {
+        final String id = row['product_id']! as String;
+        return MapEntry<String, ProductCartItem>(
+          id,
+          ProductCartItem(
+            id: id,
+            product: ProductDetailsData(
+              id: id,
+              name: row['name']! as String,
+              image: row['image']! as String,
+              description: row['description']! as String,
+              brand: row['brand']! as String,
+              price: row['price']! as int,
+              prescriptionRequired:
+                  (row['prescription_required']! as int) == 1,
+              currencyCode: row['currency_code']! as String,
+              countryCode: row['country_code']! as String,
+            ),
+            quantity: row['quantity']! as int,
+          ),
+        );
+      }));
+    notifyListeners();
+  }
 
   int quantityFor(String id) => _items[id]?.quantity ?? 0;
   int get totalCount => _items.values.fold(0, (int sum, ProductCartItem item) {
@@ -61,6 +101,7 @@ class ProductCart extends ChangeNotifier {
           ProductCartItem(id: id, product: product, quantity: quantity),
     );
     notifyListeners();
+    _persist();
   }
 
   void increase(String id) {
@@ -68,6 +109,7 @@ class ProductCart extends ChangeNotifier {
     if (item == null) return;
     _items[id] = item.copyWith(quantity: item.quantity + 1);
     notifyListeners();
+    _persist();
   }
 
   void decrease(String id) {
@@ -75,10 +117,55 @@ class ProductCart extends ChangeNotifier {
     if (item == null || item.quantity <= 1) return;
     _items[id] = item.copyWith(quantity: item.quantity - 1);
     notifyListeners();
+    _persist();
   }
 
   void remove(String id) {
-    if (_items.remove(id) != null) notifyListeners();
+    if (_items.remove(id) != null) {
+      notifyListeners();
+      _persist();
+    }
+  }
+
+  Future<void> clear() async {
+    _items.clear();
+    notifyListeners();
+    _persist();
+    await _pendingWrite;
+  }
+
+  void _persist() {
+    final AppDatabase? database = _database;
+    if (database == null) return;
+    final List<ProductCartItem> snapshot = List<ProductCartItem>.of(
+      _items.values,
+    );
+    _pendingWrite = _pendingWrite.then((_) async {
+      final Database db = await database.instance;
+      await db.transaction((Transaction transaction) async {
+        await transaction.delete('cart_items');
+        final Batch batch = transaction.batch();
+        final int now = DateTime.now().millisecondsSinceEpoch;
+        for (final ProductCartItem item in snapshot) {
+          batch.insert('cart_items', <String, Object?>{
+            'product_id': item.id,
+            'name': item.product.name,
+            'image': item.product.image,
+            'description': item.product.description,
+            'brand': item.product.brand,
+            'price': item.product.price,
+            'prescription_required': item.product.prescriptionRequired ? 1 : 0,
+            'currency_code': item.product.currencyCode,
+            'country_code': item.product.countryCode,
+            'quantity': item.quantity,
+            'updated_at': now,
+          });
+        }
+        await batch.commit(noResult: true);
+      });
+    }).catchError((Object error, StackTrace stackTrace) {
+      debugPrint('Unable to persist cart: $error');
+    });
   }
 }
 
@@ -627,19 +714,6 @@ class _ProductImage extends StatelessWidget {
       cacheWidth: decodeWidth,
       filterQuality: FilterQuality.medium,
       gaplessPlayback: true,
-      frameBuilder:
-          (
-            BuildContext context,
-            Widget child,
-            int? frame,
-            bool wasSynchronouslyLoaded,
-          ) {
-            if (wasSynchronouslyLoaded || frame != null) {
-              return child;
-            }
-
-            return const _ProductImageLoading();
-          },
       errorBuilder: (_, _, _) => const _ProductImageFallback(),
     );
   }
