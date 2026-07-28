@@ -6,7 +6,7 @@ final class AppDatabase {
   Future<Database> get instance async {
     return _database ??= await openDatabase(
       'atpharma_offline.db',
-      version: 2,
+      version: 3,
       onCreate: (Database db, int version) async {
         await db.execute(
           'CREATE TABLE storefront_config ('
@@ -43,10 +43,14 @@ final class AppDatabase {
           ')',
         );
         await _createCartItemsTable(db);
+        await _createFavoriteProductsTable(db);
       },
       onUpgrade: (Database db, int oldVersion, int newVersion) async {
         if (oldVersion < 2) {
           await _createCartItemsTable(db);
+        }
+        if (oldVersion < 3) {
+          await _createFavoriteProductsTable(db);
         }
       },
       onDowngrade: (Database db, int oldVersion, int newVersion) async {
@@ -77,6 +81,20 @@ final class AppDatabase {
       'currency_code TEXT NOT NULL DEFAULT \'\', '
       'country_code TEXT NOT NULL DEFAULT \'\', '
       'quantity INTEGER NOT NULL CHECK (quantity > 0), '
+      'updated_at INTEGER NOT NULL'
+      ')',
+    );
+  }
+
+  static Future<void> _createFavoriteProductsTable(Database db) {
+    return db.execute(
+      'CREATE TABLE IF NOT EXISTS favorite_products ('
+      'product_id TEXT PRIMARY KEY, '
+      'name TEXT NOT NULL, '
+      'image TEXT NOT NULL, '
+      'description TEXT NOT NULL, '
+      'brand TEXT NOT NULL, '
+      'price INTEGER NOT NULL, '
       'updated_at INTEGER NOT NULL'
       ')',
     );

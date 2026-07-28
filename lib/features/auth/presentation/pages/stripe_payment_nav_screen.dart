@@ -1,18 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-
 import '../../../../core/routes/app_routes.dart';
 import '../../../../shared/widgets/navigation_page_scaffold.dart';
 import 'cod_payment_screen.dart';
 import 'favorite_header_button.dart';
 import 'floating_profile_screen.dart';
 import 'mada_ payment_screen.dart';
+import 'notification_screen.dart';
 import 'review_order_screen.dart';
+import 'screen_product_details.dart';
+
+void _openNotifications(BuildContext context) {
+  showDialog<void>(
+    context: context,
+    barrierColor: Colors.black.withOpacity(0.08),
+    builder: (_) => const SafeArea(
+      child: Align(
+        alignment: Alignment.topRight,
+        child: Padding(
+          padding: EdgeInsets.only(top: 66, right: 28),
+          child: NotificationScreen(maxHeight: 280, width: 330),
+        ),
+      ),
+    ),
+  );
+}
 
 class StripePaymentNavScreen extends StatefulWidget {
-  const StripePaymentNavScreen({super.key});
+  const StripePaymentNavScreen({super.key, this.purchaseItems});
 
   static const String routeName = '/stripe-payment';
+  final List<ProductCartItem>? purchaseItems;
 
   @override
   State<StripePaymentNavScreen> createState() => _StripePaymentNavScreenState();
@@ -27,6 +45,17 @@ class _StripePaymentNavScreenState extends State<StripePaymentNavScreen> {
   Widget build(BuildContext context) {
     final bottomSafe = MediaQuery.paddingOf(context).bottom;
     final pagePadding = _PaymentResponsive.pagePadding(context);
+    final List<ProductCartItem> items =
+        widget.purchaseItems ?? ProductCart.instance.items;
+    final int itemCount = items.fold<int>(
+      0,
+      (int sum, ProductCartItem item) => sum + item.quantity,
+    );
+    final double total = items.fold<double>(
+      0,
+      (double sum, ProductCartItem item) =>
+          sum + (item.product.price * item.quantity),
+    );
 
     return MediaQuery(
       data: MediaQuery.of(
@@ -41,8 +70,8 @@ class _StripePaymentNavScreenState extends State<StripePaymentNavScreen> {
           child: Column(
             children: <Widget>[
               Padding(
-                padding: EdgeInsets.fromLTRB(pagePadding, 18, pagePadding, 0),
-                child: const _CheckoutHeader(itemCount: 4),
+                padding: EdgeInsets.fromLTRB(pagePadding, 8, pagePadding, 0),
+                child: _CheckoutHeader(itemCount: itemCount),
               ),
               Expanded(
                 child: CustomScrollView(
@@ -62,6 +91,8 @@ class _StripePaymentNavScreenState extends State<StripePaymentNavScreen> {
                           if (_showReview)
                             ReviewOrderScreen(
                               embedded: true,
+                              purchaseItems: widget.purchaseItems,
+                              paymentMethod: _selectedPaymentMethod,
                               onBack: () {
                                 setState(() {
                                   _showReview = false;
@@ -118,7 +149,7 @@ class _StripePaymentNavScreenState extends State<StripePaymentNavScreen> {
                               const _TermsAndPrivacyText(),
                               const SizedBox(height: 24),
                               _ContinueToReviewButton(
-                                total: 12.00,
+                                total: total,
                                 onPressed: () {
                                   setState(() {
                                     _showReview = true;
@@ -162,9 +193,9 @@ class _CheckoutHeader extends StatelessWidget {
                     maxLines: 1,
                     style: TextStyle(
                       fontFamily: 'Poppins',
-                      fontSize: 18,
-                      height: 22 / 18,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                      height: 22 / 16,
+                      fontWeight: FontWeight.w600,
                       color: _PaymentColors.title,
                     ),
                   ),
@@ -192,7 +223,10 @@ class _CheckoutHeader extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 16),
-        const _HeaderIcon(icon: Icons.notifications_none_rounded),
+        _HeaderIcon(
+          icon: Icons.notifications_none_rounded,
+          onTap: () => _openNotifications(context),
+        ),
         const SizedBox(width: 4),
         const FavoriteHeaderButton(inactiveColor: _PaymentColors.title),
         const SizedBox(width: 4),
@@ -203,23 +237,28 @@ class _CheckoutHeader extends StatelessWidget {
 }
 
 class _HeaderIcon extends StatelessWidget {
-  const _HeaderIcon({required this.icon});
+  const _HeaderIcon({required this.icon, required this.onTap});
 
   final IconData icon;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        shape: BoxShape.circle,
-        boxShadow: <BoxShadow>[
-          BoxShadow(color: Color(0x14000000), blurRadius: 28),
-        ],
+    return InkWell(
+      onTap: onTap,
+      customBorder: const CircleBorder(),
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+          boxShadow: <BoxShadow>[
+            BoxShadow(color: Color(0x14000000), blurRadius: 28),
+          ],
+        ),
+        child: Icon(icon, size: 20, color: _PaymentColors.title),
       ),
-      child: Icon(icon, size: 20, color: _PaymentColors.title),
     );
   }
 }

@@ -9,10 +9,13 @@ import 'core/network/backend_smoke_tester.dart';
 import 'core/routes/app_routes.dart';
 import 'core/session/session_manager.dart';
 import 'core/storage/app_database.dart';
+import 'core/storage/local_storage_service.dart';
 import 'features/auth/presentation/pages/cart_screen.dart';
 import 'features/auth/presentation/pages/checkout_screen.dart';
 import 'features/auth/presentation/pages/completed_order_screen.dart';
+import 'features/auth/presentation/pages/contact_support_screen.dart';
 import 'features/auth/presentation/pages/explore_screen.dart';
+import 'features/auth/presentation/pages/favorite_store.dart';
 import 'features/auth/presentation/pages/home_screen.dart';
 import 'features/auth/presentation/pages/login_screen.dart';
 import 'features/auth/presentation/pages/otp_screen.dart';
@@ -36,7 +39,9 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await configureDependencies();
-  await ProductCart.instance.initialize(sl<AppDatabase>());
+  final AppDatabase database = sl<AppDatabase>();
+  await ProductCart.instance.initialize(database);
+  await FavoriteStore.instance.initialize(sl<LocalStorageService>());
 
   /// Runs only in debug mode because assert statements are removed
   /// automatically from profile and release builds.
@@ -136,16 +141,37 @@ class AtPharmaApp extends StatelessWidget {
         },
 
         AppRoutes.checkout: (BuildContext context) {
-          return const CheckoutScreen();
+          final Object? arguments = ModalRoute.settingsOf(context)?.arguments;
+          return CheckoutScreen(
+            purchaseItems: arguments is List<ProductCartItem>
+                ? arguments
+                : null,
+          );
         },
         AppRoutes.stripePayment: (BuildContext context) {
-          return const StripePaymentNavScreen();
+          final Object? arguments = ModalRoute.settingsOf(context)?.arguments;
+          return StripePaymentNavScreen(
+            purchaseItems: arguments is List<ProductCartItem>
+                ? arguments
+                : null,
+          );
         },
         AppRoutes.reviewOrder: (BuildContext context) {
-          return const ReviewOrderScreen();
+          final Object? arguments = ModalRoute.settingsOf(context)?.arguments;
+          final ReviewOrderArguments? reviewArguments =
+              arguments is ReviewOrderArguments ? arguments : null;
+          return ReviewOrderScreen(
+            purchaseItems:
+                reviewArguments?.purchaseItems ??
+                (arguments is List<ProductCartItem> ? arguments : null),
+            paymentMethod: reviewArguments?.paymentMethod ?? 'Stripe',
+          );
         },
         AppRoutes.completedOrder: (BuildContext context) {
           return const CompletedOrderScreen();
+        },
+        AppRoutes.contactSupport: (BuildContext context) {
+          return const ContactSupportScreen();
         },
 
         AppRoutes.productDetails: (BuildContext context) {

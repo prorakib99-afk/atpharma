@@ -1,8 +1,11 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../../shared/widgets/navigation_page_scaffold.dart';
 
@@ -27,9 +30,12 @@ class PrescriptionScreen extends StatefulWidget {
 }
 
 class _PrescriptionScreenState extends State<PrescriptionScreen> {
+  static const int _maxUploadBytes = 15 * 1024 * 1024;
+
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
   final List<_ChatMessage> _messages = <_ChatMessage>[];
+  final ImagePicker _imagePicker = ImagePicker();
   bool _isAnswering = false;
 
   static const _suggestions = <_SuggestionItem>[
@@ -57,8 +63,9 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
     _scrollToBottom();
 
     try {
-      final answer = await (widget.answerQuestion?.call(text) ??
-          _MedicalKnowledgeBase.answer(text));
+      final answer =
+          await (widget.answerQuestion?.call(text) ??
+              _MedicalKnowledgeBase.answer(text));
       if (!mounted) return;
       setState(() => _messages.add(_ChatMessage(answer)));
     } catch (_) {
@@ -90,6 +97,119 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
     });
   }
 
+  Future<void> _capturePrescription() async {
+    if (widget.onCameraTap != null) {
+      widget.onCameraTap!();
+      return;
+    }
+
+    try {
+      final XFile? photo = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 90,
+      );
+      if (photo == null) return;
+
+      final int size = await photo.length();
+      if (size > _maxUploadBytes) {
+        _showUploadError(
+          'The captured photo is ${_formatBytes(size)}. '
+          'Please upload a file smaller than 15 MB.',
+        );
+        return;
+      }
+      _recordUpload(imageBytes: await photo.readAsBytes());
+    } on PlatformException catch (error) {
+      final denied =
+          error.code == 'camera_access_denied' ||
+          error.code == 'camera_access_denied_without_prompt' ||
+          error.code == 'camera_access_restricted';
+      _showUploadError(
+        denied
+            ? 'Camera permission is required. Please allow camera access from your device settings and try again.'
+            : 'Could not open the camera. Please try again.',
+      );
+    }
+  }
+
+  Future<void> _pickPrescription() async {
+    if (widget.onAttachTap != null) {
+      widget.onAttachTap!();
+      return;
+    }
+
+    try {
+      final FilePickerResult? result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        withData: true,
+        allowedExtensions: const <String>['jpg', 'jpeg', 'png', 'webp', 'pdf'],
+      );
+      if (result == null || result.files.isEmpty) return;
+
+      final PlatformFile file = result.files.single;
+      if (file.size > _maxUploadBytes) {
+        _showUploadError(
+          '${file.name} is ${_formatBytes(file.size)}. '
+          'Only images or PDFs up to 15 MB can be uploaded.',
+        );
+        return;
+      }
+      final String extension = file.extension?.toLowerCase() ?? '';
+      final bool isImage = <String>{
+        'jpg',
+        'jpeg',
+        'png',
+        'webp',
+      }.contains(extension);
+      _recordUpload(
+        imageBytes: isImage ? file.bytes : null,
+        isPdf: extension == 'pdf',
+      );
+    } on PlatformException {
+      _showUploadError(
+        'Could not select that file. Please choose an image or PDF up to 15 MB.',
+      );
+    }
+  }
+
+  void _recordUpload({
+    Uint8List? imageBytes,
+    bool isPdf = false,
+  }) {
+    if (!mounted) return;
+    setState(() {
+      _messages.add(
+        _ChatMessage(
+          '',
+          isUser: true,
+          imageBytes: imageBytes,
+          isPdf: isPdf,
+        ),
+      );
+    });
+    _scrollToBottom();
+  }
+
+  void _showUploadError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: const Color(0xFFB42318),
+        ),
+      );
+  }
+
+  String _formatBytes(int bytes) {
+    if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    }
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -106,7 +226,9 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
           bottom: false,
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final horizontalPadding = constraints.maxWidth <= 340 ? 16.0 : 20.0;
+              final horizontalPadding = constraints.maxWidth <= 340
+                  ? 16.0
+                  : 20.0;
               return Stack(
                 children: [
                   const _BackgroundGlow(),
@@ -122,20 +244,20 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
                             SliverPadding(
                               padding: EdgeInsets.fromLTRB(
                                 horizontalPadding,
-                                constraints.maxHeight <= 650 ? 10 : 24,
+                                constraints.maxHeight <= 650 ? 10 : 16,
                                 horizontalPadding,
                                 12,
                               ),
                               sliver: SliverList.list(
                                 children: [
                                   const _AnimatedAssistantOrb(),
-                                  const SizedBox(height: 12),
+                                  const SizedBox(height: 16),
                                   const _AssistantBadge(),
                                   const SizedBox(height: 24),
                                   const _HeroText(),
-                                  const SizedBox(height: 28),
+                                  const SizedBox(height: 32),
                                   const _DisclaimerCard(),
-                                  const SizedBox(height: 28),
+                                  const SizedBox(height: 48),
                                   _SuggestionChips(
                                     suggestions: _suggestions,
                                     onSelected: _send,
@@ -162,8 +284,8 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
                         ),
                         child: _MessageComposer(
                           controller: _messageController,
-                          onCameraTap: widget.onCameraTap,
-                          onAttachTap: widget.onAttachTap,
+                          onCameraTap: _capturePrescription,
+                          onAttachTap: _pickPrescription,
                           onSendTap: _send,
                         ),
                       ),
@@ -225,7 +347,7 @@ class _AnimatedAssistantOrbState extends State<_AnimatedAssistantOrb>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 2800),
+    duration: const Duration(milliseconds: 4200),
   )..repeat();
 
   @override
@@ -237,6 +359,7 @@ class _AnimatedAssistantOrbState extends State<_AnimatedAssistantOrb>
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context).width <= 340 ? 160.0 : 183.0;
+    final disableAnimations = MediaQuery.disableAnimationsOf(context);
     return Center(
       child: SizedBox(
         width: size,
@@ -244,7 +367,9 @@ class _AnimatedAssistantOrbState extends State<_AnimatedAssistantOrb>
         child: AnimatedBuilder(
           animation: _controller,
           builder: (context, child) {
-            final wave = (math.sin(_controller.value * math.pi * 2) + 1) / 2;
+            final progress = disableAnimations ? 0.0 : _controller.value;
+            final phase = progress * math.pi * 2;
+            final wave = (math.sin(phase) + 1) / 2;
             return Stack(
               alignment: Alignment.center,
               children: [
@@ -255,24 +380,69 @@ class _AnimatedAssistantOrbState extends State<_AnimatedAssistantOrb>
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF168BFF)
-                            .withValues(alpha: .16 + wave * .20),
+                        color: const Color(
+                          0xFF168BFF,
+                        ).withValues(alpha: .16 + wave * .20),
                         blurRadius: 24 + wave * 24,
                         spreadRadius: 2 + wave * 5,
                       ),
                     ],
                   ),
                 ),
-                Transform.rotate(
-                  angle: _controller.value * math.pi * 2,
-                  child: CustomPaint(
-                    size: Size.square(size * .79),
-                    painter: _GlowRingPainter(),
+                CustomPaint(
+                  size: Size.square(size * .79),
+                  painter: _GlowRingPainter(),
+                ),
+                child!,
+                Transform(
+                  alignment: Alignment.center,
+                  transform: Matrix4.identity()
+                    ..setEntry(3, 2, .0012)
+                    ..rotateX(math.sin(phase) * .045)
+                    ..rotateZ(phase),
+                  child: ClipOval(
+                    child: SizedBox(
+                      width: size * .657,
+                      height: size * .657,
+                      child: Stack(
+                        clipBehavior: Clip.hardEdge,
+                        children: <Widget>[
+                          Positioned.fill(
+                            child: SvgPicture.asset(
+                              'assets/icons/ai_sphere_base.svg',
+                              fit: BoxFit.fill,
+                            ),
+                          ),
+                          Positioned(
+                            left: size * -.141,
+                            top: size * -.0615,
+                            width: size * .912,
+                            height: size * .773,
+                            child: SvgPicture.asset(
+                              'assets/icons/ai_orb_ribbons.svg',
+                              fit: BoxFit.fill,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-                Transform.rotate(
-                  angle: -_controller.value * math.pi * 2,
-                  child: child,
+                SvgPicture.asset(
+                  'assets/icons/ai_outer_rim.svg',
+                  width: size * .657,
+                  height: size * .657,
+                  fit: BoxFit.fill,
+                ),
+                Positioned(
+                  left: size * .204,
+                  top: size * .176,
+                  width: size * .552,
+                  height: size * .193,
+                  child: SvgPicture.asset(
+                    'assets/icons/ai_upper_rim_highlight.svg',
+                    fit: BoxFit.fill,
+                  ),
                 ),
               ],
             );
@@ -327,13 +497,21 @@ class _AssistantBadge extends StatelessWidget {
           borderRadius: BorderRadius.circular(40),
           border: Border.all(color: Colors.white, width: 2),
           boxShadow: const [
-            BoxShadow(color: Color(0x0F000000), blurRadius: 8, offset: Offset(4, 8)),
+            BoxShadow(
+              color: Color(0x0F000000),
+              blurRadius: 8,
+              offset: Offset(4, 8),
+            ),
           ],
         ),
         child: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.auto_awesome_outlined, size: 20, color: Color(0xFF0B83D9)),
+            Icon(
+              Icons.auto_awesome_outlined,
+              size: 20,
+              color: Color(0xFF0B83D9),
+            ),
             SizedBox(width: 8),
             Text(
               'AI Prescription Assistant',
@@ -489,8 +667,9 @@ class _ChatHistory extends StatelessWidget {
       children: [
         for (final message in messages) ...[
           Align(
-            alignment:
-                message.isUser ? Alignment.centerRight : Alignment.centerLeft,
+            alignment: message.isUser
+                ? Alignment.centerRight
+                : Alignment.centerLeft,
             child: Container(
               constraints: BoxConstraints(
                 maxWidth: MediaQuery.sizeOf(context).width * .78,
@@ -516,18 +695,59 @@ class _ChatHistory extends StatelessWidget {
                             : const Color(0xFFD9ECFA),
                       ),
               ),
-              child: Text(
-                message.text,
-                style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 12,
-                  height: 1.55,
-                  color: message.isUser
-                      ? Colors.white
-                      : message.isError
-                      ? const Color(0xFFB42318)
-                      : const Color(0xFF25364A),
-                ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (message.imageBytes != null) ...[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.memory(
+                        message.imageBytes!,
+                        width: 230,
+                        height: 170,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  if (message.isPdf) ...[
+                    const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.picture_as_pdf_rounded,
+                          color: Colors.white,
+                          size: 28,
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'PDF prescription',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  if (message.text.isNotEmpty)
+                    Text(
+                      message.text,
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 12,
+                        height: 1.55,
+                        color: message.isUser
+                            ? Colors.white
+                            : message.isError
+                            ? const Color(0xFFB42318)
+                            : const Color(0xFF25364A),
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
@@ -566,7 +786,7 @@ class _TypingIndicator extends StatelessWidget {
   }
 }
 
-class _MessageComposer extends StatelessWidget {
+class _MessageComposer extends StatefulWidget {
   const _MessageComposer({
     required this.controller,
     required this.onCameraTap,
@@ -580,64 +800,142 @@ class _MessageComposer extends StatelessWidget {
   final VoidCallback onSendTap;
 
   @override
+  State<_MessageComposer> createState() => _MessageComposerState();
+}
+
+class _MessageComposerState extends State<_MessageComposer>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _borderController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2600),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _borderController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 56,
-      padding: const EdgeInsets.only(left: 14, right: 7),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0xFF0090FF), width: 2),
-        boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 56)],
+    final bool disableAnimations = MediaQuery.disableAnimationsOf(context);
+
+    return AnimatedBuilder(
+      animation: disableAnimations
+          ? kAlwaysDismissedAnimation
+          : _borderController,
+      builder: (BuildContext context, Widget? child) => CustomPaint(
+        foregroundPainter: _RotatingComposerBorderPainter(
+          progress: disableAnimations ? 0 : _borderController.value,
+        ),
+        child: child,
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: controller,
-              textInputAction: TextInputAction.send,
-              onSubmitted: (_) => onSendTap(),
-              style: const TextStyle(fontFamily: 'Poppins', fontSize: 12),
-              decoration: const InputDecoration(
-                border: InputBorder.none,
-                isDense: true,
-                hintText: 'Ask about a medicine...',
-                hintStyle: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 12,
-                  color: Color(0xFF98A1B3),
-                ),
-              ),
-            ),
-          ),
-          _ComposerButton(icon: Icons.camera_alt_outlined, onTap: onCameraTap),
-          const SizedBox(width: 4),
-          _ComposerButton(icon: Icons.attach_file_rounded, onTap: onAttachTap),
-          const SizedBox(width: 4),
-          Material(
-            color: Colors.transparent,
-            shape: const CircleBorder(),
-            child: InkWell(
-              onTap: onSendTap,
-              customBorder: const CircleBorder(),
-              child: Ink(
-                width: 36,
-                height: 36,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF0187ED), Color(0xFF021E79)],
+      child: Container(
+        height: 56,
+        padding: const EdgeInsets.only(left: 14, right: 7),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(999),
+          boxShadow: const [
+            BoxShadow(color: Color(0x14000000), blurRadius: 56),
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: widget.controller,
+                textInputAction: TextInputAction.send,
+                onSubmitted: (_) => widget.onSendTap(),
+                style: const TextStyle(fontFamily: 'Poppins', fontSize: 12),
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  isDense: true,
+                  hintText: 'Ask about a medicine...',
+                  hintStyle: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 12,
+                    color: Color(0xFF98A1B3),
                   ),
                 ),
-                child: const Icon(Icons.send_rounded, size: 20, color: Colors.white),
               ),
             ),
-          ),
-        ],
+            _ComposerButton(
+              icon: Icons.camera_alt_outlined,
+              onTap: widget.onCameraTap,
+            ),
+            const SizedBox(width: 4),
+            _ComposerButton(
+              icon: Icons.attach_file_rounded,
+              onTap: widget.onAttachTap,
+            ),
+            const SizedBox(width: 4),
+            Material(
+              color: Colors.transparent,
+              shape: const CircleBorder(),
+              child: InkWell(
+                onTap: widget.onSendTap,
+                customBorder: const CircleBorder(),
+                child: Ink(
+                  width: 36,
+                  height: 36,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF0187ED), Color(0xFF021E79)],
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.send_rounded,
+                    size: 20,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
+  }
+}
+
+class _RotatingComposerBorderPainter extends CustomPainter {
+  const _RotatingComposerBorderPainter({required this.progress});
+
+  final double progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Rect bounds = Offset.zero & size;
+    final Paint paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
+      ..shader = SweepGradient(
+        transform: GradientRotation(progress * math.pi * 2),
+        colors: const <Color>[
+          Color(0xFF0078F0),
+          Color(0xFF54E4FF),
+          Color(0xFF0078F0),
+          Color(0xFF02369F),
+          Color(0xFF0078F0),
+        ],
+        stops: const <double>[0, .18, .42, .72, 1],
+      ).createShader(bounds);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        bounds.deflate(1),
+        Radius.circular(size.height / 2),
+      ),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _RotatingComposerBorderPainter oldDelegate) {
+    return oldDelegate.progress != progress;
   }
 }
 
@@ -673,11 +971,19 @@ class _SuggestionItem {
 }
 
 class _ChatMessage {
-  const _ChatMessage(this.text, {this.isUser = false, this.isError = false});
+  const _ChatMessage(
+    this.text, {
+    this.isUser = false,
+    this.isError = false,
+    this.imageBytes,
+    this.isPdf = false,
+  });
 
   final String text;
   final bool isUser;
   final bool isError;
+  final Uint8List? imageBytes;
+  final bool isPdf;
 }
 
 abstract final class _MedicalKnowledgeBase {

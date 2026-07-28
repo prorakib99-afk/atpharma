@@ -128,7 +128,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
               border: Border.all(color: const Color(0xffe5e7eb)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
+                  color: Colors.black.withValues(alpha: 0.08),
                   blurRadius: 20,
                   offset: const Offset(0, 8),
                 ),
@@ -160,7 +160,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                   vertical: 4,
                                 ),
                                 itemCount: _entries.length,
-                                separatorBuilder: (_, __) => Divider(
+                                separatorBuilder: (_, _) => Divider(
                                   height: 1,
                                   color: Colors.grey.shade200,
                                 ),

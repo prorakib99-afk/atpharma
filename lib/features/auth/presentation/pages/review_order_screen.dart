@@ -2,15 +2,35 @@ import 'dart:math' as math;
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../core/routes/app_routes.dart';
+import 'screen_product_details.dart';
+
+class ReviewOrderArguments {
+  const ReviewOrderArguments({
+    this.purchaseItems,
+    this.paymentMethod = 'Stripe',
+  });
+
+  final List<ProductCartItem>? purchaseItems;
+  final String paymentMethod;
+}
 
 class ReviewOrderScreen extends StatefulWidget {
-  const ReviewOrderScreen({super.key, this.embedded = false, this.onBack});
+  const ReviewOrderScreen({
+    super.key,
+    this.embedded = false,
+    this.onBack,
+    this.purchaseItems,
+    this.paymentMethod = 'Stripe',
+  });
 
   static const String routeName = '/review-order';
   final bool embedded;
   final VoidCallback? onBack;
+  final List<ProductCartItem>? purchaseItems;
+  final String paymentMethod;
 
   @override
   State<ReviewOrderScreen> createState() => _ReviewOrderScreenState();
@@ -20,40 +40,21 @@ class _ReviewOrderScreenState extends State<ReviewOrderScreen> {
   final TextEditingController _couponController = TextEditingController();
   String? _couponError;
   bool _couponApplied = false;
-  final List<_ReviewOrderItem> _items = const <_ReviewOrderItem>[
-    _ReviewOrderItem(
-      index: 1,
-      title: 'Paracetamol 500mg',
-      type: 'Tablet',
-      imageUrl: _ReviewImages.paracetamol,
-      unitPrice: 5,
-      quantity: 2,
-    ),
-    _ReviewOrderItem(
-      index: 2,
-      title: 'Vitamin D3 Tablets',
-      type: 'Tablet',
-      imageUrl: _ReviewImages.vitaminD3,
-      unitPrice: 5,
-      quantity: 2,
-    ),
-    _ReviewOrderItem(
-      index: 3,
-      title: 'Hand Sanitizer 500ml',
-      type: 'Liquid',
-      imageUrl: _ReviewImages.sanitizer,
-      unitPrice: 5,
-      quantity: 2,
-    ),
-    _ReviewOrderItem(
-      index: 4,
-      title: 'Organic Honey 500g',
-      type: 'Liquid',
-      imageUrl: _ReviewImages.honey,
-      unitPrice: 5,
-      quantity: 2,
-    ),
-  ];
+  List<_ReviewOrderItem> get _items {
+    final List<ProductCartItem> cartItems =
+        widget.purchaseItems ?? ProductCart.instance.items;
+    return List<_ReviewOrderItem>.generate(cartItems.length, (int index) {
+      final ProductCartItem cartItem = cartItems[index];
+      return _ReviewOrderItem(
+        index: index + 1,
+        title: cartItem.product.name,
+        type: cartItem.product.brand,
+        imageUrl: cartItem.product.image,
+        unitPrice: cartItem.product.price.toDouble(),
+        quantity: cartItem.quantity,
+      );
+    }, growable: false);
+  }
 
   double get _subtotal {
     return _items.fold<double>(
@@ -99,7 +100,12 @@ class _ReviewOrderScreenState extends State<ReviewOrderScreen> {
         ),
       ),
       const SizedBox(height: 24),
-      _OrderItemsCard(items: _items),
+      _OrderItemsCard(
+        items: _items,
+        onEdit: widget.purchaseItems == null
+            ? () => Navigator.of(context).pushNamed(AppRoutes.cart)
+            : (widget.onBack ?? () => Navigator.maybePop(context)),
+      ),
       const SizedBox(height: 14),
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -129,13 +135,13 @@ class _ReviewOrderScreenState extends State<ReviewOrderScreen> {
       const SizedBox(height: 22),
       const _ShippingAddressCard(),
       const SizedBox(height: 22),
-      const _PaymentMethodCard(),
+      _PaymentMethodCard(paymentMethod: widget.paymentMethod),
       const SizedBox(height: 22),
       const _NeedHelpCard(),
       const SizedBox(height: 28),
       const _TermsText(),
       const SizedBox(height: 22),
-      const _PlaceOrderButton(total: 12.00),
+      _PlaceOrderButton(total: _totalPayable),
     ];
 
     if (widget.embedded) {
@@ -210,9 +216,10 @@ class _BackButton extends StatelessWidget {
 }
 
 class _OrderItemsCard extends StatelessWidget {
-  const _OrderItemsCard({required this.items});
+  const _OrderItemsCard({required this.items, required this.onEdit});
 
   final List<_ReviewOrderItem> items;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -221,12 +228,12 @@ class _OrderItemsCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'Order Items (4)',
+                  'Order Items (${items.length})',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontFamily: 'Poppins',
                     fontSize: 18,
                     height: 22 / 18,
@@ -235,7 +242,10 @@ class _OrderItemsCard extends StatelessWidget {
                   ),
                 ),
               ),
-              _SmallOutlineIconButton(icon: Icons.edit_outlined, onTap: () {}),
+              _SmallOutlineIconButton(
+                icon: Icons.edit_outlined,
+                onTap: onEdit,
+              ),
             ],
           ),
           const SizedBox(height: 22),
@@ -285,20 +295,9 @@ class _OrderItemTile extends StatelessWidget {
         const SizedBox(width: 10),
         ClipRRect(
           borderRadius: BorderRadius.circular(9),
-          child: Image.network(
-            item.imageUrl,
-            width: imageSize,
-            height: imageSize,
-            fit: BoxFit.cover,
-            errorBuilder: (_, _, _) => Container(
-                width: imageSize,
-                height: imageSize,
-                color: _ReviewColors.primaryLight,
-                child: const Icon(
-                  Icons.medication_outlined,
-                  color: _ReviewColors.primary,
-                ),
-              ),
+          child: _ReviewProductImage(
+            source: item.imageUrl,
+            size: imageSize,
           ),
         ),
         const SizedBox(width: 12),
@@ -395,6 +394,47 @@ class _OrderItemTile extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+class _ReviewProductImage extends StatelessWidget {
+  const _ReviewProductImage({required this.source, required this.size});
+
+  final String source;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final Uri? uri = Uri.tryParse(source.trim());
+    final bool isNetwork =
+        uri != null &&
+        (uri.scheme == 'http' || uri.scheme == 'https') &&
+        uri.host.isNotEmpty;
+    final Widget fallback = Container(
+      width: size,
+      height: size,
+      color: _ReviewColors.primaryLight,
+      child: const Icon(
+        Icons.medication_outlined,
+        color: _ReviewColors.primary,
+      ),
+    );
+
+    return isNetwork
+        ? Image.network(
+            source,
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => fallback,
+          )
+        : Image.asset(
+            source,
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => fallback,
+          );
   }
 }
 
@@ -886,10 +926,24 @@ class _DefaultBadge extends StatelessWidget {
 }
 
 class _PaymentMethodCard extends StatelessWidget {
-  const _PaymentMethodCard();
+  const _PaymentMethodCard({required this.paymentMethod});
+
+  final String paymentMethod;
 
   @override
   Widget build(BuildContext context) {
+    final bool isMada = paymentMethod == 'Mada';
+    final bool isCod = paymentMethod == 'COD';
+    final String title = isCod ? 'Cash On Delivery' : paymentMethod;
+    final String subtitle = isCod
+        ? 'Pay with cash when your order is delivered'
+        : isMada
+        ? 'Mada card ending in ****  ****  ****  3456'
+        : 'Card ending in ****  ****  ****  3456';
+    final String iconAsset = isMada
+        ? 'assets/icons/mada_icon.svg'
+        : 'assets/icons/stripe_icon.svg';
+
     return _ReviewCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -918,29 +972,35 @@ class _PaymentMethodCard extends StatelessWidget {
                 Container(
                   width: 28,
                   height: 28,
-                  alignment: Alignment.center,
+                  padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
-                    color: const Color(0xff6865e8),
+                    color: isCod
+                        ? const Color(0xfff59e0b)
+                        : isMada
+                        ? Colors.white
+                        : const Color(0xff6865e8),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Text(
-                    'S',
-                    style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 16,
-                      height: 1,
-                      fontWeight: FontWeight.w800,
-                      color: _ReviewColors.white,
-                    ),
-                  ),
+                  child: isCod
+                      ? Image.asset(
+                          'assets/icons/cod_icon.png',
+                          fit: BoxFit.contain,
+                          cacheWidth: 60,
+                          errorBuilder: (_, _, _) => const Icon(
+                            Icons.payments_outlined,
+                            size: 18,
+                            color: Colors.white,
+                          ),
+                        )
+                      : SvgPicture.asset(iconAsset, fit: BoxFit.contain),
                 ),
                 const SizedBox(width: 10),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Stripe',
+                        title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -953,7 +1013,7 @@ class _PaymentMethodCard extends StatelessWidget {
                       ),
                       SizedBox(height: 3),
                       Text(
-                        'Card ending in ****  ****  ****  3456',
+                        subtitle,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -1022,7 +1082,8 @@ class _NeedHelpCard extends StatelessWidget {
           ),
           const SizedBox(height: 22),
           InkWell(
-            onTap: () {},
+            onTap: () =>
+                Navigator.of(context).pushNamed(AppRoutes.contactSupport),
             borderRadius: BorderRadius.circular(16),
             child: Container(
               width: double.infinity,

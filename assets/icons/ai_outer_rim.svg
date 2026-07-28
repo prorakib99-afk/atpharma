@@ -1,0 +1,11 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="123.234" height="123.234" viewBox="0 0 123.234 123.234" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path id="Outer Rim" d="M61.6172 121.734C94.819 121.734 121.734 94.819 121.734 61.6172C121.734 28.4154 94.819 1.5 61.6172 1.5C28.4154 1.5 1.5 28.4154 1.5 61.6172C1.5 94.819 28.4154 121.734 61.6172 121.734Z" stroke="url(#paint0_linear_0_6)" stroke-width="3"/>
+<defs>
+<linearGradient id="paint0_linear_0_6" x1="9.66406" y1="9.66406" x2="116.539" y2="120.25" gradientUnits="userSpaceOnUse">
+<stop stop-color="#1098FF"/>
+<stop offset="0.36" stop-color="#006BFF"/>
+<stop offset="0.7" stop-color="#0035D8"/>
+<stop offset="1" stop-color="#25D4FF"/>
+</linearGradient>
+</defs>
+</svg>

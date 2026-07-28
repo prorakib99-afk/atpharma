@@ -13,8 +13,7 @@ abstract interface class AuthRemoteDataSource {
 }
 
 final class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
-  AuthRemoteDataSourceImpl({required DioClient dioClient})
-    : _dioClient = dioClient;
+  AuthRemoteDataSourceImpl({required this._dioClient});
 
   final DioClient _dioClient;
 
@@ -25,10 +24,7 @@ final class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   }) async {
     final Response<dynamic> response = await _dioClient.post<dynamic>(
       AuthEndpoints.login,
-      data: <String, dynamic>{
-        'identifier': identifier,
-        'password': password,
-      },
+      data: <String, dynamic>{'identifier': identifier, 'password': password},
       options: ApiRequestOptions.publicRequest(allowRetry: false),
     );
 

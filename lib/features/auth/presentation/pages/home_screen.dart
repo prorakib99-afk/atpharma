@@ -403,9 +403,9 @@ void _showNotifications(BuildContext context) {
     context: context,
     barrierDismissible: true,
     barrierLabel: 'Close notifications',
-    barrierColor: Colors.black.withOpacity(0.08),
+    barrierColor: Colors.black.withValues(alpha: 0.08),
     transitionDuration: const Duration(milliseconds: 180),
-    pageBuilder: (BuildContext dialogContext, _, __) {
+    pageBuilder: (BuildContext dialogContext, _, _) {
       return SafeArea(
         child: Stack(
           children: <Widget>[
@@ -704,21 +704,21 @@ class _CategoryCard extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
-          Image.asset(
-            image,
-            width: 38,
-            height: 34,
-            fit: BoxFit.contain,
-            cacheWidth: 76,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: _Text.cardTitle12,
-          ),
-          Text(count, style: _Text.body12),
+              Image.asset(
+                image,
+                width: 38,
+                height: 34,
+                fit: BoxFit.contain,
+                cacheWidth: 76,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: _Text.cardTitle12,
+              ),
+              Text(count, style: _Text.body12),
             ],
           ),
         ),
@@ -860,6 +860,7 @@ class _ProductCard extends StatelessWidget {
           brand: product.displayCompanyName,
           price: product.sellingPrice.round(),
           prescriptionRequired: product.prescriptionRequired,
+          isOutOfStock: product.isOutOfStock,
           currencyCode: product.currencyCode,
           countryCode: product.countryCode,
         ),
@@ -881,6 +882,7 @@ class _ProductCard extends StatelessWidget {
               brand: product.displayCompanyName,
               price: product.sellingPrice.round(),
               prescriptionRequired: product.prescriptionRequired,
+              isOutOfStock: product.isOutOfStock,
               currencyCode: product.currencyCode,
               countryCode: product.countryCode,
             ),
@@ -1249,11 +1251,7 @@ class _ArticleCard extends StatelessWidget {
   }
 }
 
-String _formatPrice(
-  double price, {
-  String? currencyCode,
-  String? countryCode,
-}) {
+String _formatPrice(double price, {String? currencyCode, String? countryCode}) {
   return CurrencyDisplay.format(
     price,
     currencyCode: currencyCode,

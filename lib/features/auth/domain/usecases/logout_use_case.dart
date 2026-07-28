@@ -2,8 +2,7 @@ import '../../../../core/error/app_result.dart';
 import '../repositories/auth_repository.dart';
 
 final class LogoutUseCase {
-  const LogoutUseCase({required AuthRepository repository})
-    : _repository = repository;
+  const LogoutUseCase({required this._repository});
 
   final AuthRepository _repository;
 

@@ -79,7 +79,7 @@ class FloatingProfileScreen extends StatelessWidget {
       PageRouteBuilder(
         opaque: false,
         barrierDismissible: true,
-        barrierColor: Colors.black.withOpacity(0.05),
+        barrierColor: Colors.black.withValues(alpha: 0.05),
         transitionDuration: const Duration(milliseconds: 150),
         pageBuilder: (context, anim, secondaryAnim) {
           return FadeTransition(
@@ -151,7 +151,7 @@ class FloatingProfileScreen extends StatelessWidget {
             border: Border.all(color: const Color(0xffe5e7eb)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.10),
+                color: Colors.black.withValues(alpha: 0.10),
                 blurRadius: 24,
                 offset: const Offset(0, 10),
               ),
@@ -238,8 +238,9 @@ class FloatingProfileScreen extends StatelessWidget {
           ),
         );
 
-        if (!showAccentTab)
+        if (!showAccentTab) {
           return Material(color: Colors.transparent, child: card);
+        }
 
         return Material(
           color: Colors.transparent,

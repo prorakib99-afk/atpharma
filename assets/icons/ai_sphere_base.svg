@@ -1,0 +1,11 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="120.234" height="120.234" viewBox="0 0 120.234 120.234" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path id="Sphere Base" d="M60.1172 120.234C93.319 120.234 120.234 93.319 120.234 60.1172C120.234 26.9154 93.319 0 60.1172 0C26.9154 0 0 26.9154 0 60.1172C0 93.319 26.9154 120.234 60.1172 120.234Z" fill="url(#paint0_radial_0_7)"/>
+<defs>
+<radialGradient id="paint0_radial_0_7" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(41.1914 30.0586) rotate(52) scale(106.133)">
+<stop stop-color="#063B92"/>
+<stop offset="0.32" stop-color="#021C50"/>
+<stop offset="0.72" stop-color="#010B25"/>
+<stop offset="1" stop-color="#00030B"/>
+</radialGradient>
+</defs>
+</svg>

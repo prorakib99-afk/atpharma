@@ -20,6 +20,7 @@ class ProductDetailsData {
     this.brand = 'FreshLife',
     this.price = 500,
     this.prescriptionRequired = false,
+    this.isOutOfStock = false,
     this.currencyCode = '',
     this.countryCode = '',
   });
@@ -31,6 +32,7 @@ class ProductDetailsData {
   final String brand;
   final int price;
   final bool prescriptionRequired;
+  final bool isOutOfStock;
   final String currencyCode;
   final String countryCode;
 
@@ -89,6 +91,8 @@ class ProductCart extends ChangeNotifier {
       List<ProductCartItem>.unmodifiable(_items.values);
 
   void add(ProductDetailsData product, int quantity) {
+    if (product.isOutOfStock || quantity < 1) return;
+
     final String id = product.id?.trim().isNotEmpty == true
         ? product.id!.trim()
         : product.name.trim();
@@ -199,14 +203,17 @@ class ScreenProductDetails extends StatefulWidget {
 
 class _ScreenProductDetailsState extends State<ScreenProductDetails> {
   int quantity = 1;
+  Timer? _cartSnackBarTimer;
+  ScaffoldFeatureController<SnackBar, SnackBarClosedReason>?
+      _cartSnackBarController;
 
   ProductDetailsData get product => widget.product;
   String get productId => product.id?.trim().isNotEmpty == true
       ? product.id!.trim()
       : product.name.trim();
 
-  void _toggleFavourite() {
-    FavoriteStore.instance.toggle(
+  Future<void> _toggleFavourite() async {
+    await FavoriteStore.instance.toggle(
       FavoriteProduct(
         id: productId,
         name: product.name,
@@ -214,8 +221,76 @@ class _ScreenProductDetailsState extends State<ScreenProductDetails> {
         description: product.description,
         brand: product.brand,
         price: product.price,
+        isOutOfStock: product.isOutOfStock,
       ),
     );
+  }
+
+  void _addToCart() {
+    if (product.isOutOfStock) return;
+
+    ProductCart.instance.add(product, quantity);
+
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    _cartSnackBarTimer?.cancel();
+    _cartSnackBarController?.close();
+    messenger.hideCurrentSnackBar();
+    _cartSnackBarController = messenger.showSnackBar(
+      SnackBar(
+          duration: const Duration(seconds: 5),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+          elevation: 4,
+          backgroundColor: const Color(0xFFF2FFF6),
+          shape: RoundedRectangleBorder(
+            side: const BorderSide(color: Color(0xFF65C982)),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          content: const Row(
+            children: <Widget>[
+              Icon(Icons.check_circle, color: _green, size: 19),
+              SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  'Added to cart',
+                  style: TextStyle(color: Color(0xFF131415)),
+                ),
+              ),
+            ],
+          ),
+          action: SnackBarAction(
+            label: 'View Cart',
+            textColor: _blue,
+            onPressed: () {
+              _cartSnackBarTimer?.cancel();
+              Navigator.of(context).pushNamed(AppRoutes.cart);
+            },
+          ),
+      ),
+    );
+    _cartSnackBarTimer = Timer(const Duration(seconds: 5), () {
+      _cartSnackBarController?.close();
+      _cartSnackBarController = null;
+    });
+  }
+
+  void _buyNow() {
+    if (product.isOutOfStock) return;
+
+    Navigator.of(context).pushNamed(
+      AppRoutes.checkout,
+      arguments: <ProductCartItem>[
+        ProductCartItem(id: productId, product: product, quantity: quantity),
+      ],
+    );
+  }
+
+  @override
+  void dispose() {
+    _cartSnackBarTimer?.cancel();
+    _cartSnackBarController?.close();
+    _cartSnackBarController = null;
+    super.dispose();
   }
 
   Future<void> _openFloatingCart() async {
@@ -366,7 +441,11 @@ class _ScreenProductDetailsState extends State<ScreenProductDetails> {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const _Badge('In stock', dark: true),
+                    _Badge(
+                      product.isOutOfStock ? 'Out of stock' : 'In stock',
+                      dark: !product.isOutOfStock,
+                      outOfStock: product.isOutOfStock,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -541,31 +620,6 @@ class _ScreenProductDetailsState extends State<ScreenProductDetails> {
                 ),
                 const SizedBox(height: 16),
                 _RelatedProducts(current: product),
-                if (added) ...[
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF2FFF6),
-                      border: Border.all(color: const Color(0xFF65C982)),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.check_circle, color: _green, size: 18),
-                        SizedBox(width: 8),
-                        Expanded(child: Text('Added to cart')),
-                        Text(
-                          'View Cart',
-                          style: TextStyle(
-                            color: _blue,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
@@ -583,7 +637,7 @@ class _ScreenProductDetailsState extends State<ScreenProductDetails> {
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () {},
+                      onPressed: product.isOutOfStock ? null : _buyNow,
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size.fromHeight(50),
                         side: const BorderSide(color: _blue, width: 1.5),
@@ -597,19 +651,32 @@ class _ScreenProductDetailsState extends State<ScreenProductDetails> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: () =>
-                          ProductCart.instance.add(product, quantity),
+                      onPressed: product.isOutOfStock
+                          ? null
+                          : _addToCart,
                       style: FilledButton.styleFrom(
                         backgroundColor: _blue,
+                        disabledBackgroundColor: const Color(0xFF98A1B3),
+                        disabledForegroundColor: Colors.white,
                         minimumSize: const Size.fromHeight(50),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
                       icon: Icon(
-                        added ? Icons.check : Icons.shopping_cart_outlined,
+                        product.isOutOfStock
+                            ? Icons.remove_shopping_cart_outlined
+                            : added
+                            ? Icons.check
+                            : Icons.shopping_cart_outlined,
                       ),
-                      label: Text(added ? 'Added' : 'Add To Cart'),
+                      label: Text(
+                        product.isOutOfStock
+                            ? 'Out of Stock'
+                            : added
+                            ? 'Added'
+                            : 'Add To Cart',
+                      ),
                     ),
                   ),
                 ],
@@ -829,15 +896,23 @@ class _FavouriteShortcut extends StatelessWidget {
 }
 
 class _Badge extends StatelessWidget {
-  const _Badge(this.text, {this.dark = false, this.blue = false});
+  const _Badge(
+    this.text, {
+    this.dark = false,
+    this.blue = false,
+    this.outOfStock = false,
+  });
   final String text;
   final bool dark;
   final bool blue;
+  final bool outOfStock;
   @override
   Widget build(BuildContext context) => Container(
     padding: EdgeInsets.symmetric(horizontal: dark ? 10 : 14, vertical: 5),
     decoration: BoxDecoration(
-      color: dark
+      color: outOfStock
+          ? const Color(0xFFFFE8E8)
+          : dark
           ? const Color(0xFF131415)
           : blue
           ? const Color(0xFFE7F3FB)
@@ -848,7 +923,9 @@ class _Badge extends StatelessWidget {
       text,
       style: TextStyle(
         fontSize: dark ? 11 : 13,
-        color: dark
+        color: outOfStock
+            ? const Color(0xFFD92D20)
+            : dark
             ? Colors.white
             : blue
             ? _blue

@@ -3,8 +3,7 @@ import '../entities/auth_session.dart';
 import '../repositories/auth_repository.dart';
 
 final class LoginUseCase {
-  const LoginUseCase({required AuthRepository repository})
-    : _repository = repository;
+  const LoginUseCase({required this._repository});
 
   final AuthRepository _repository;
 

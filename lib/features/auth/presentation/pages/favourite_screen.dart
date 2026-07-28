@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/routes/app_routes.dart';
 import 'favorite_store.dart';
 import 'screen_product_details.dart';
 
@@ -76,6 +77,7 @@ class _FavouriteCard extends StatelessWidget {
                 description: product.description,
                 brand: product.brand,
                 price: product.price,
+                isOutOfStock: product.isOutOfStock,
               ),
             ),
           ),
@@ -83,7 +85,7 @@ class _FavouriteCard extends StatelessWidget {
       },
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        height: 116,
+        height: 124,
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           color: const Color(0xFFF7F8FA),
@@ -139,10 +141,64 @@ class _FavouriteCard extends StatelessWidget {
                 ],
               ),
             ),
-            IconButton(
-              tooltip: 'Remove from favourites',
-              onPressed: () => FavoriteStore.instance.remove(product.id),
-              icon: const Icon(Icons.favorite, color: Colors.red),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: <Widget>[
+                SizedBox(
+                  width: 36,
+                  height: 36,
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    tooltip: 'Remove from favourites',
+                    onPressed: () async {
+                      await FavoriteStore.instance.remove(product.id);
+                    },
+                    icon: const Icon(Icons.favorite, color: Colors.red),
+                  ),
+                ),
+                const Spacer(),
+                SizedBox(
+                  height: 34,
+                  child: FilledButton.icon(
+                    onPressed: product.isOutOfStock
+                        ? null
+                        : () {
+                            ProductCart.instance.add(
+                              ProductDetailsData(
+                                id: product.id,
+                                name: product.name,
+                                image: product.image,
+                                description: product.description,
+                                brand: product.brand,
+                                price: product.price,
+                              ),
+                              1,
+                            );
+                            Navigator.of(context).pushNamed(AppRoutes.cart);
+                          },
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      backgroundColor: const Color(0xFF0B83D9),
+                      disabledBackgroundColor: const Color(0xFF98A1B3),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                    ),
+                    icon: const Icon(
+                      Icons.shopping_cart_outlined,
+                      size: 16,
+                    ),
+                    label: Text(
+                      product.isOutOfStock ? 'Out' : 'Add Cart',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

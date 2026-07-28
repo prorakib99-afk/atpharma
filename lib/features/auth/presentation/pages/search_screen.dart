@@ -16,6 +16,23 @@ import '../../../shop/domain/usecases/get_shop_products_use_case.dart';
 import 'screen_product_details.dart';
 import 'favorite_header_button.dart';
 import 'floating_profile_screen.dart';
+import 'notification_screen.dart';
+
+void _openNotifications(BuildContext context) {
+  showDialog<void>(
+    context: context,
+    barrierColor: Colors.black.withOpacity(0.08),
+    builder: (_) => const SafeArea(
+      child: Align(
+        alignment: Alignment.topRight,
+        child: Padding(
+          padding: EdgeInsets.only(top: 66, right: 28),
+          child: NotificationScreen(maxHeight: 280, width: 330),
+        ),
+      ),
+    ),
+  );
+}
 
 void _addSearchProductToCart(
   BuildContext context,
@@ -198,7 +215,7 @@ class _SearchScreenState extends State<SearchScreen> {
       child: Column(
         children: [
           const Padding(
-            padding: EdgeInsets.fromLTRB(20, 12, 20, 0),
+            padding: EdgeInsets.fromLTRB(20, 8, 20, 0),
             child: _Header(),
           ),
           Expanded(
@@ -294,8 +311,8 @@ class _Header extends StatelessWidget {
             Text(
               'Search',
               style: TextStyle(
-                fontSize: 18,
-                height: 22 / 18,
+                fontSize: 16,
+                height: 22 / 16,
                 fontWeight: FontWeight.w600,
                 color: _Colors.text,
               ),
@@ -312,7 +329,10 @@ class _Header extends StatelessWidget {
           ],
         ),
       ),
-      const _RoundIcon(Icons.notifications_none_rounded),
+      _RoundIcon(
+        Icons.notifications_none_rounded,
+        onTap: () => _openNotifications(context),
+      ),
       const SizedBox(width: 4),
       const FavoriteHeaderButton(inactiveColor: _Colors.text),
       const SizedBox(width: 4),
@@ -340,11 +360,12 @@ class _Header extends StatelessWidget {
 }
 
 class _RoundIcon extends StatelessWidget {
-  const _RoundIcon(this.icon);
+  const _RoundIcon(this.icon, {required this.onTap});
   final IconData icon;
+  final VoidCallback onTap;
   @override
   Widget build(BuildContext context) => InkWell(
-    onTap: () {},
+    onTap: onTap,
     customBorder: const CircleBorder(),
     child: Container(
       width: 40,

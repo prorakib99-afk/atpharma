@@ -7,10 +7,9 @@ import '../datasources/auth_remote_data_source.dart';
 
 final class AuthRepositoryImpl implements AuthRepository {
   AuthRepositoryImpl({
-    required AuthRemoteDataSource remoteDataSource,
+    required this._remoteDataSource,
     required SessionManager sessionManager,
-  }) : _remoteDataSource = remoteDataSource,
-       _sessionManager = sessionManager;
+  }) : _sessionManager = sessionManager;
 
   final AuthRemoteDataSource _remoteDataSource;
   final SessionManager _sessionManager;

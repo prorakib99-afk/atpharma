@@ -6,6 +6,23 @@ import '../../../../shared/widgets/navigation_page_scaffold.dart';
 import 'screen_product_details.dart';
 import 'favorite_header_button.dart';
 import 'floating_profile_screen.dart';
+import 'notification_screen.dart';
+
+void _openNotifications(BuildContext context) {
+  showDialog<void>(
+    context: context,
+    barrierColor: Colors.black.withOpacity(0.08),
+    builder: (_) => const SafeArea(
+      child: Align(
+        alignment: Alignment.topRight,
+        child: Padding(
+          padding: EdgeInsets.only(top: 66, right: 28),
+          child: NotificationScreen(maxHeight: 280, width: 330),
+        ),
+      ),
+    ),
+  );
+}
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -45,7 +62,7 @@ class _CartScreenState extends State<CartScreen> {
             child: Column(
               children: [
                 Padding(
-                  padding: EdgeInsets.fromLTRB(pagePadding, 18, pagePadding, 0),
+                  padding: EdgeInsets.fromLTRB(pagePadding, 8, pagePadding, 0),
                   child: _CartHeader(
                     itemCount: ProductCart.instance.totalCount,
                   ),
@@ -147,9 +164,9 @@ class _CartHeader extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontFamily: 'Poppins',
-                    fontSize: 24,
-                    height: 1.15,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                    height: 22 / 16,
+                    fontWeight: FontWeight.w600,
                     color: _CartColors.title,
                   ),
                 ),
@@ -157,8 +174,8 @@ class _CartHeader extends StatelessWidget {
               const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 7,
+                  horizontal: 8,
+                  vertical: 5,
                 ),
                 decoration: BoxDecoration(
                   color: _CartColors.primaryLight,
@@ -168,9 +185,9 @@ class _CartHeader extends StatelessWidget {
                   '${itemCount.toString().padLeft(2, '0')} Items',
                   style: const TextStyle(
                     fontFamily: 'Poppins',
-                    fontSize: 13,
-                    height: 1,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 10,
+                    height: 16 / 10,
+                    fontWeight: FontWeight.w500,
                     color: _CartColors.primary,
                   ),
                 ),
@@ -179,11 +196,14 @@ class _CartHeader extends StatelessWidget {
           ),
         ),
         SizedBox(width: compact ? 8 : 12),
-        const _RoundIconButton(icon: Icons.notifications_none_rounded),
+        _RoundIconButton(
+          icon: Icons.notifications_none_rounded,
+          onTap: () => _openNotifications(context),
+        ),
         SizedBox(width: compact ? 6 : 8),
         FavoriteHeaderButton(
-          size: MediaQuery.sizeOf(context).width <= 360 ? 40 : 44,
-          iconSize: 23,
+          size: 40,
+          iconSize: 20,
           borderColor: _CartColors.card,
           inactiveColor: _CartColors.title,
         ),
@@ -195,30 +215,35 @@ class _CartHeader extends StatelessWidget {
 }
 
 class _RoundIconButton extends StatelessWidget {
-  const _RoundIconButton({required this.icon});
+  const _RoundIconButton({required this.icon, required this.onTap});
 
   final IconData icon;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context).width <= 360 ? 40.0 : 44.0;
+    const size = 40.0;
 
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        shape: BoxShape.circle,
-        border: Border.all(color: _CartColors.card),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x14000000),
-            blurRadius: 28,
-            offset: Offset(0, 8),
-          ),
-        ],
+    return InkWell(
+      onTap: onTap,
+      customBorder: const CircleBorder(),
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+          border: Border.all(color: _CartColors.card),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x14000000),
+              blurRadius: 28,
+              offset: Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Icon(icon, size: 20, color: _CartColors.title),
       ),
-      child: Icon(icon, size: 23, color: _CartColors.title),
     );
   }
 }
@@ -228,7 +253,7 @@ class _ProfileAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context).width <= 360 ? 40.0 : 44.0;
+    const size = 40.0;
 
     return InkWell(
       onTap: () => FloatingProfileScreen.show(
@@ -255,16 +280,27 @@ class _CartItemView extends StatelessWidget {
 
   final ProductCartItem item;
 
+  void _openProductDetails(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ScreenProductDetails(product: item.product),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final isSmall = width <= 360;
     final imageSize = isSmall ? 112.0 : 132.0;
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        children: [
+    return InkWell(
+      onTap: () => _openProductDetails(context),
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Column(
+          children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -350,7 +386,8 @@ class _CartItemView extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           const Divider(height: 1, color: _CartColors.border),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -8,9 +8,7 @@ import 'login_event.dart';
 import 'login_state.dart';
 
 final class LoginBloc extends Bloc<LoginEvent, LoginState> {
-  LoginBloc({required LoginUseCase loginUseCase})
-    : _loginUseCase = loginUseCase,
-      super(const LoginState()) {
+  LoginBloc({required this._loginUseCase}) : super(const LoginState()) {
     on<LoginSubmitted>(_onSubmitted, transformer: droppable());
   }
 

@@ -17,6 +17,23 @@ import 'floating_explore_filter_screen.dart';
 import 'floating_profile_screen.dart';
 import 'screen_product_details.dart';
 import 'favorite_header_button.dart';
+import 'notification_screen.dart';
+
+void _openNotifications(BuildContext context) {
+  showDialog<void>(
+    context: context,
+    barrierColor: Colors.black.withOpacity(0.08),
+    builder: (_) => const SafeArea(
+      child: Align(
+        alignment: Alignment.topRight,
+        child: Padding(
+          padding: EdgeInsets.only(top: 66, right: 28),
+          child: NotificationScreen(maxHeight: 280, width: 330),
+        ),
+      ),
+    ),
+  );
+}
 
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({
@@ -211,7 +228,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 Padding(
                   padding: EdgeInsets.fromLTRB(
                     _Responsive.pagePadding(context),
-                    18,
+                    8,
                     _Responsive.pagePadding(context),
                     0,
                   ),
@@ -293,9 +310,9 @@ class _ExploreHeader extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontFamily: 'Poppins',
-                  fontSize: 18,
-                  height: 22 / 18,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                  height: 22 / 16,
+                  fontWeight: FontWeight.w600,
                   color: _ExploreColors.title,
                 ),
               ),
@@ -316,7 +333,10 @@ class _ExploreHeader extends StatelessWidget {
           ),
         ),
         SizedBox(width: compact ? 8 : 12),
-        const _RoundIconButton(icon: Icons.notifications_none_rounded),
+        _RoundIconButton(
+          icon: Icons.notifications_none_rounded,
+          onTap: () => _openNotifications(context),
+        ),
         SizedBox(width: compact ? 6 : 8),
         const FavoriteHeaderButton(
           borderColor: _ExploreColors.card,
@@ -330,14 +350,15 @@ class _ExploreHeader extends StatelessWidget {
 }
 
 class _RoundIconButton extends StatelessWidget {
-  const _RoundIconButton({required this.icon});
+  const _RoundIconButton({required this.icon, required this.onTap});
 
   final IconData icon;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () {},
+      onTap: onTap,
       customBorder: const CircleBorder(),
       child: Container(
         width: 40,
@@ -588,6 +609,7 @@ class _ProductCard extends StatelessWidget {
           brand: product.displayCompanyName,
           price: product.sellingPrice.round(),
           prescriptionRequired: product.prescriptionRequired,
+          isOutOfStock: product.isOutOfStock,
           currencyCode: product.currencyCode,
           countryCode: product.countryCode,
         ),
@@ -613,6 +635,7 @@ class _ProductCard extends StatelessWidget {
               brand: product.displayCompanyName,
               price: product.sellingPrice.round(),
               prescriptionRequired: product.prescriptionRequired,
+              isOutOfStock: product.isOutOfStock,
               currencyCode: product.currencyCode,
               countryCode: product.countryCode,
             ),

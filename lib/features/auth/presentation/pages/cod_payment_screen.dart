@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/routes/app_routes.dart';
+import 'review_order_screen.dart';
 
 class CodePaymentScreen extends StatelessWidget {
   const CodePaymentScreen({super.key});
@@ -34,7 +35,12 @@ class CodePaymentScreen extends StatelessWidget {
                   delegate: SliverChildListDelegate(<Widget>[
                     CodPaymentContent(
                       onContinue: () {
-                        Navigator.of(context).pushNamed(AppRoutes.reviewOrder);
+                        Navigator.of(context).pushNamed(
+                          AppRoutes.reviewOrder,
+                          arguments: const ReviewOrderArguments(
+                            paymentMethod: 'COD',
+                          ),
+                        );
                       },
                     ),
                   ]),

@@ -82,36 +82,64 @@ class _NavigationBar extends StatelessWidget {
           InkWell(
             onTap: () => _open(context, NavigationPage.prescription),
             customBorder: const CircleBorder(),
-            child: Container(
+            child: SizedBox(
               width: 80,
               height: 80,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: const [
-                  BoxShadow(color: Color(0x14000000), blurRadius: 28),
-                ],
-              ),
-              child: CustomPaint(
-                painter: const _RxButtonPainter(),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SvgPicture.asset(
-                      'assets/icons/upload_icon.svg',
-                      width: 32,
-                      height: 32,
-                    ),
-                    const Text(
-                      'Rx.',
-                      style: TextStyle(
-                        fontSize: 14,
-                        height: 24 / 14,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.white,
+              child: Stack(
+                clipBehavior: Clip.none,
+                alignment: Alignment.center,
+                children: <Widget>[
+                  if (currentPage == NavigationPage.prescription)
+                    Positioned(
+                      width: 104,
+                      height: 104,
+                      child: IgnorePointer(
+                        child: SvgPicture.asset(
+                          'assets/images/rx_active_glow.svg',
+                          width: 104,
+                          height: 104,
+                          fit: BoxFit.fill,
+                        ),
                       ),
                     ),
-                  ],
-                ),
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: <BoxShadow>[
+                        BoxShadow(
+                          color: currentPage == NavigationPage.prescription
+                              ? const Color(0x52168BFF)
+                              : const Color(0x14000000),
+                          blurRadius: 28,
+                        ),
+                      ],
+                    ),
+                    child: CustomPaint(
+                      painter: const _RxButtonPainter(),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SvgPicture.asset(
+                            'assets/icons/upload_icon.svg',
+                            width: 32,
+                            height: 32,
+                          ),
+                          const Text(
+                            'Rx.',
+                            style: TextStyle(
+                              fontSize: 14,
+                              height: 24 / 14,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
