@@ -853,7 +853,6 @@ class _HorizontalCard extends StatelessWidget {
             id: product.id,
             name: product.name,
             image: product.primaryImageUrl,
-            galleryImages: product.allImageUrls,
             description: product.displayDescription,
             brand: product.displayCompanyName,
             price: product.sellingPrice.round(),
@@ -990,7 +989,6 @@ class _GridCard extends StatelessWidget {
             id: product.id,
             name: product.name,
             image: product.primaryImageUrl,
-            galleryImages: product.allImageUrls,
             description: product.displayDescription,
             brand: product.displayCompanyName,
             price: product.sellingPrice.round(),
@@ -1143,9 +1141,8 @@ class _SearchProductImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (imageUrl.trim().isEmpty) {
-      return _SearchImageFallback(width: width, height: height);
-    }
+    final Widget fallback = _SearchImageFallback(width: width, height: height);
+    if (imageUrl.trim().isEmpty) return fallback;
     return Image.network(
       imageUrl,
       width: width,
@@ -1153,9 +1150,7 @@ class _SearchProductImage extends StatelessWidget {
       fit: BoxFit.cover,
       cacheWidth: 360,
       filterQuality: FilterQuality.low,
-      errorBuilder: (_, _, _) {
-        return _SearchImageFallback(width: width, height: height);
-      },
+      errorBuilder: (_, _, _) => fallback,
     );
   }
 }

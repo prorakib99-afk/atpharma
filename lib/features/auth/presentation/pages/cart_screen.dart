@@ -173,10 +173,7 @@ class _CartHeader extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 5,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                 decoration: BoxDecoration(
                   color: _CartColors.primaryLight,
                   borderRadius: BorderRadius.circular(100),
@@ -301,91 +298,91 @@ class _CartItemView extends StatelessWidget {
         padding: const EdgeInsets.only(bottom: 16),
         child: Column(
           children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                width: imageSize,
-                height: imageSize,
-                decoration: BoxDecoration(
-                  color: const Color(0xfff2f4f7),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: _CartColors.border),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: imageSize,
+                  height: imageSize,
+                  decoration: BoxDecoration(
+                    color: const Color(0xfff2f4f7),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: _CartColors.border),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: _CartProductImage(source: item.product.image),
                 ),
-                clipBehavior: Clip.antiAlias,
-                child: _CartProductImage(source: item.product.image),
-              ),
-              SizedBox(width: isSmall ? 10 : 12),
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.product.brand,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 14,
-                        height: 24 / 14,
-                        fontWeight: FontWeight.w600,
-                        color: _CartColors.success,
+                SizedBox(width: isSmall ? 10 : 12),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.product.brand,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 14,
+                          height: 24 / 14,
+                          fontWeight: FontWeight.w600,
+                          color: _CartColors.success,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            item.product.name,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: isSmall ? 15 : 16,
-                              height: 22 / 16,
-                              fontWeight: FontWeight.w700,
-                              color: _CartColors.title,
+                      const SizedBox(height: 2),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              item.product.name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: isSmall ? 15 : 16,
+                                height: 22 / 16,
+                                fontWeight: FontWeight.w700,
+                                color: _CartColors.title,
+                              ),
                             ),
                           ),
-                        ),
-                        if (item.product.prescriptionRequired) ...[
-                          const SizedBox(width: 8),
-                          const Padding(
-                            padding: EdgeInsets.only(top: 2),
-                            child: _RxBadge(),
+                          if (item.product.prescriptionRequired) ...[
+                            const SizedBox(width: 8),
+                            const Padding(
+                              padding: EdgeInsets.only(top: 2),
+                              child: _RxBadge(),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      _PriceLine(item: item),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          _QuantityStepper(
+                            quantity: item.quantity,
+                            onDecrease: () =>
+                                ProductCart.instance.decrease(item.id),
+                            onIncrease: () =>
+                                ProductCart.instance.increase(item.id),
+                          ),
+                          const Spacer(),
+                          _DeleteButton(
+                            onPressed: () =>
+                                ProductCart.instance.remove(item.id),
                           ),
                         ],
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    _PriceLine(item: item),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        _QuantityStepper(
-                          quantity: item.quantity,
-                          onDecrease: () =>
-                              ProductCart.instance.decrease(item.id),
-                          onIncrease: () =>
-                              ProductCart.instance.increase(item.id),
-                        ),
-                        const Spacer(),
-                        _DeleteButton(
-                          onPressed: () =>
-                              ProductCart.instance.remove(item.id),
-                        ),
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const Divider(height: 1, color: _CartColors.border),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Divider(height: 1, color: _CartColors.border),
           ],
         ),
       ),
@@ -429,16 +426,13 @@ class _CartProductImage extends StatelessWidget {
         uri != null &&
         (uri.scheme == 'http' || uri.scheme == 'https') &&
         uri.host.isNotEmpty;
-    const Widget fallback = ColoredBox(
-      color: Color(0xFFF2F4F7),
-      child: Center(
-        child: Icon(
-          Icons.medication_outlined,
-          size: 42,
-          color: _CartColors.muted,
-        ),
-      ),
+    final Widget fallback = Image.asset(
+      'assets/images/dummy_image.png',
+      fit: BoxFit.cover,
+      cacheWidth: 360,
     );
+
+    if (source.trim().isEmpty) return fallback;
 
     return isNetwork
         ? Image.network(

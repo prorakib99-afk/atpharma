@@ -79,9 +79,7 @@ final class ShopCategoryStore extends ChangeNotifier {
         }
       }
 
-      _categories = List<ShopCategory>.unmodifiable(
-        _mergeMedicineCategories(loaded),
-      );
+      _categories = List<ShopCategory>.unmodifiable(_groupCategories(loaded));
       _totalProducts =
           int.tryParse(data['total']?.toString() ?? '') ??
           loaded.fold<int>(0, (int sum, ShopCategory item) => sum + item.count);
@@ -93,51 +91,57 @@ final class ShopCategoryStore extends ChangeNotifier {
     }
   }
 
-  List<ShopCategory> _mergeMedicineCategories(List<ShopCategory> source) {
-    const Set<String> medicineNames = <String>{
-      'medecine',
-      'medicine',
-      'medicines',
-      'medical equipments',
+  List<ShopCategory> _groupCategories(List<ShopCategory> source) {
+    const List<String> groupOrder = <String>[
+      'Medicines',
+      'Grocery',
+      'Personal Care',
+      'Baby Care',
+      'Ayurvedic & Herbal',
+    ];
+    final Map<String, List<ShopCategory>> groups = <String, List<ShopCategory>>{
+      for (final String name in groupOrder) name: <ShopCategory>[],
     };
-    final List<ShopCategory> medicines = source
-        .where((ShopCategory category) {
-          return medicineNames.contains(category.name.toLowerCase());
-        })
-        .toList(growable: false);
 
-    if (medicines.isEmpty) {
-      return source;
+    for (final ShopCategory category in source) {
+      groups[_groupNameFor(category.name)]!.add(category);
     }
 
-    final ShopCategory primary = medicines.firstWhere(
-      (ShopCategory category) => category.name.toLowerCase() == 'medicines',
-      orElse: () => medicines.first,
-    );
-    final int insertIndex = source.indexWhere(
-      (ShopCategory category) =>
-          medicineNames.contains(category.name.toLowerCase()),
-    );
-    final List<ShopCategory> result = source
-        .where(
-          (ShopCategory category) =>
-              !medicineNames.contains(category.name.toLowerCase()),
-        )
-        .toList(growable: true);
-    final ShopCategory merged = ShopCategory(
-      id: primary.id,
-      name: 'Medicines',
-      count: medicines.fold<int>(
-        0,
-        (int total, ShopCategory category) => total + category.count,
-      ),
-      additionalIds: medicines
-          .where((ShopCategory category) => category.id != primary.id)
-          .map((ShopCategory category) => category.id)
-          .toList(growable: false),
-    );
+    return groupOrder
+        .map((String groupName) {
+          final List<ShopCategory> members = groups[groupName]!;
+          return ShopCategory(
+            id: members.isEmpty
+                ? 'missing:${groupName.toLowerCase()}'
+                : members.first.id,
+            name: groupName,
+            count: members.fold<int>(
+              0,
+              (int total, ShopCategory category) => total + category.count,
+            ),
+            additionalIds: members
+                .skip(1)
+                .map((ShopCategory category) => category.id)
+                .toList(growable: false),
+          );
+        })
+        .toList(growable: false);
+  }
 
-    result.insert(insertIndex.clamp(0, result.length), merged);
-    return result;
+  String _groupNameFor(String categoryName) {
+    final String name = categoryName.toLowerCase();
+    if (name.contains('baby')) return 'Baby Care';
+    if (name.contains('ayurvedic') || name.contains('herbal')) {
+      return 'Ayurvedic & Herbal';
+    }
+    if (name.contains('cosmetic') ||
+        name.contains('toiletr') ||
+        name.contains('personal')) {
+      return 'Personal Care';
+    }
+    if (name.contains('general') || name.contains('grocery')) {
+      return 'Grocery';
+    }
+    return 'Medicines';
   }
 }

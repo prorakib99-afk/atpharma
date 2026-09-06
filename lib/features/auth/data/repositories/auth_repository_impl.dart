@@ -39,21 +39,9 @@ final class AuthRepositoryImpl implements AuthRepository {
       );
 
       if (!requiresTwoFactor) {
-        final String userId = user['id']?.toString().trim() ?? '';
-        final String userStatus =
-            user['status']?.toString().trim().toUpperCase() ?? '';
-
-        if (token == null ||
-            token.isEmpty ||
-            userId.isEmpty ||
-            userStatus.isEmpty) {
+        if (token == null || token.isEmpty || user.isEmpty) {
           throw const FormatException('Incomplete login response.');
         }
-
-        if (userStatus != 'ACTIVE') {
-          throw StateError('Your account is not active.');
-        }
-
         await _sessionManager.saveAuthenticatedSession(
           accessToken: token,
           user: user,

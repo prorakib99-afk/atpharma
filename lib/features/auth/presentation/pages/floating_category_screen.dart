@@ -74,12 +74,10 @@ class FloatingCategoryScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        store.totalProducts > 0
-                            ? '${store.totalProducts} products across '
-                                  '${store.categories.length} categories'
-                            : 'Browse our healthcare products and medicines',
-                        style: const TextStyle(
+                      const Text(
+                        'Browse through our wide range of healthcare '
+                        'products and medicines',
+                        style: TextStyle(
                           fontFamily: 'Poppins',
                           fontSize: 12,
                           height: 16 / 12,
@@ -121,22 +119,7 @@ class FloatingCategoryScreen extends StatelessWidget {
                   );
                 }
 
-                return GridView.builder(
-                  shrinkWrap: true,
-                  itemCount: store.categories.length,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
-                    mainAxisExtent: 104,
-                  ),
-                  itemBuilder: (_, int index) {
-                    return _CategoryCard(
-                      category: store.categories[index],
-                      index: index,
-                    );
-                  },
-                );
+                return _FigmaCategoryGrid(categories: store.categories);
               },
             ),
           ),
@@ -161,6 +144,49 @@ class FloatingCategoryScreen extends StatelessWidget {
   }
 }
 
+class _FigmaCategoryGrid extends StatelessWidget {
+  const _FigmaCategoryGrid({required this.categories});
+
+  final List<ShopCategory> categories;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      child: Column(
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              for (int index = 0; index < 3; index++) ...<Widget>[
+                if (index > 0) const SizedBox(width: 8),
+                Expanded(
+                  child: _CategoryCard(
+                    category: categories[index],
+                    index: index,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: <Widget>[
+              for (int index = 3; index < 5; index++) ...<Widget>[
+                if (index > 3) const SizedBox(width: 8),
+                Expanded(
+                  child: _CategoryCard(
+                    category: categories[index],
+                    index: index,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _CategoryCard extends StatelessWidget {
   const _CategoryCard({required this.category, required this.index});
 
@@ -175,42 +201,58 @@ class _CategoryCard extends StatelessWidget {
       child: InkWell(
         onTap: () => Navigator.of(context).pop(category),
         borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              Image.asset(
-                categoryImageFor(category.name),
-                width: 38,
-                height: 32,
-                fit: BoxFit.contain,
-                cacheWidth: 80,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                category.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
+        child: SizedBox(
+          height: 104,
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                CategoryVisual(name: category.name),
+                const SizedBox(height: 12),
+                Text(
+                  category.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                '${category.count}',
-                style: const TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 12,
-                  color: Color(0xFF666E80),
+                const SizedBox(height: 2),
+                Text(
+                  '${category.count}',
+                  style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 12,
+                    color: Color(0xFF666E80),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class CategoryVisual extends StatelessWidget {
+  const CategoryVisual({super.key, required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 38,
+      height: 34,
+      child: Image.asset(
+        categoryImageFor(name),
+        fit: BoxFit.contain,
+        cacheWidth: 80,
       ),
     );
   }
@@ -222,18 +264,18 @@ String categoryImageFor(String name) {
   if (normalized.contains('baby')) {
     return 'assets/images/baby_care_icon_opt.png';
   }
-  if (normalized.contains('cosmetic') ||
-      normalized.contains('toiletr') ||
-      normalized.contains('care')) {
-    return 'assets/images/skin_care_opt.png';
-  }
   if (normalized.contains('medicine') ||
       normalized.contains('medecine') ||
       normalized.contains('medical')) {
     return 'assets/images/drug_icon_opt.png';
   }
-
-  return 'assets/images/grocery_icon_opt.png';
+  if (normalized.contains('general') ||
+      normalized.contains('grocery') ||
+      normalized.contains('herbal') ||
+      normalized.contains('ayurvedic')) {
+    return 'assets/images/grocery_icon_opt.png';
+  }
+  return 'assets/images/skin_care_opt.png';
 }
 
 Color categoryColorFor(String name, int index) {

@@ -185,10 +185,7 @@ class _FavouriteCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(9),
                       ),
                     ),
-                    icon: const Icon(
-                      Icons.shopping_cart_outlined,
-                      size: 16,
-                    ),
+                    icon: const Icon(Icons.shopping_cart_outlined, size: 16),
                     label: Text(
                       product.isOutOfStock ? 'Out' : 'Add Cart',
                       style: const TextStyle(
@@ -214,31 +211,29 @@ class _FavoriteImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Uri? uri = Uri.tryParse(source);
+    final String normalizedSource = source.trim();
+    final Uri? uri = Uri.tryParse(normalizedSource);
     final bool network =
         uri != null &&
         (uri.scheme == 'http' || uri.scheme == 'https') &&
         uri.host.isNotEmpty;
-    const Widget fallback = ColoredBox(
-      color: Color(0xFFF1F5F9),
-      child: Center(
-        child: Icon(
-          Icons.medication_outlined,
-          color: Color(0xFF0B83D9),
-          size: 36,
-        ),
-      ),
+    final Widget fallback = Image.asset(
+      'assets/images/dummy_image.png',
+      fit: BoxFit.cover,
+      cacheWidth: 240,
     );
+
+    if (normalizedSource.isEmpty) return fallback;
 
     return network
         ? Image.network(
-            source,
+            normalizedSource,
             fit: BoxFit.cover,
             cacheWidth: 240,
             errorBuilder: (_, _, _) => fallback,
           )
         : Image.asset(
-            source,
+            normalizedSource,
             fit: BoxFit.cover,
             cacheWidth: 240,
             errorBuilder: (_, _, _) => fallback,

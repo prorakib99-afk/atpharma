@@ -762,7 +762,7 @@ class _CategorySectionState extends State<_CategorySection> {
                   return SizedBox(
                     width: 108,
                     child: _CategoryCard(
-                      image: categoryImageFor(category.name),
+                      categoryName: category.name,
                       title: category.name,
                       count: '${category.count}',
                       color: categoryColorFor(category.name, index),
@@ -785,14 +785,14 @@ class _CategorySectionState extends State<_CategorySection> {
 
 class _CategoryCard extends StatelessWidget {
   const _CategoryCard({
-    required this.image,
+    required this.categoryName,
     required this.title,
     required this.count,
     required this.color,
     required this.onTap,
   });
 
-  final String image;
+  final String categoryName;
   final String title;
   final String count;
   final Color color;
@@ -811,13 +811,7 @@ class _CategoryCard extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
-              Image.asset(
-                image,
-                width: 38,
-                height: 34,
-                fit: BoxFit.contain,
-                cacheWidth: 76,
-              ),
+              CategoryVisual(name: categoryName),
               const SizedBox(height: 8),
               Text(
                 title,

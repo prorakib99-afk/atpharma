@@ -340,7 +340,8 @@ class _ProductImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Uri? uri = Uri.tryParse(imagePath.trim());
+    final String normalizedImagePath = imagePath.trim();
+    final Uri? uri = Uri.tryParse(normalizedImagePath);
     final bool isNetworkImage =
         uri != null &&
         (uri.scheme == 'http' || uri.scheme == 'https') &&
@@ -350,16 +351,18 @@ class _ProductImage extends StatelessWidget {
       aspectRatio: 1,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
-        child: isNetworkImage
+        child: normalizedImagePath.isEmpty
+            ? const _CartImageFallback()
+            : isNetworkImage
             ? Image.network(
-                imagePath,
+                normalizedImagePath,
                 fit: BoxFit.cover,
                 cacheWidth: 360,
                 filterQuality: FilterQuality.medium,
                 errorBuilder: (_, _, _) => const _CartImageFallback(),
               )
             : Image.asset(
-                imagePath,
+                normalizedImagePath,
                 fit: BoxFit.cover,
                 cacheWidth: 360,
                 filterQuality: FilterQuality.medium,
@@ -375,15 +378,10 @@ class _CartImageFallback extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const ColoredBox(
-      color: Color(0xFFF3F4F6),
-      child: Center(
-        child: Icon(
-          Icons.medication_outlined,
-          size: 42,
-          color: Color(0xFF98A1B3),
-        ),
-      ),
+    return Image.asset(
+      'assets/images/dummy_image.png',
+      fit: BoxFit.cover,
+      cacheWidth: 360,
     );
   }
 }

@@ -373,15 +373,9 @@ class _CheckoutStepCard extends StatelessWidget {
             active: true,
           ),
           _StepLine(),
-          _StepItem(
-            icon: Icons.credit_card_rounded,
-            label: 'Payment',
-          ),
+          _StepItem(icon: Icons.credit_card_rounded, label: 'Payment'),
           _StepLine(),
-          _StepItem(
-            icon: Icons.receipt_long_rounded,
-            label: 'Review',
-          ),
+          _StepItem(icon: Icons.receipt_long_rounded, label: 'Review'),
         ],
       ),
     );
@@ -492,9 +486,7 @@ class _InputField extends StatelessWidget {
             fontWeight: FontWeight.w400,
             color: _CheckoutColors.title,
           ),
-          decoration: _CheckoutInputDecoration.inputDecoration(
-            hint: hint,
-          ),
+          decoration: _CheckoutInputDecoration.inputDecoration(hint: hint),
         ),
       ],
     );
@@ -531,10 +523,7 @@ class _PhoneInputField extends StatelessWidget {
                   color: const Color(0xff006c35),
                   borderRadius: BorderRadius.circular(4),
                 ),
-                child: const Text(
-                  '🇸🇦',
-                  style: TextStyle(fontSize: 13),
-                ),
+                child: const Text('🇸🇦', style: TextStyle(fontSize: 13)),
               ),
               const SizedBox(width: 6),
               const Icon(
@@ -554,11 +543,7 @@ class _PhoneInputField extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              Container(
-                width: 1,
-                height: 24,
-                color: _CheckoutColors.border,
-              ),
+              Container(width: 1, height: 24, color: _CheckoutColors.border),
               const SizedBox(width: 10),
               const Expanded(
                 child: TextField(
@@ -653,10 +638,7 @@ class _SelectField extends StatelessWidget {
 }
 
 class _FieldLabel extends StatelessWidget {
-  const _FieldLabel({
-    required this.label,
-    this.required = false,
-  });
+  const _FieldLabel({required this.label, this.required = false});
 
   final String label;
   final bool required;
@@ -698,10 +680,7 @@ class _FieldLabel extends StatelessWidget {
 }
 
 class _ResponsiveTwoColumn extends StatelessWidget {
-  const _ResponsiveTwoColumn({
-    required this.left,
-    required this.right,
-  });
+  const _ResponsiveTwoColumn({required this.left, required this.right});
 
   final Widget left;
   final Widget right;
@@ -711,13 +690,7 @@ class _ResponsiveTwoColumn extends StatelessWidget {
     final shouldStack = MediaQuery.sizeOf(context).width <= 330;
 
     if (shouldStack) {
-      return Column(
-        children: [
-          left,
-          const SizedBox(height: 20),
-          right,
-        ],
-      );
+      return Column(children: [left, const SizedBox(height: 20), right]);
     }
 
     return Row(
@@ -732,10 +705,7 @@ class _ResponsiveTwoColumn extends StatelessWidget {
 }
 
 class _SaveCardOption extends StatelessWidget {
-  const _SaveCardOption({
-    required this.value,
-    required this.onChanged,
-  });
+  const _SaveCardOption({required this.value, required this.onChanged});
 
   final bool value;
   final ValueChanged<bool> onChanged;
@@ -763,10 +733,10 @@ class _SaveCardOption extends StatelessWidget {
             ),
             child: value
                 ? const Icon(
-              Icons.check_rounded,
-              size: 18,
-              color: _CheckoutColors.white,
-            )
+                    Icons.check_rounded,
+                    size: 18,
+                    color: _CheckoutColors.white,
+                  )
                 : null,
           ),
           const SizedBox(width: 12),
@@ -833,10 +803,7 @@ class _ContinueButton extends StatelessWidget {
         child: Ink(
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [
-                _CheckoutColors.primary,
-                Color(0xff0968c3),
-              ],
+              colors: [_CheckoutColors.primary, Color(0xff0968c3)],
             ),
             borderRadius: BorderRadius.circular(16),
           ),
@@ -913,10 +880,7 @@ class _CheckoutInputDecoration {
       filled: true,
       fillColor: _CheckoutColors.white,
       isDense: true,
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: 14,
-      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
         borderSide: const BorderSide(color: _CheckoutColors.border, width: 1),

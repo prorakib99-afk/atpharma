@@ -100,14 +100,15 @@ class _ExploreScreenState extends State<ExploreScreen> {
     PaginatedResult<ShopProductEntity> page,
   ) {
     final List<ShopProductEntity> productsWithImages = page.items
-        .where((ShopProductEntity product) {
-          return product.primaryImageUrl.trim().isNotEmpty;
-        })
+        .where(
+          (ShopProductEntity product) =>
+              product.primaryImageUrl.trim().isNotEmpty,
+        )
         .toList(growable: false);
     final List<ShopProductEntity> productsWithoutImages = page.items
-        .where((ShopProductEntity product) {
-          return product.primaryImageUrl.trim().isEmpty;
-        })
+        .where(
+          (ShopProductEntity product) => product.primaryImageUrl.trim().isEmpty,
+        )
         .toList(growable: false);
 
     return page.copyWith(
@@ -121,16 +122,16 @@ class _ExploreScreenState extends State<ExploreScreen> {
   Future<PaginatedResult<ShopProductEntity>> _loadImageFirstPage(
     PaginatedResult<ShopProductEntity> page,
   ) async {
-    final int imageCount = page.items.where((ShopProductEntity product) {
-      return product.primaryImageUrl.trim().isNotEmpty;
-    }).length;
+    final int imageCount = page.items
+        .where(
+          (ShopProductEntity product) =>
+              product.primaryImageUrl.trim().isNotEmpty,
+        )
+        .length;
     if (imageCount >= _perPage || page.totalPages <= 1) {
       return _prioritizeProductImages(page);
     }
 
-    // The API currently has no image-first sort and most image-bearing records
-    // are on later pages. Sample the matching query from the back so genuine
-    // product photos are shown before placeholder-only products.
     final int firstCandidate = page.totalPages - ((page.page - 1) * 4);
     final List<int> candidatePages = List<int>.generate(
       4,
@@ -190,17 +191,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
   void initState() {
     super.initState();
     final String categoryId = widget.initialCategoryId?.trim() ?? '';
-    final List<String> categoryIds = widget.initialCategoryIds
-        .map((String id) => id.trim())
-        .where((String id) => id.isNotEmpty)
-        .toList(growable: false);
-    _filter = ExploreFilter(
-      categoryIds: categoryIds.isNotEmpty
-          ? categoryIds
-          : categoryId.isEmpty
-          ? const <String>[]
-          : <String>[categoryId],
-    );
+    final List<String> categoryIds = <String>{
+      ...widget.initialCategoryIds.map((String id) => id.trim()),
+      if (categoryId.isNotEmpty) categoryId,
+    }.where((String id) => id.isNotEmpty).toList(growable: false);
+    _filter = ExploreFilter(categoryIds: categoryIds);
     _getProducts = sl<GetShopProductsUseCase>();
     _cancelProducts = sl<CancelShopProductsRequestUseCase>();
     _loadPage(1);
@@ -740,7 +735,6 @@ class _ProductCard extends StatelessWidget {
               id: product.id,
               name: product.name,
               image: product.primaryImageUrl,
-              galleryImages: product.allImageUrls,
               description: product.displayDescription,
               brand: product.displayCompanyName,
               price: product.sellingPrice.round(),
@@ -990,10 +984,10 @@ class _FilterPanel extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(isSmall ? 14 : 16),
+      padding: EdgeInsets.all(isSmall ? 8 : 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: const [
           BoxShadow(
             color: Color(0x1A000000),
@@ -1051,7 +1045,7 @@ class _ActionChipButton extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        height: 44,
+        height: 40,
         padding: EdgeInsets.symmetric(horizontal: isSmall ? 10 : 14),
         decoration: BoxDecoration(
           color: _ExploreColors.card,
