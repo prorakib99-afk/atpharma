@@ -196,7 +196,11 @@ final class ApiException implements Exception {
     if (value is String) {
       final String normalizedValue = value.trim();
 
-      return normalizedValue.isEmpty ? null : normalizedValue;
+      if (normalizedValue.isEmpty || _looksLikeHtml(normalizedValue)) {
+        return null;
+      }
+
+      return normalizedValue;
     }
 
     if (value is List) {
@@ -233,6 +237,15 @@ final class ApiException implements Exception {
     final String normalizedValue = value.toString().trim();
 
     return normalizedValue.isEmpty ? null : normalizedValue;
+  }
+
+  static bool _looksLikeHtml(String value) {
+    final String normalizedValue = value.trimLeft().toLowerCase();
+
+    return normalizedValue.startsWith('<!doctype html') ||
+        normalizedValue.startsWith('<html') ||
+        (normalizedValue.contains('<head') &&
+            normalizedValue.contains('<body'));
   }
 
   static String? _extractErrorCode(dynamic responseData) {

@@ -12,4 +12,10 @@ abstract final class StorageKeys {
 
   /// Email or phone saved when "Remember me" is enabled.
   static const String rememberedIdentifier = 'remembered_identifier';
+
+  /// Last successfully resolved delivery address shown on the home screen.
+  static const String lastKnownAddress = 'last_known_address';
+
+  /// Whether the user explicitly chose to browse without signing in.
+  static const String guestMode = 'guest_mode';
 }

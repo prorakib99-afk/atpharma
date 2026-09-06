@@ -295,6 +295,7 @@ class _ProductCard extends StatelessWidget {
             id: product.id,
             name: product.name,
             image: product.primaryImageUrl,
+            galleryImages: product.allImageUrls,
             description: product.displayDescription,
             brand: product.displayCompanyName,
             price: product.sellingPrice.round(),
@@ -463,34 +464,17 @@ class _NetworkProductImage extends StatelessWidget {
   }
 }
 
-class _ImageLoading extends StatelessWidget {
-  const _ImageLoading();
-
-  @override
-  Widget build(BuildContext context) {
-    return const ColoredBox(
-      color: Color(0xFFF1F5F9),
-      child: Center(
-        child: SizedBox(
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(strokeWidth: 2, color: _Colors.blue),
-        ),
-      ),
-    );
-  }
-}
-
 class _ImageFallback extends StatelessWidget {
   const _ImageFallback();
 
   @override
   Widget build(BuildContext context) {
-    return const ColoredBox(
-      color: Color(0xFFF1F5F9),
-      child: Center(
-        child: Icon(Icons.medication_outlined, size: 42, color: _Colors.blue),
-      ),
+    return Image.asset(
+      'assets/images/dummy_image.png',
+      width: double.infinity,
+      height: double.infinity,
+      fit: BoxFit.cover,
+      cacheWidth: 360,
     );
   }
 }
@@ -675,11 +659,7 @@ class _CloseButton extends StatelessWidget {
   }
 }
 
-String _formatPrice(
-  double price, {
-  String? currencyCode,
-  String? countryCode,
-}) {
+String _formatPrice(double price, {String? currencyCode, String? countryCode}) {
   return CurrencyDisplay.format(
     price,
     currencyCode: currencyCode,

@@ -35,6 +35,14 @@ class _CartFlyTargetRenderBox extends RenderProxyBox {
     }
     super.detach();
   }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    // Routes kept below the current Navigator route can remain attached.
+    // The marker that is actually painted is the visible cart destination.
+    CartFlyTarget.renderBox = this;
+    super.paint(context, offset);
+  }
 }
 
 Future<void> flyToCart(
@@ -52,9 +60,27 @@ Future<void> flyToCart(
   final Offset start = source.localToGlobal(source.size.center(Offset.zero));
   final RenderBox? target = CartFlyTarget.renderBox;
   final Size screen = MediaQuery.sizeOf(context);
-  final Offset end = target != null && target.hasSize
-      ? target.localToGlobal(target.size.center(Offset.zero))
-      : Offset(screen.width - 54, screen.height - 72);
+  final EdgeInsets screenPadding = MediaQuery.paddingOf(context);
+  final Offset fallbackEnd = Offset(
+    screen.width - 54,
+    screen.height - screenPadding.bottom - 56,
+  );
+  Offset end = fallbackEnd;
+
+  if (target != null && target.attached && target.hasSize) {
+    final Offset candidate = target.localToGlobal(
+      target.size.center(Offset.zero),
+    );
+    final bool isInsideCartZone =
+        candidate.dx >= screen.width * .68 &&
+        candidate.dx <= screen.width &&
+        candidate.dy >= screen.height * .70 &&
+        candidate.dy <= screen.height;
+
+    if (isInsideCartZone) {
+      end = candidate;
+    }
+  }
   final Completer<void> completer = Completer<void>();
   late final OverlayEntry entry;
 
@@ -99,12 +125,13 @@ class _FlyingProductState extends State<_FlyingProduct>
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 620),
-    )..addStatusListener((AnimationStatus status) {
-        if (status == AnimationStatus.completed) widget.onComplete();
-      });
+    _controller =
+        AnimationController(
+          vsync: this,
+          duration: const Duration(milliseconds: 620),
+        )..addStatusListener((AnimationStatus status) {
+          if (status == AnimationStatus.completed) widget.onComplete();
+        });
     _controller.forward();
   }
 
@@ -144,10 +171,7 @@ class _FlyingProductState extends State<_FlyingProduct>
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white, width: 2),
                         boxShadow: const <BoxShadow>[
-                          BoxShadow(
-                            color: Color(0x500B83D9),
-                            blurRadius: 12,
-                          ),
+                          BoxShadow(color: Color(0x500B83D9), blurRadius: 12),
                         ],
                       ),
                       child: ClipOval(

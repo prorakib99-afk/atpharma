@@ -96,9 +96,8 @@ final class HomeProductsBloc
     return ShopProductQuery(
       page: 1,
       perPage: featuredPerPage,
-      featured: true,
       availability: ShopProductAvailability.inStock,
-      sort: ShopProductSort.newest,
+      sort: ShopProductSort.popular,
     );
   }
 

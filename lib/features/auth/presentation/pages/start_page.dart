@@ -176,13 +176,15 @@ class StartPage extends StatelessWidget {
                                       textColor: Colors.white,
                                       onTap: onSignInTap,
                                     ),
-                                    const SizedBox(height: 16),
-                                    _AuthButton(
-                                      label: 'Continue as a guest',
-                                      backgroundColor: _primarySoft,
-                                      textColor: _primary,
-                                      onTap: onGuestTap,
-                                    ),
+                                    if (onGuestTap != null) ...[
+                                      const SizedBox(height: 16),
+                                      _AuthButton(
+                                        label: 'Continue as a guest',
+                                        backgroundColor: _primarySoft,
+                                        textColor: _primary,
+                                        onTap: onGuestTap,
+                                      ),
+                                    ],
                                     const SizedBox(height: 32),
                                     Row(
                                       mainAxisSize: MainAxisSize.min,

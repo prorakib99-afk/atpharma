@@ -8,8 +8,8 @@ import '../datasources/auth_remote_data_source.dart';
 final class AuthRepositoryImpl implements AuthRepository {
   AuthRepositoryImpl({
     required this._remoteDataSource,
-    required SessionManager sessionManager,
-  }) : _sessionManager = sessionManager;
+    required this._sessionManager,
+  });
 
   final AuthRemoteDataSource _remoteDataSource;
   final SessionManager _sessionManager;
@@ -39,9 +39,21 @@ final class AuthRepositoryImpl implements AuthRepository {
       );
 
       if (!requiresTwoFactor) {
-        if (token == null || token.isEmpty || user.isEmpty) {
+        final String userId = user['id']?.toString().trim() ?? '';
+        final String userStatus =
+            user['status']?.toString().trim().toUpperCase() ?? '';
+
+        if (token == null ||
+            token.isEmpty ||
+            userId.isEmpty ||
+            userStatus.isEmpty) {
           throw const FormatException('Incomplete login response.');
         }
+
+        if (userStatus != 'ACTIVE') {
+          throw StateError('Your account is not active.');
+        }
+
         await _sessionManager.saveAuthenticatedSession(
           accessToken: token,
           user: user,

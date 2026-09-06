@@ -6,11 +6,15 @@ import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../../../../core/di/injection_container.dart';
+import '../../../../core/location/google_geocoding_service.dart';
 import '../../../../core/routes/app_routes.dart';
+import '../../../../core/storage/local_storage_service.dart';
+import '../../../../core/storage/storage_keys.dart';
 import '../../../../core/utils/currency_display.dart';
 import '../../../../shared/widgets/navigation_page_scaffold.dart';
 import '../../../../shared/widgets/fly_to_cart.dart';
 import '../../../shop/domain/entities/shop_product_entity.dart';
+import '../../../shop/presentation/controllers/shop_category_store.dart';
 import '../../../shop/presentation/bloc/home_products/home_products_bloc.dart';
 import '../../../shop/presentation/bloc/home_products/home_products_event.dart';
 import '../../../shop/presentation/bloc/home_products/home_products_state.dart';
@@ -50,6 +54,7 @@ class _HomeBody extends StatefulWidget {
 class _HomeBodyState extends State<_HomeBody> with WidgetsBindingObserver {
   String _address = 'Finding your location...';
   bool _locationLoading = false;
+  final GoogleGeocodingService _googleGeocoder = GoogleGeocodingService();
 
   String get _greeting {
     final int hour = DateTime.now().hour;
@@ -68,10 +73,15 @@ class _HomeBodyState extends State<_HomeBody> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
+    final String? cachedAddress = sl<LocalStorageService>().readString(
+      StorageKeys.lastKnownAddress,
+    );
+    if (cachedAddress != null) {
+      _address = _removePlusCode(cachedAddress);
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future<void>.delayed(const Duration(milliseconds: 600), () {
-        if (mounted) unawaited(_loadLocation());
-      });
+      if (mounted) unawaited(_loadLocation());
     });
   }
 
@@ -127,30 +137,67 @@ class _HomeBodyState extends State<_HomeBody> with WidgetsBindingObserver {
         return;
       }
 
-      final Position position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.medium,
-          timeLimit: Duration(seconds: 15),
-        ),
-      );
+      Position? position;
 
-      final List<Placemark> places = await Geocoding().placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
+      try {
+        position = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.medium,
+            timeLimit: Duration(seconds: 12),
+          ),
+        );
+      } catch (_) {
+        position = await Geolocator.getLastKnownPosition();
+      }
+
+      if (position == null) {
+        _showLocationUnavailableWhenNeeded();
+        return;
+      }
+
+      final String? googleAddress = await _googleGeocoder.reverseGeocode(
+        latitude: position.latitude,
+        longitude: position.longitude,
       );
+      List<Placemark> places = const <Placemark>[];
+
+      if (googleAddress == null) {
+        try {
+          places = await Geocoding().placemarkFromCoordinates(
+            position.latitude,
+            position.longitude,
+          );
+        } catch (_) {
+          // Coordinates remain usable if both geocoders are unavailable.
+        }
+      }
 
       if (!mounted) return;
 
-      _updateAddress(
-        places.isEmpty
-            ? '${position.latitude.toStringAsFixed(4)}, '
-                  '${position.longitude.toStringAsFixed(4)}'
-            : _formatAddress(places.first),
+      final String resolvedAddress = googleAddress != null
+          ? _removePlusCode(googleAddress)
+          : places.isNotEmpty
+          ? _formatAddress(places.first)
+          : '${position.latitude.toStringAsFixed(4)}, '
+                '${position.longitude.toStringAsFixed(4)}';
+
+      _updateAddress(resolvedAddress);
+      unawaited(
+        sl<LocalStorageService>().write<String>(
+          key: StorageKeys.lastKnownAddress,
+          value: resolvedAddress,
+        ),
       );
     } catch (_) {
-      _updateAddress('Unable to find your location');
+      _showLocationUnavailableWhenNeeded();
     } finally {
       _locationLoading = false;
+    }
+  }
+
+  void _showLocationUnavailableWhenNeeded() {
+    if (_address == 'Finding your location...') {
+      _updateAddress('Unable to find your location');
     }
   }
 
@@ -161,18 +208,26 @@ class _HomeBodyState extends State<_HomeBody> with WidgetsBindingObserver {
   }
 
   String _formatAddress(Placemark place) {
+    final String country = (place.country ?? '').trim();
+    final String locality = (place.locality ?? '').trim();
+    final String administrativeArea = (place.administrativeArea ?? '').trim();
     final List<String> values = <String>[
-      place.street ?? '',
+      ...(place.street ?? '').split(',').where((String part) {
+        final String normalized = part.trim();
+        return normalized.toLowerCase() != country.toLowerCase() &&
+            normalized.toLowerCase() != locality.toLowerCase() &&
+            normalized.toLowerCase() != administrativeArea.toLowerCase();
+      }),
       place.subLocality ?? '',
-      place.locality ?? '',
-      place.administrativeArea ?? '',
-      place.country ?? '',
+      locality,
+      administrativeArea,
+      country,
     ];
 
     final List<String> result = <String>[];
 
     for (final String value in values) {
-      final String normalized = value.trim();
+      final String normalized = _removePlusCode(value);
 
       if (normalized.isEmpty) continue;
 
@@ -181,10 +236,23 @@ class _HomeBodyState extends State<_HomeBody> with WidgetsBindingObserver {
       });
 
       if (!duplicate) result.add(normalized);
-      if (result.length == 3) break;
+      if (result.length == 4) break;
     }
 
     return result.isEmpty ? 'Current location' : result.join(', ');
+  }
+
+  String _removePlusCode(String value) {
+    final RegExp plusCode = RegExp(
+      r'^[23456789CFGHJMPQRVWX]{4,8}\+[23456789CFGHJMPQRVWX]{2,3}\s*',
+      caseSensitive: false,
+    );
+
+    return value
+        .split(',')
+        .map((String part) => part.trim().replaceFirst(plusCode, '').trim())
+        .where((String part) => part.isNotEmpty)
+        .join(', ');
   }
 
   Future<void> _showLocationDialog() {
@@ -318,6 +386,10 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool compact = MediaQuery.sizeOf(context).width <= 360;
+    final double actionSize = compact ? 38 : 40;
+    final double actionGap = compact ? 3 : 4;
+
     return Row(
       children: <Widget>[
         Expanded(
@@ -354,20 +426,29 @@ class _Header extends StatelessWidget {
             ),
           ),
         ),
-        _RoundButton(
-          icon: Icons.notifications_none_rounded,
-          onTap: () => _showNotifications(context),
+        SizedBox(width: actionGap),
+        Tooltip(
+          message: 'Notifications',
+          child: _RoundButton(
+            icon: Icons.notifications_none_rounded,
+            size: actionSize,
+            onTap: () => _showNotifications(context),
+          ),
         ),
-        const SizedBox(width: 4),
-        const _FavouriteHeaderButton(),
-        const SizedBox(width: 4),
-        _ProfileAvatarButton(
-          onTap: () => FloatingProfileScreen.show(
-            context,
-            avatarAssetPath: 'assets/images/at_pharma_icon.png',
-            onProfileTap: () =>
-                Navigator.of(context).pushNamed(AppRoutes.profile),
-            onSignOutTap: () => signOutFromProfile(context),
+        SizedBox(width: actionGap),
+        _FavouriteHeaderButton(size: actionSize),
+        SizedBox(width: actionGap),
+        Tooltip(
+          message: 'Profile',
+          child: _ProfileAvatarButton(
+            size: actionSize,
+            onTap: () => FloatingProfileScreen.show(
+              context,
+              avatarAssetPath: 'assets/images/at_pharma_icon.png',
+              onProfileTap: () =>
+                  Navigator.of(context).pushNamed(AppRoutes.profile),
+              onSignOutTap: () => signOutFromProfile(context),
+            ),
           ),
         ),
       ],
@@ -376,22 +457,26 @@ class _Header extends StatelessWidget {
 }
 
 class _ProfileAvatarButton extends StatelessWidget {
-  const _ProfileAvatarButton({required this.onTap});
+  const _ProfileAvatarButton({required this.onTap, this.size = 42});
 
   final VoidCallback onTap;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
       customBorder: const CircleBorder(),
-      child: ClipOval(
-        child: Image.asset(
-          'assets/images/at_pharma_icon.png',
-          width: 40,
-          height: 40,
-          fit: BoxFit.cover,
-          cacheWidth: 80,
+      child: SizedBox.square(
+        dimension: size,
+        child: ClipOval(
+          child: Image.asset(
+            'assets/images/at_pharma_icon.png',
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+            cacheWidth: 80,
+          ),
         ),
       ),
     );
@@ -441,10 +526,11 @@ void _showNotifications(BuildContext context) {
 }
 
 class _RoundButton extends StatelessWidget {
-  const _RoundButton({required this.icon, this.onTap});
+  const _RoundButton({required this.icon, this.onTap, this.size = 42});
 
   final IconData icon;
   final VoidCallback? onTap;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
@@ -457,9 +543,9 @@ class _RoundButton extends StatelessWidget {
         onTap: onTap,
         customBorder: const CircleBorder(),
         child: SizedBox(
-          width: 40,
-          height: 40,
-          child: Icon(icon, size: 20, color: _Colors.text),
+          width: size,
+          height: size,
+          child: Icon(icon, size: 21, color: _Colors.text),
         ),
       ),
     );
@@ -467,7 +553,9 @@ class _RoundButton extends StatelessWidget {
 }
 
 class _FavouriteHeaderButton extends StatelessWidget {
-  const _FavouriteHeaderButton();
+  const _FavouriteHeaderButton({this.size = 42});
+
+  final double size;
 
   @override
   Widget build(BuildContext context) {
@@ -479,32 +567,35 @@ class _FavouriteHeaderButton extends StatelessWidget {
         return Stack(
           clipBehavior: Clip.none,
           children: <Widget>[
-            InkWell(
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const FavouriteScreen(),
+            Tooltip(
+              message: 'Favourites',
+              child: InkWell(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const FavouriteScreen(),
+                    ),
+                  );
+                },
+                customBorder: const CircleBorder(),
+                child: Container(
+                  width: size,
+                  height: size,
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: <BoxShadow>[
+                      BoxShadow(color: Color(0x14000000), blurRadius: 18),
+                    ],
                   ),
-                );
-              },
-              customBorder: const CircleBorder(),
-              child: Container(
-                width: 40,
-                height: 40,
-                alignment: Alignment.center,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  boxShadow: <BoxShadow>[
-                    BoxShadow(color: Color(0x14000000), blurRadius: 18),
-                  ],
-                ),
-                child: Icon(
-                  count > 0
-                      ? Icons.favorite_rounded
-                      : Icons.favorite_border_rounded,
-                  size: 20,
-                  color: count > 0 ? _Colors.red : _Colors.text,
+                  child: Icon(
+                    count > 0
+                        ? Icons.favorite_rounded
+                        : Icons.favorite_border_rounded,
+                    size: 20,
+                    color: count > 0 ? _Colors.red : _Colors.text,
+                  ),
                 ),
               ),
             ),
@@ -603,17 +694,30 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-class _CategorySection extends StatelessWidget {
+class _CategorySection extends StatefulWidget {
   const _CategorySection();
+
+  @override
+  State<_CategorySection> createState() => _CategorySectionState();
+}
+
+class _CategorySectionState extends State<_CategorySection> {
+  final ShopCategoryStore _store = ShopCategoryStore.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_store.load());
+  }
 
   void _openCategory(
     BuildContext context, {
-    required String id,
+    required List<String> ids,
     required String name,
   }) {
     Navigator.of(context).pushNamed(
       AppRoutes.explore,
-      arguments: <String, String>{'categoryId': id, 'categoryName': name},
+      arguments: <String, Object>{'categoryIds': ids, 'categoryName': name},
     );
   }
 
@@ -626,50 +730,53 @@ class _CategorySection extends StatelessWidget {
           onSeeAll: () => showFloatingCategoryScreen(context),
         ),
         const SizedBox(height: 16),
-        Row(
-          children: <Widget>[
-            Expanded(
-              child: _CategoryCard(
-                image: 'assets/images/drug_icon_opt.png',
-                title: 'Medicines',
-                count: '12',
-                color: Color(0xFFF7FBFE),
-                onTap: () => _openCategory(
-                  context,
-                  id: 'cmrdtm3u90000dc06b8txq5c8',
-                  name: 'Medicine',
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _CategoryCard(
-                image: 'assets/images/grocery_icon_opt.png',
-                title: 'Grocery',
-                count: '5',
-                color: Color(0xFFECFDFD),
-                onTap: () => _openCategory(
-                  context,
-                  id: 'cmrf7emim0000hkvp20b5ffet',
-                  name: 'Grocery',
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _CategoryCard(
-                image: 'assets/images/skin_care_opt.png',
-                title: 'Personal Care',
-                count: '35',
-                color: Color(0xFFF8EAFE),
-                onTap: () => _openCategory(
-                  context,
-                  id: 'cmrf6hrf30000ufw7wnco3wy2',
-                  name: 'Personal Care',
-                ),
-              ),
-            ),
-          ],
+        SizedBox(
+          height: 104,
+          child: AnimatedBuilder(
+            animation: _store,
+            builder: (BuildContext context, _) {
+              if (_store.isLoading && _store.categories.isEmpty) {
+                return const Center(
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                );
+              }
+
+              if (_store.categories.isEmpty) {
+                return Center(
+                  child: TextButton.icon(
+                    onPressed: () => _store.load(force: true),
+                    icon: const Icon(Icons.refresh),
+                    label: Text(_store.errorMessage ?? 'Retry categories'),
+                  ),
+                );
+              }
+
+              return ListView.separated(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                itemCount: _store.categories.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (_, int index) {
+                  final ShopCategory category = _store.categories[index];
+
+                  return SizedBox(
+                    width: 108,
+                    child: _CategoryCard(
+                      image: categoryImageFor(category.name),
+                      title: category.name,
+                      count: '${category.count}',
+                      color: categoryColorFor(category.name, index),
+                      onTap: () => _openCategory(
+                        context,
+                        ids: category.filterIds,
+                        name: category.name,
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
         ),
       ],
     );
@@ -878,6 +985,7 @@ class _ProductCard extends StatelessWidget {
               id: product.id,
               name: product.name,
               image: product.primaryImageUrl,
+              galleryImages: product.allImageUrls,
               description: product.displayDescription,
               brand: product.displayCompanyName,
               price: product.sellingPrice.round(),
@@ -1030,6 +1138,10 @@ class _NetworkProductImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (imageUrl.trim().isEmpty) {
+      return const _ImageFallback();
+    }
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),
       child: ColoredBox(
@@ -1054,8 +1166,12 @@ class _ImageFallback extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Icon(Icons.medication_outlined, size: 42, color: _Colors.blue),
+    return Image.asset(
+      'assets/images/dummy_image.png',
+      width: double.infinity,
+      height: double.infinity,
+      fit: BoxFit.cover,
+      cacheWidth: 360,
     );
   }
 }

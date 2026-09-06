@@ -42,7 +42,7 @@ class FloatingProfileScreen extends StatelessWidget {
     this.avatarAssetPath,
     this.name = 'Sabbir Shawon',
     this.role = 'Super Admin',
-    this.width = 260,
+    this.width = 220,
     this.onProfileTap,
     this.onAccountSettingsTap,
     this.onHelpCenterTap,
@@ -91,14 +91,11 @@ class FloatingProfileScreen extends StatelessWidget {
                 builder: (context, constraints) {
                   final isWide = constraints.maxWidth >= 600;
                   return Align(
-                    alignment: isWide
-                        ? Alignment.topRight
-                        : Alignment.topCenter,
+                    alignment: Alignment.topRight,
                     child: Padding(
                       padding: EdgeInsets.only(
-                        top: 68,
-                        right: isWide ? 20 : 0,
-                        left: isWide ? 0 : 20,
+                        top: isWide ? 84 : 88,
+                        right: isWide ? 20 : 24,
                       ),
                       child: GestureDetector(
                         onTap: () {},
@@ -161,11 +158,11 @@ class FloatingProfileScreen extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(14, 16, 14, 14),
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
                 child: Row(
                   children: [
                     CircleAvatar(
-                      radius: 20,
+                      radius: 18,
                       backgroundColor: const Color(0xffe5e7eb),
                       backgroundImage: avatarAssetPath != null
                           ? AssetImage(avatarAssetPath!)
@@ -174,11 +171,11 @@ class FloatingProfileScreen extends StatelessWidget {
                           ? const Icon(
                               Icons.person,
                               color: Colors.white,
-                              size: 20,
+                              size: 18,
                             )
                           : null,
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -188,7 +185,7 @@ class FloatingProfileScreen extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              fontSize: 14.5,
+                              fontSize: 13.5,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
@@ -196,7 +193,7 @@ class FloatingProfileScreen extends StatelessWidget {
                           Text(
                             role,
                             style: const TextStyle(
-                              fontSize: 12.5,
+                              fontSize: 11.5,
                               color: _textMuted,
                             ),
                           ),
@@ -208,7 +205,7 @@ class FloatingProfileScreen extends StatelessWidget {
               ),
               Divider(height: 1, color: Colors.grey.shade200),
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
+                padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Column(
                   children: [
                     _MenuRow(
@@ -250,7 +247,7 @@ class FloatingProfileScreen extends StatelessWidget {
               card,
               Positioned(
                 left: -4,
-                top: 60,
+                top: 52,
                 child: Container(
                   width: 6,
                   height: 34,
@@ -291,13 +288,13 @@ class _MenuRow extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width: 30,
-              height: 30,
+              width: 28,
+              height: 28,
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: const Color(0xfff1e9fe),
@@ -305,7 +302,7 @@ class _MenuRow extends StatelessWidget {
               ),
               child: Icon(icon, size: 15, color: const Color(0xff7c3aed)),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -313,7 +310,7 @@ class _MenuRow extends StatelessWidget {
                   Text(
                     title,
                     style: const TextStyle(
-                      fontSize: 13.5,
+                      fontSize: 12.5,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -321,7 +318,7 @@ class _MenuRow extends StatelessWidget {
                   Text(
                     subtitle,
                     style: const TextStyle(
-                      fontSize: 12,
+                      fontSize: 11,
                       color: Color(0xff6b7280),
                     ),
                   ),
@@ -347,7 +344,7 @@ class _SignOutRow extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Row(
           children: [
             Icon(Icons.logout_rounded, size: 17, color: Color(0xffdc2626)),

@@ -92,7 +92,11 @@ class AtPharmaApp extends StatelessWidget {
       ),
       routes: <String, WidgetBuilder>{
         AppRoutes.splash: (BuildContext context) {
-          return const SplashScreen(nextRoute: AppRoutes.startpage);
+          return SplashScreen(
+            nextRoute: sl<SessionManager>().canAccessStore
+                ? AppRoutes.home
+                : AppRoutes.startpage,
+          );
         },
 
         AppRoutes.startpage: (BuildContext context) {
@@ -100,8 +104,11 @@ class AtPharmaApp extends StatelessWidget {
             onSignInTap: () {
               Navigator.of(context).pushNamed(AppRoutes.login);
             },
-            onGuestTap: () {
-              Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+            onGuestTap: () async {
+              await sl<SessionManager>().startGuestSession();
+              if (context.mounted) {
+                Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+              }
             },
             onSignUpTap: () {
               Navigator.of(context).pushNamed(AppRoutes.register);
@@ -110,6 +117,17 @@ class AtPharmaApp extends StatelessWidget {
         },
 
         AppRoutes.home: (BuildContext context) {
+          if (!sl<SessionManager>().canAccessStore) {
+            return StartPage(
+              onSignInTap: () {
+                Navigator.of(context).pushReplacementNamed(AppRoutes.login);
+              },
+              onSignUpTap: () {
+                Navigator.of(context).pushReplacementNamed(AppRoutes.register);
+              },
+            );
+          }
+
           return const HomeScreen();
         },
 
@@ -122,8 +140,14 @@ class AtPharmaApp extends StatelessWidget {
           final Map<Object?, Object?> values = arguments is Map
               ? arguments
               : const <Object?, Object?>{};
+          final List<String> categoryIds = values['categoryIds'] is List
+              ? (values['categoryIds'] as List)
+                    .map((dynamic id) => id.toString())
+                    .toList(growable: false)
+              : const <String>[];
           return ExploreScreen(
             initialCategoryId: values['categoryId'] as String?,
+            initialCategoryIds: categoryIds,
             initialCategoryName: values['categoryName'] as String?,
           );
         },
@@ -243,9 +267,7 @@ class AtPharmaApp extends StatelessWidget {
         AppRoutes.otp: (BuildContext context) {
           final destination =
               ModalRoute.settingsOf(context)?.arguments as String?;
-          return OtpScreen(
-            destination: destination ?? '+880123-56*****',
-          );
+          return OtpScreen(destination: destination ?? '+880123-56*****');
         },
 
         AppRoutes.resetPassword: (BuildContext context) {
@@ -261,8 +283,11 @@ class AtPharmaApp extends StatelessWidget {
             onSignInTap: () {
               Navigator.of(context).pushNamed(AppRoutes.login);
             },
-            onGuestTap: () {
-              Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+            onGuestTap: () async {
+              await sl<SessionManager>().startGuestSession();
+              if (context.mounted) {
+                Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+              }
             },
           );
         },

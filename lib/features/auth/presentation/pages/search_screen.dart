@@ -21,7 +21,7 @@ import 'notification_screen.dart';
 void _openNotifications(BuildContext context) {
   showDialog<void>(
     context: context,
-    barrierColor: Colors.black.withOpacity(0.08),
+    barrierColor: Colors.black.withValues(alpha: 0.08),
     builder: (_) => const SafeArea(
       child: Align(
         alignment: Alignment.topRight,
@@ -34,10 +34,7 @@ void _openNotifications(BuildContext context) {
   );
 }
 
-void _addSearchProductToCart(
-  BuildContext context,
-  ShopProductEntity product,
-) {
+void _addSearchProductToCart(BuildContext context, ShopProductEntity product) {
   if (product.isOutOfStock) return;
 
   flyToCart(
@@ -856,6 +853,7 @@ class _HorizontalCard extends StatelessWidget {
             id: product.id,
             name: product.name,
             image: product.primaryImageUrl,
+            galleryImages: product.allImageUrls,
             description: product.displayDescription,
             brand: product.displayCompanyName,
             price: product.sellingPrice.round(),
@@ -992,6 +990,7 @@ class _GridCard extends StatelessWidget {
             id: product.id,
             name: product.name,
             image: product.primaryImageUrl,
+            galleryImages: product.allImageUrls,
             description: product.displayDescription,
             brand: product.displayCompanyName,
             price: product.sellingPrice.round(),
@@ -1144,7 +1143,9 @@ class _SearchProductImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (imageUrl.trim().isEmpty) return const _SearchImageFallback();
+    if (imageUrl.trim().isEmpty) {
+      return _SearchImageFallback(width: width, height: height);
+    }
     return Image.network(
       imageUrl,
       width: width,
@@ -1152,21 +1153,27 @@ class _SearchProductImage extends StatelessWidget {
       fit: BoxFit.cover,
       cacheWidth: 360,
       filterQuality: FilterQuality.low,
-      errorBuilder: (_, _, _) => const _SearchImageFallback(),
+      errorBuilder: (_, _, _) {
+        return _SearchImageFallback(width: width, height: height);
+      },
     );
   }
 }
 
 class _SearchImageFallback extends StatelessWidget {
-  const _SearchImageFallback();
+  const _SearchImageFallback({this.width, this.height});
+
+  final double? width;
+  final double? height;
 
   @override
   Widget build(BuildContext context) {
-    return const ColoredBox(
-      color: Color(0xFFF1F5F9),
-      child: Center(
-        child: Icon(Icons.medication_outlined, color: _Colors.blue, size: 38),
-      ),
+    return Image.asset(
+      'assets/images/dummy_image.png',
+      width: width,
+      height: height,
+      fit: BoxFit.cover,
+      cacheWidth: 360,
     );
   }
 }
@@ -1201,11 +1208,7 @@ class _SearchError extends StatelessWidget {
   }
 }
 
-String _formatPrice(
-  double price, {
-  String? currencyCode,
-  String? countryCode,
-}) {
+String _formatPrice(double price, {String? currencyCode, String? countryCode}) {
   return CurrencyDisplay.format(
     price,
     currencyCode: currencyCode,

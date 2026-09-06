@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import '../storage/local_storage_service.dart';
 import '../storage/storage_keys.dart';
 import '../storage/token_storage.dart';
@@ -20,7 +22,34 @@ final class SessionManager {
   }
 
   bool get isAuthenticated {
-    return hasAccessToken;
+    final String? token = accessToken;
+    final Map<String, dynamic>? user = currentUser;
+
+    if (token == null || token.isEmpty || user == null || user.isEmpty) {
+      return false;
+    }
+
+    try {
+      final List<String> parts = token.split('.');
+
+      if (parts.length != 3) {
+        return false;
+      }
+
+      final dynamic payload = jsonDecode(
+        utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
+      );
+      final dynamic expiry = payload is Map ? payload['exp'] : null;
+
+      if (expiry is! num) {
+        return false;
+      }
+
+      final int nowInSeconds = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      return expiry.toInt() > nowInSeconds;
+    } catch (_) {
+      return false;
+    }
   }
 
   Map<String, dynamic>? get currentUser {
@@ -29,6 +58,14 @@ final class SessionManager {
 
   bool get rememberMe {
     return _localStorageService.readBool(StorageKeys.rememberMe) ?? false;
+  }
+
+  bool get isGuestMode {
+    return _localStorageService.readBool(StorageKeys.guestMode) ?? false;
+  }
+
+  bool get canAccessStore {
+    return isAuthenticated || isGuestMode;
   }
 
   String? get rememberedIdentifier {
@@ -57,12 +94,25 @@ final class SessionManager {
 
     await _tokenStorage.saveAccessToken(normalizedToken);
 
+    await _localStorageService.write<bool>(
+      key: StorageKeys.guestMode,
+      value: false,
+    );
+
     await _localStorageService.writeMap(
       key: StorageKeys.currentUser,
       value: user,
     );
 
     await saveRememberedLogin(rememberMe: rememberMe, identifier: identifier);
+  }
+
+  Future<void> startGuestSession() async {
+    await clearSession(preserveRememberedLogin: true);
+    await _localStorageService.write<bool>(
+      key: StorageKeys.guestMode,
+      value: true,
+    );
   }
 
   Future<void> updateCurrentUser(Map<String, dynamic> user) async {
@@ -105,6 +155,10 @@ final class SessionManager {
     await _tokenStorage.clearAccessToken();
 
     await _localStorageService.remove(StorageKeys.currentUser);
+    await _localStorageService.write<bool>(
+      key: StorageKeys.guestMode,
+      value: false,
+    );
 
     if (!preserveRememberedLogin) {
       await _localStorageService.removeAll(<String>[

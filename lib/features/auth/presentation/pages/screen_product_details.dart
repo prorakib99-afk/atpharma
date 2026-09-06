@@ -15,6 +15,7 @@ class ProductDetailsData {
     this.id,
     required this.name,
     required this.image,
+    this.galleryImages = const <String>[],
     this.description =
         'Helps prevent dehydration and restore body fluids quickly.',
     this.brand = 'FreshLife',
@@ -28,6 +29,7 @@ class ProductDetailsData {
   final String? id;
   final String name;
   final String image;
+  final List<String> galleryImages;
   final String description;
   final String brand;
   final int price;
@@ -40,6 +42,31 @@ class ProductDetailsData {
     currencyCode: currencyCode,
     countryCode: countryCode,
   );
+
+  List<String> get displayImages {
+    final Set<String> images = <String>{};
+    final String primaryImage = image.trim();
+
+    if (primaryImage.isNotEmpty) {
+      images.add(primaryImage);
+    }
+
+    for (final String galleryImage in galleryImages) {
+      final String normalizedImage = galleryImage.trim();
+
+      if (normalizedImage.isNotEmpty) {
+        images.add(normalizedImage);
+      }
+    }
+
+    final List<String> result = images.take(4).toList(growable: true);
+
+    while (result.length < 4) {
+      result.add('assets/images/dummy_image.png');
+    }
+
+    return List<String>.unmodifiable(result);
+  }
 }
 
 class ProductCart extends ChangeNotifier {
@@ -58,28 +85,30 @@ class ProductCart extends ChangeNotifier {
     );
     _items
       ..clear()
-      ..addEntries(rows.map((Map<String, Object?> row) {
-        final String id = row['product_id']! as String;
-        return MapEntry<String, ProductCartItem>(
-          id,
-          ProductCartItem(
-            id: id,
-            product: ProductDetailsData(
+      ..addEntries(
+        rows.map((Map<String, Object?> row) {
+          final String id = row['product_id']! as String;
+          return MapEntry<String, ProductCartItem>(
+            id,
+            ProductCartItem(
               id: id,
-              name: row['name']! as String,
-              image: row['image']! as String,
-              description: row['description']! as String,
-              brand: row['brand']! as String,
-              price: row['price']! as int,
-              prescriptionRequired:
-                  (row['prescription_required']! as int) == 1,
-              currencyCode: row['currency_code']! as String,
-              countryCode: row['country_code']! as String,
+              product: ProductDetailsData(
+                id: id,
+                name: row['name']! as String,
+                image: row['image']! as String,
+                description: row['description']! as String,
+                brand: row['brand']! as String,
+                price: row['price']! as int,
+                prescriptionRequired:
+                    (row['prescription_required']! as int) == 1,
+                currencyCode: row['currency_code']! as String,
+                countryCode: row['country_code']! as String,
+              ),
+              quantity: row['quantity']! as int,
             ),
-            quantity: row['quantity']! as int,
-          ),
-        );
-      }));
+          );
+        }),
+      );
     notifyListeners();
   }
 
@@ -144,32 +173,36 @@ class ProductCart extends ChangeNotifier {
     final List<ProductCartItem> snapshot = List<ProductCartItem>.of(
       _items.values,
     );
-    _pendingWrite = _pendingWrite.then((_) async {
-      final Database db = await database.instance;
-      await db.transaction((Transaction transaction) async {
-        await transaction.delete('cart_items');
-        final Batch batch = transaction.batch();
-        final int now = DateTime.now().millisecondsSinceEpoch;
-        for (final ProductCartItem item in snapshot) {
-          batch.insert('cart_items', <String, Object?>{
-            'product_id': item.id,
-            'name': item.product.name,
-            'image': item.product.image,
-            'description': item.product.description,
-            'brand': item.product.brand,
-            'price': item.product.price,
-            'prescription_required': item.product.prescriptionRequired ? 1 : 0,
-            'currency_code': item.product.currencyCode,
-            'country_code': item.product.countryCode,
-            'quantity': item.quantity,
-            'updated_at': now,
+    _pendingWrite = _pendingWrite
+        .then((_) async {
+          final Database db = await database.instance;
+          await db.transaction((Transaction transaction) async {
+            await transaction.delete('cart_items');
+            final Batch batch = transaction.batch();
+            final int now = DateTime.now().millisecondsSinceEpoch;
+            for (final ProductCartItem item in snapshot) {
+              batch.insert('cart_items', <String, Object?>{
+                'product_id': item.id,
+                'name': item.product.name,
+                'image': item.product.image,
+                'description': item.product.description,
+                'brand': item.product.brand,
+                'price': item.product.price,
+                'prescription_required': item.product.prescriptionRequired
+                    ? 1
+                    : 0,
+                'currency_code': item.product.currencyCode,
+                'country_code': item.product.countryCode,
+                'quantity': item.quantity,
+                'updated_at': now,
+              });
+            }
+            await batch.commit(noResult: true);
           });
-        }
-        await batch.commit(noResult: true);
-      });
-    }).catchError((Object error, StackTrace stackTrace) {
-      debugPrint('Unable to persist cart: $error');
-    });
+        })
+        .catchError((Object error, StackTrace stackTrace) {
+          debugPrint('Unable to persist cart: $error');
+        });
   }
 }
 
@@ -203,9 +236,10 @@ class ScreenProductDetails extends StatefulWidget {
 
 class _ScreenProductDetailsState extends State<ScreenProductDetails> {
   int quantity = 1;
-  Timer? _cartSnackBarTimer;
-  ScaffoldFeatureController<SnackBar, SnackBarClosedReason>?
-      _cartSnackBarController;
+  static Timer? _cartSnackBarTimer;
+  static int _cartSnackBarGeneration = 0;
+  Timer? _addedButtonTimer;
+  bool _showAddedConfirmation = false;
 
   ProductDetailsData get product => widget.product;
   String get productId => product.id?.trim().isNotEmpty == true
@@ -231,46 +265,57 @@ class _ScreenProductDetailsState extends State<ScreenProductDetails> {
 
     ProductCart.instance.add(product, quantity);
 
+    _addedButtonTimer?.cancel();
+    setState(() => _showAddedConfirmation = true);
+    _addedButtonTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) {
+        setState(() => _showAddedConfirmation = false);
+      }
+    });
+
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
     _cartSnackBarTimer?.cancel();
-    _cartSnackBarController?.close();
-    messenger.hideCurrentSnackBar();
-    _cartSnackBarController = messenger.showSnackBar(
+    final int snackBarGeneration = ++_cartSnackBarGeneration;
+    messenger.removeCurrentSnackBar();
+    messenger.showSnackBar(
       SnackBar(
-          duration: const Duration(seconds: 5),
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-          elevation: 4,
-          backgroundColor: const Color(0xFFF2FFF6),
-          shape: RoundedRectangleBorder(
-            side: const BorderSide(color: Color(0xFF65C982)),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          content: const Row(
-            children: <Widget>[
-              Icon(Icons.check_circle, color: _green, size: 19),
-              SizedBox(width: 9),
-              Expanded(
-                child: Text(
-                  'Added to cart',
-                  style: TextStyle(color: Color(0xFF131415)),
-                ),
+        duration: const Duration(seconds: 5),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+        elevation: 4,
+        backgroundColor: const Color(0xFFF2FFF6),
+        shape: RoundedRectangleBorder(
+          side: const BorderSide(color: Color(0xFF65C982)),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        content: const Row(
+          children: <Widget>[
+            Icon(Icons.check_circle, color: _green, size: 19),
+            SizedBox(width: 9),
+            Expanded(
+              child: Text(
+                'Added to cart',
+                style: TextStyle(color: Color(0xFF131415)),
               ),
-            ],
-          ),
-          action: SnackBarAction(
-            label: 'View Cart',
-            textColor: _blue,
-            onPressed: () {
-              _cartSnackBarTimer?.cancel();
-              Navigator.of(context).pushNamed(AppRoutes.cart);
-            },
-          ),
+            ),
+          ],
+        ),
+        action: SnackBarAction(
+          label: 'View Cart',
+          textColor: _blue,
+          onPressed: () {
+            _cartSnackBarTimer?.cancel();
+            Navigator.of(context).pushNamed(AppRoutes.cart);
+          },
+        ),
       ),
     );
     _cartSnackBarTimer = Timer(const Duration(seconds: 5), () {
-      _cartSnackBarController?.close();
-      _cartSnackBarController = null;
+      if (snackBarGeneration != _cartSnackBarGeneration) {
+        return;
+      }
+
+      messenger.hideCurrentSnackBar();
     });
   }
 
@@ -287,9 +332,7 @@ class _ScreenProductDetailsState extends State<ScreenProductDetails> {
 
   @override
   void dispose() {
-    _cartSnackBarTimer?.cancel();
-    _cartSnackBarController?.close();
-    _cartSnackBarController = null;
+    _addedButtonTimer?.cancel();
     super.dispose();
   }
 
@@ -357,7 +400,6 @@ class _ScreenProductDetailsState extends State<ScreenProductDetails> {
         FavoriteStore.instance,
       ]),
       builder: (context, _) {
-        final added = ProductCart.instance.quantityFor(productId) > 0;
         final bool favourite = FavoriteStore.instance.contains(productId);
         return Scaffold(
           backgroundColor: Colors.white,
@@ -418,7 +460,7 @@ class _ScreenProductDetailsState extends State<ScreenProductDetails> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _HeroImage(image: product.image),
+                _HeroImage(images: product.displayImages),
                 const SizedBox(height: 24),
                 Text(
                   product.brand,
@@ -651,9 +693,7 @@ class _ScreenProductDetailsState extends State<ScreenProductDetails> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: product.isOutOfStock
-                          ? null
-                          : _addToCart,
+                      onPressed: product.isOutOfStock ? null : _addToCart,
                       style: FilledButton.styleFrom(
                         backgroundColor: _blue,
                         disabledBackgroundColor: const Color(0xFF98A1B3),
@@ -666,14 +706,14 @@ class _ScreenProductDetailsState extends State<ScreenProductDetails> {
                       icon: Icon(
                         product.isOutOfStock
                             ? Icons.remove_shopping_cart_outlined
-                            : added
+                            : _showAddedConfirmation
                             ? Icons.check
                             : Icons.shopping_cart_outlined,
                       ),
                       label: Text(
                         product.isOutOfStock
                             ? 'Out of Stock'
-                            : added
+                            : _showAddedConfirmation
                             ? 'Added'
                             : 'Add To Cart',
                       ),
@@ -694,49 +734,69 @@ const _green = Color(0xFF05972C);
 const _body = Color(0xFF666E80);
 const _border = Color(0xFFE1E2E6);
 
-class _HeroImage extends StatelessWidget {
-  const _HeroImage({required this.image});
-  final String image;
+class _HeroImage extends StatefulWidget {
+  const _HeroImage({required this.images});
+
+  final List<String> images;
 
   @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      AspectRatio(
-        aspectRatio: 1.05,
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: _ProductImage(image: image),
-              ),
-            ),
-            Positioned(
-              right: 10,
-              top: 10,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 5,
+  State<_HeroImage> createState() => _HeroImageState();
+}
+
+class _HeroImageState extends State<_HeroImage> {
+  int _currentPage = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        AspectRatio(
+          aspectRatio: 1.05,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: PageView.builder(
+                    itemCount: widget.images.length,
+                    onPageChanged: (int page) {
+                      setState(() => _currentPage = page);
+                    },
+                    itemBuilder: (_, int index) {
+                      return _ProductImage(image: widget.images[index]);
+                    },
+                  ),
                 ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: _border),
-                  borderRadius: BorderRadius.circular(30),
-                ),
-                child: const Text('1 / 4'),
               ),
-            ),
-          ],
+              Positioned(
+                right: 10,
+                top: 10,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: _border),
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  child: Text('${_currentPage + 1} / ${widget.images.length}'),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
-      const SizedBox(height: 12),
-      const Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [_Dot(active: true), _Dot(), _Dot(), _Dot()],
-      ),
-    ],
-  );
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List<Widget>.generate(widget.images.length, (int index) {
+            return _Dot(active: index == _currentPage);
+          }),
+        ),
+      ],
+    );
+  }
 }
 
 class _ProductImage extends StatelessWidget {
@@ -786,34 +846,16 @@ class _ProductImage extends StatelessWidget {
   }
 }
 
-class _ProductImageLoading extends StatelessWidget {
-  const _ProductImageLoading();
-
-  @override
-  Widget build(BuildContext context) {
-    return const ColoredBox(
-      color: Color(0xFFF1F5F9),
-      child: Center(
-        child: SizedBox(
-          width: 24,
-          height: 24,
-          child: CircularProgressIndicator(strokeWidth: 2, color: _blue),
-        ),
-      ),
-    );
-  }
-}
-
 class _ProductImageFallback extends StatelessWidget {
   const _ProductImageFallback();
 
   @override
   Widget build(BuildContext context) {
-    return const ColoredBox(
-      color: Color(0xFFF1F5F9),
-      child: Center(
-        child: Icon(Icons.medication_outlined, size: 56, color: _blue),
-      ),
+    return Image.asset(
+      'assets/images/dummy_image.png',
+      width: double.infinity,
+      height: double.infinity,
+      fit: BoxFit.cover,
     );
   }
 }

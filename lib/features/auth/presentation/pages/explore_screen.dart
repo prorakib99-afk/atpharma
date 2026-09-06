@@ -22,7 +22,7 @@ import 'notification_screen.dart';
 void _openNotifications(BuildContext context) {
   showDialog<void>(
     context: context,
-    barrierColor: Colors.black.withOpacity(0.08),
+    barrierColor: Colors.black.withValues(alpha: 0.08),
     builder: (_) => const SafeArea(
       child: Align(
         alignment: Alignment.topRight,
@@ -39,12 +39,14 @@ class ExploreScreen extends StatefulWidget {
   const ExploreScreen({
     super.key,
     this.initialCategoryId,
+    this.initialCategoryIds = const <String>[],
     this.initialCategoryName,
   });
 
   static const String routeName = '/explore';
 
   final String? initialCategoryId;
+  final List<String> initialCategoryIds;
   final String? initialCategoryName;
 
   @override
@@ -94,12 +96,110 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
+  PaginatedResult<ShopProductEntity> _prioritizeProductImages(
+    PaginatedResult<ShopProductEntity> page,
+  ) {
+    final List<ShopProductEntity> productsWithImages = page.items
+        .where((ShopProductEntity product) {
+          return product.primaryImageUrl.trim().isNotEmpty;
+        })
+        .toList(growable: false);
+    final List<ShopProductEntity> productsWithoutImages = page.items
+        .where((ShopProductEntity product) {
+          return product.primaryImageUrl.trim().isEmpty;
+        })
+        .toList(growable: false);
+
+    return page.copyWith(
+      items: List<ShopProductEntity>.unmodifiable(<ShopProductEntity>[
+        ...productsWithImages,
+        ...productsWithoutImages,
+      ]),
+    );
+  }
+
+  Future<PaginatedResult<ShopProductEntity>> _loadImageFirstPage(
+    PaginatedResult<ShopProductEntity> page,
+  ) async {
+    final int imageCount = page.items.where((ShopProductEntity product) {
+      return product.primaryImageUrl.trim().isNotEmpty;
+    }).length;
+    if (imageCount >= _perPage || page.totalPages <= 1) {
+      return _prioritizeProductImages(page);
+    }
+
+    // The API currently has no image-first sort and most image-bearing records
+    // are on later pages. Sample the matching query from the back so genuine
+    // product photos are shown before placeholder-only products.
+    final int firstCandidate = page.totalPages - ((page.page - 1) * 4);
+    final List<int> candidatePages = List<int>.generate(
+      4,
+      (int index) => firstCandidate - index,
+    ).where((int value) => value > page.page).toList(growable: false);
+
+    final List<AppResult<PaginatedResult<ShopProductEntity>>> results =
+        await Future.wait(
+          candidatePages.map((int candidatePage) {
+            return _getProducts(
+              query: _query(candidatePage),
+              requestKey: 'explore-image-priority-$candidatePage',
+            );
+          }),
+        );
+
+    final Set<String> seenIds = <String>{};
+    final List<ShopProductEntity> imageProducts = <ShopProductEntity>[];
+    for (final AppResult<PaginatedResult<ShopProductEntity>> result
+        in results) {
+      for (final ShopProductEntity product
+          in result.dataOrNull?.items ?? const <ShopProductEntity>[]) {
+        if (product.primaryImageUrl.trim().isNotEmpty &&
+            seenIds.add(product.id)) {
+          imageProducts.add(product);
+        }
+      }
+    }
+
+    final List<ShopProductEntity> ordered = <ShopProductEntity>[
+      ...imageProducts,
+      ...page.items.where((ShopProductEntity product) {
+        return seenIds.add(product.id);
+      }),
+    ];
+    return page.copyWith(
+      items: List<ShopProductEntity>.unmodifiable(ordered.take(_perPage)),
+    );
+  }
+
+  Future<void> _refreshImagePriority(
+    PaginatedResult<ShopProductEntity> sourcePage,
+    int version,
+  ) async {
+    final PaginatedResult<ShopProductEntity> imageFirstPage =
+        await _loadImageFirstPage(sourcePage);
+    if (!mounted || version != _version || _page.page != sourcePage.page) {
+      return;
+    }
+    setState(() {
+      _page = imageFirstPage;
+      _cache[sourcePage.page] = imageFirstPage;
+    });
+  }
+
   @override
   void initState() {
     super.initState();
     final String categoryId = widget.initialCategoryId?.trim() ?? '';
+    final List<String> categoryIds = widget.initialCategoryIds
+        .map((String id) => id.trim())
+        .where((String id) => id.isNotEmpty)
+        .toList(growable: false);
     _filter = ExploreFilter(
-      categoryIds: categoryId.isEmpty ? const <String>[] : <String>[categoryId],
+      categoryIds: categoryIds.isNotEmpty
+          ? categoryIds
+          : categoryId.isEmpty
+          ? const <String>[]
+          : <String>[categoryId],
     );
     _getProducts = sl<GetShopProductsUseCase>();
     _cancelProducts = sl<CancelShopProductsRequestUseCase>();
@@ -131,7 +231,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
         await _getProducts(query: _query(page), requestKey: _requestKey);
 
     if (!mounted || version != _version) return;
-    final data = result.dataOrNull;
+    final PaginatedResult<ShopProductEntity>? rawData = result.dataOrNull;
+    final PaginatedResult<ShopProductEntity>? data = rawData == null
+        ? null
+        : _prioritizeProductImages(rawData);
     setState(() {
       _loading = false;
       if (data != null) {
@@ -141,7 +244,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
         _error = result.failureOrNull?.message ?? 'Unable to load products.';
       }
     });
-    if (data != null) _prefetch(page + 1);
+    if (rawData != null) {
+      unawaited(_refreshImagePriority(rawData, version));
+      unawaited(_prefetch(page + 1));
+    }
   }
 
   Future<void> _prefetch(int page) async {
@@ -155,7 +261,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
       requestKey: _prefetchKey,
     );
     if (!mounted) return;
-    final data = result.dataOrNull;
+    final PaginatedResult<ShopProductEntity>? rawData = result.dataOrNull;
+    final PaginatedResult<ShopProductEntity>? data = rawData == null
+        ? null
+        : _prioritizeProductImages(rawData);
     if (data != null) _cache[page] = data;
   }
 
@@ -631,6 +740,7 @@ class _ProductCard extends StatelessWidget {
               id: product.id,
               name: product.name,
               image: product.primaryImageUrl,
+              galleryImages: product.allImageUrls,
               description: product.displayDescription,
               brand: product.displayCompanyName,
               price: product.sellingPrice.round(),
@@ -673,17 +783,16 @@ class _ProductCard extends StatelessWidget {
                       border: Border.all(color: _ExploreColors.border),
                     ),
                     clipBehavior: Clip.antiAlias,
-                    child: Image.network(
-                      product.primaryImageUrl,
-                      fit: BoxFit.cover,
-                      cacheWidth: 420,
-                      filterQuality: FilterQuality.low,
-                      errorBuilder: (_, _, _) => const Icon(
-                          Icons.medication_outlined,
-                          size: 54,
-                          color: _ExploreColors.primary,
-                        ),
-                    ),
+                    child: product.primaryImageUrl.trim().isEmpty
+                        ? const _ExploreProductImageFallback()
+                        : Image.network(
+                            product.primaryImageUrl,
+                            fit: BoxFit.cover,
+                            cacheWidth: 420,
+                            filterQuality: FilterQuality.low,
+                            errorBuilder: (_, _, _) =>
+                                const _ExploreProductImageFallback(),
+                          ),
                   ),
                   Positioned(
                     right: -2,
@@ -808,6 +917,19 @@ class _ProductCard extends StatelessWidget {
   }
 }
 
+class _ExploreProductImageFallback extends StatelessWidget {
+  const _ExploreProductImageFallback();
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.asset(
+      'assets/images/dummy_image.png',
+      fit: BoxFit.cover,
+      cacheWidth: 420,
+    );
+  }
+}
+
 class _ExplorePagination extends StatelessWidget {
   const _ExplorePagination({required this.page, required this.onChanged});
 
@@ -845,11 +967,7 @@ class _ExplorePagination extends StatelessWidget {
   }
 }
 
-String _formatPrice(
-  double price, {
-  String? currencyCode,
-  String? countryCode,
-}) {
+String _formatPrice(double price, {String? currencyCode, String? countryCode}) {
   return CurrencyDisplay.format(
     price,
     currencyCode: currencyCode,

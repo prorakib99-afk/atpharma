@@ -13,7 +13,7 @@ import 'screen_product_details.dart';
 void _openNotifications(BuildContext context) {
   showDialog<void>(
     context: context,
-    barrierColor: Colors.black.withOpacity(0.08),
+    barrierColor: Colors.black.withValues(alpha: 0.08),
     builder: (_) => const SafeArea(
       child: Align(
         alignment: Alignment.topRight,

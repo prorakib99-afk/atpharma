@@ -2,7 +2,7 @@ abstract final class ApiConstants {
   ApiConstants._();
 
   /// Backend root host.
-  static const String host = 'https://pharmabackend.altamam.cloud';
+  static const String host = 'https://backend.altamampharma.com';
 
   /// Every REST endpoint is served under the `/api` global prefix.
   static const String apiPrefix = '/api';
