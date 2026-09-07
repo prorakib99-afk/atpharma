@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../../../../shared/widgets/skeleton_loader.dart';
 
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/error/app_result.dart';
@@ -78,7 +79,6 @@ class _SearchScreenState extends State<SearchScreen> {
   String _query = '';
   bool _submitted = false;
   bool _loading = true;
-  bool _scrollToBottomAfterInitialLoad = true;
   String? _error;
   int _requestVersion = 0;
 
@@ -133,14 +133,6 @@ class _SearchScreenState extends State<SearchScreen> {
         _error = result.failureOrNull?.message ?? 'Unable to load products.';
       }
     });
-
-    if (_scrollToBottomAfterInitialLoad && result.dataOrNull != null) {
-      _scrollToBottomAfterInitialLoad = false;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || !_scrollController.hasClients) return;
-        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
-      });
-    }
   }
 
   void _onQueryChanged(String value) {
@@ -186,7 +178,7 @@ class _SearchScreenState extends State<SearchScreen> {
     Future<void>.delayed(const Duration(milliseconds: 300), () {
       if (!mounted || !_scrollController.hasClients) return;
       _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
+        _scrollController.position.minScrollExtent,
         duration: const Duration(milliseconds: 350),
         curve: Curves.easeOutCubic,
       );
@@ -217,6 +209,8 @@ class _SearchScreenState extends State<SearchScreen> {
           ),
           Expanded(
             child: CustomScrollView(
+              // Anchor the search field from the first frame, even while products load.
+              reverse: true,
               controller: _scrollController,
               physics: const BouncingScrollPhysics(),
               slivers: [
@@ -229,8 +223,6 @@ class _SearchScreenState extends State<SearchScreen> {
                   ),
                   sliver: SliverList(
                     delegate: SliverChildListDelegate.fixed([
-                      _content(),
-                      const SizedBox(height: 20),
                       _SearchField(
                         controller: _controller,
                         focusNode: _focusNode,
@@ -240,6 +232,8 @@ class _SearchScreenState extends State<SearchScreen> {
                         onClear: _clearSearch,
                         onTap: _scrollToSearchField,
                       ),
+                      const SizedBox(height: 20),
+                      _content(),
                     ]),
                   ),
                 ),
@@ -252,12 +246,6 @@ class _SearchScreenState extends State<SearchScreen> {
   );
 
   Widget _content() {
-    if (_loading && _productsPage.isEmpty) {
-      return const SizedBox(
-        height: 260,
-        child: Center(child: CircularProgressIndicator(color: _Colors.blue)),
-      );
-    }
     if (_error != null && _productsPage.isEmpty) {
       return _SearchError(
         message: _error!,
@@ -265,7 +253,7 @@ class _SearchScreenState extends State<SearchScreen> {
       );
     }
     if (_submitted) {
-      return _productsPage.isEmpty
+      return !_loading && _productsPage.isEmpty
           ? _NoResults(
               query: _query,
               onSuggestion: _search,
@@ -287,6 +275,7 @@ class _SearchScreenState extends State<SearchScreen> {
     }
     return _DefaultState(
       products: _suggestedProducts,
+      loading: _loading && _suggestedProducts.isEmpty,
       recent: _recent,
       onPopular: _search,
       onRecent: _search,
@@ -434,6 +423,7 @@ class _SearchField extends StatelessWidget {
 class _DefaultState extends StatelessWidget {
   const _DefaultState({
     required this.products,
+    required this.loading,
     required this.recent,
     required this.onPopular,
     required this.onRecent,
@@ -441,6 +431,7 @@ class _DefaultState extends StatelessWidget {
     required this.onClearRecent,
   });
   final List<ShopProductEntity> products;
+  final bool loading;
   final List<String> recent;
   final ValueChanged<String> onPopular;
   final ValueChanged<String> onRecent;
@@ -484,14 +475,17 @@ class _DefaultState extends StatelessWidget {
           children: [
             const Text('Suggested for you', style: _Text.section),
             const SizedBox(height: 16),
-            ...products
-                .take(4)
-                .map(
-                  (product) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _HorizontalCard(product),
+            if (loading)
+              const _SuggestedProductsSkeleton()
+            else
+              ...products
+                  .take(4)
+                  .map(
+                    (product) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _HorizontalCard(product),
+                    ),
                   ),
-                ),
           ],
         ),
       ),
@@ -555,6 +549,51 @@ class _DefaultState extends StatelessWidget {
         ),
       ],
     ],
+  );
+}
+
+class _SuggestedProductsSkeleton extends StatelessWidget {
+  const _SuggestedProductsSkeleton();
+
+  @override
+  Widget build(BuildContext context) => Column(
+    children: List.generate(
+      4,
+      (_) => Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Container(
+          height: 116,
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: _Colors.card,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white, width: 2),
+          ),
+          child: const SkeletonLoader(
+            child: Row(
+              children: [
+                SkeletonBlock(width: 104, height: 100, radius: 8),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SkeletonBlock(width: 56, height: 10),
+                      SizedBox(height: 8),
+                      SkeletonBlock(width: double.infinity, height: 14),
+                      SizedBox(height: 8),
+                      SkeletonBlock(width: 80, height: 10),
+                      Spacer(),
+                      SkeletonBlock(width: 64, height: 16),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
   );
 }
 
@@ -705,18 +744,24 @@ class _Results extends StatelessWidget {
           style: TextStyle(fontSize: 12, color: _Colors.body),
         ),
         const SizedBox(height: 20),
-        GridView.builder(
-          itemCount: page.items.length,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 8,
-            mainAxisExtent: 280,
+        if (loading)
+          ProductGridSkeleton(
+            itemCount: page.items.isEmpty ? 6 : page.items.length,
+          )
+        else
+          GridView.builder(
+            padding: EdgeInsets.zero,
+            itemCount: page.items.length,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+              mainAxisExtent: 280,
+            ),
+            itemBuilder: (_, index) => _GridCard(page.items[index]),
           ),
-          itemBuilder: (_, index) => _GridCard(page.items[index]),
-        ),
         if (page.totalPages > 1) ...[
           const SizedBox(height: 24),
           _Pagination(
@@ -1145,6 +1190,16 @@ class _SearchProductImage extends StatelessWidget {
     if (imageUrl.trim().isEmpty) return fallback;
     return Image.network(
       imageUrl,
+      frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+        if (wasSynchronouslyLoaded || frame != null) return child;
+        return SkeletonLoader(
+          child: SkeletonBlock(
+            width: width ?? double.infinity,
+            height: height ?? 148,
+            radius: 8,
+          ),
+        );
+      },
       width: width,
       height: height,
       fit: BoxFit.cover,

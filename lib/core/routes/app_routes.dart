@@ -16,6 +16,8 @@ abstract final class AppRoutes {
   static const String search = '/search';
   static const String cart = '/cart';
   static const String checkout = '/checkout';
+  static const String termsAndConditions = '/terms-and-conditions';
+  static const String privacyPolicy = '/privacy-policy';
   static const String stripePayment = '/stripe-payment';
   static const String reviewOrder = '/review-order';
   static const String completedOrder = '/completed-order';

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../../../../shared/widgets/skeleton_loader.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
@@ -19,6 +20,7 @@ import '../../../shop/presentation/bloc/home_products/home_products_bloc.dart';
 import '../../../shop/presentation/bloc/home_products/home_products_event.dart';
 import '../../../shop/presentation/bloc/home_products/home_products_state.dart';
 import 'buy_again_floating_screen.dart';
+import 'article_search_screen.dart';
 import 'favorite_store.dart';
 import 'favourite_screen.dart';
 import 'floating_category_screen.dart';
@@ -356,7 +358,12 @@ class _HomeBodyState extends State<_HomeBody> with WidgetsBindingObserver {
                               const _BackendProductContent(),
                               const SizedBox(height: 32),
                               const _ArticleSection(),
-                              const SizedBox(height: 24),
+                              // Scaffold includes the floating navigation bar
+                              // in this inset when extendBody is enabled.
+                              SizedBox(
+                                height:
+                                    MediaQuery.paddingOf(context).bottom + 16,
+                              ),
                             ],
                           ),
                         ),
@@ -736,9 +743,7 @@ class _CategorySectionState extends State<_CategorySection> {
             animation: _store,
             builder: (BuildContext context, _) {
               if (_store.isLoading && _store.categories.isEmpty) {
-                return const Center(
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                );
+                return const CategorySkeleton();
               }
 
               if (_store.categories.isEmpty) {
@@ -1207,11 +1212,9 @@ class _LoadingProducts extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const SizedBox(
-      height: 180,
-      child: Center(
-        child: CircularProgressIndicator(color: _Colors.blue, strokeWidth: 2.5),
-      ),
+    return ProductGridSkeleton(
+      columns: MediaQuery.sizeOf(context).width >= 650 ? 3 : 2,
+      itemCount: 4,
     );
   }
 }
@@ -1313,49 +1316,60 @@ class _ArticleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: Stack(
-        fit: StackFit.expand,
-        children: <Widget>[
-          Image.asset(article.image, fit: BoxFit.cover, cacheWidth: 340),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              height: 116,
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: <Color>[
-                    Colors.white.withValues(alpha: .78),
-                    Colors.white.withValues(alpha: .96),
-                  ],
+    return Semantics(
+      button: true,
+      label: 'Search ${article.title}',
+      child: GestureDetector(
+        onTap: () => Navigator.of(context).push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => ArticleSearchScreen(topic: article.title),
+          ),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Stack(
+            fit: StackFit.expand,
+            children: <Widget>[
+              Image.asset(article.image, fit: BoxFit.cover, cacheWidth: 340),
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: Container(
+                  height: 116,
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: <Color>[
+                        Colors.white.withValues(alpha: .78),
+                        Colors.white.withValues(alpha: .96),
+                      ],
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        article.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: _Text.articleTitle10,
+                      ),
+                      const SizedBox(height: 2),
+                      const Text(
+                        'Read helpful health and medicine tips.',
+                        maxLines: 2,
+                        style: _Text.articleBody10,
+                      ),
+                      const Spacer(),
+                      const Text('3 min to read', style: _Text.articleBody10),
+                    ],
+                  ),
                 ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    article.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: _Text.articleTitle10,
-                  ),
-                  const SizedBox(height: 2),
-                  const Text(
-                    'Read helpful health and medicine tips.',
-                    maxLines: 2,
-                    style: _Text.articleBody10,
-                  ),
-                  const Spacer(),
-                  const Text('3 min to read', style: _Text.articleBody10),
-                ],
-              ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

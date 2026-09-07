@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../../core/routes/app_routes.dart';
+import '../../../../shared/widgets/app_shimmer.dart';
 import '../../../shop/presentation/controllers/shop_category_store.dart';
 
 Future<void> showFloatingCategoryScreen(BuildContext context) async {
@@ -106,7 +107,7 @@ class FloatingCategoryScreen extends StatelessWidget {
               animation: store,
               builder: (BuildContext context, _) {
                 if (store.isLoading && store.categories.isEmpty) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const _FigmaCategoryGridSkeleton();
                 }
 
                 if (store.categories.isEmpty) {
@@ -138,6 +139,66 @@ class FloatingCategoryScreen extends StatelessWidget {
               child: const Text('Close'),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FigmaCategoryGridSkeleton extends StatelessWidget {
+  const _FigmaCategoryGridSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return AppShimmer(
+      child: SingleChildScrollView(
+        physics: const NeverScrollableScrollPhysics(),
+        child: Column(
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                for (int index = 0; index < 3; index++) ...<Widget>[
+                  if (index > 0) const SizedBox(width: 8),
+                  const Expanded(child: _CategorySkeletonCard()),
+                ],
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: <Widget>[
+                for (int index = 0; index < 2; index++) ...<Widget>[
+                  if (index > 0) const SizedBox(width: 8),
+                  const Expanded(child: _CategorySkeletonCard()),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CategorySkeletonCard extends StatelessWidget {
+  const _CategorySkeletonCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 104,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7FBFE),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      padding: const EdgeInsets.all(10),
+      child: const Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: <Widget>[
+          SkeletonBox(width: 38, height: 34, borderRadius: 8),
+          SizedBox(height: 12),
+          SkeletonBox(width: 60, height: 11, borderRadius: 4),
+          SizedBox(height: 6),
+          SkeletonBox(width: 28, height: 10, borderRadius: 4),
         ],
       ),
     );

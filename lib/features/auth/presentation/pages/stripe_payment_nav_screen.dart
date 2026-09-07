@@ -73,6 +73,19 @@ class _StripePaymentNavScreenState extends State<StripePaymentNavScreen> {
                 padding: EdgeInsets.fromLTRB(pagePadding, 8, pagePadding, 0),
                 child: _CheckoutHeader(itemCount: itemCount),
               ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(pagePadding, 24, pagePadding, 0),
+                child: _CheckoutStepCard(
+                  reviewActive: _showReview,
+                  onShippingTap: () => Navigator.maybePop(context),
+                  onPaymentTap: () {
+                    if (_showReview) setState(() => _showReview = false);
+                  },
+                  onReviewTap: () {
+                    if (!_showReview) setState(() => _showReview = true);
+                  },
+                ),
+              ),
               Expanded(
                 child: CustomScrollView(
                   physics: const BouncingScrollPhysics(),
@@ -86,8 +99,6 @@ class _StripePaymentNavScreenState extends State<StripePaymentNavScreen> {
                       ),
                       sliver: SliverList(
                         delegate: SliverChildListDelegate(<Widget>[
-                          _CheckoutStepCard(reviewActive: _showReview),
-                          const SizedBox(height: 32),
                           if (_showReview)
                             ReviewOrderScreen(
                               embedded: true,
@@ -290,9 +301,17 @@ class _HeaderAvatar extends StatelessWidget {
 }
 
 class _CheckoutStepCard extends StatelessWidget {
-  const _CheckoutStepCard({required this.reviewActive});
+  const _CheckoutStepCard({
+    required this.reviewActive,
+    required this.onShippingTap,
+    required this.onPaymentTap,
+    required this.onReviewTap,
+  });
 
   final bool reviewActive;
+  final VoidCallback onShippingTap;
+  final VoidCallback onPaymentTap;
+  final VoidCallback onReviewTap;
 
   @override
   Widget build(BuildContext context) {
@@ -319,18 +338,21 @@ class _CheckoutStepCard extends StatelessWidget {
                 : Icons.check_rounded,
             label: 'Shipping',
             completed: !reviewActive,
+            onTap: onShippingTap,
           ),
           const _StepLine(),
           _StepItem(
             icon: Icons.credit_card_rounded,
             label: 'Payment',
             active: !reviewActive,
+            onTap: onPaymentTap,
           ),
           const _StepLine(),
           _StepItem(
             icon: Icons.receipt_long_rounded,
             label: 'Review',
             active: reviewActive,
+            onTap: onReviewTap,
           ),
         ],
       ),
@@ -344,55 +366,61 @@ class _StepItem extends StatelessWidget {
     required this.label,
     this.active = false,
     this.completed = false,
+    this.onTap,
   });
 
   final IconData icon;
   final String label;
   final bool active;
   final bool completed;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 56,
-      child: Column(
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: active || completed
-                  ? _PaymentColors.primary
-                  : _PaymentColors.white,
-              shape: BoxShape.circle,
-              border: active || completed
-                  ? null
-                  : Border.all(color: _PaymentColors.body, width: 1.6),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        width: 68,
+        child: Column(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: active || completed
+                    ? _PaymentColors.primary
+                    : _PaymentColors.white,
+                shape: BoxShape.circle,
+                border: active || completed
+                    ? null
+                    : Border.all(color: _PaymentColors.body, width: 1.6),
+              ),
+              child: Icon(
+                icon,
+                size: 16,
+                color: active || completed
+                    ? _PaymentColors.white
+                    : _PaymentColors.body,
+              ),
             ),
-            child: Icon(
-              icon,
-              size: 16,
-              color: active || completed
-                  ? _PaymentColors.white
-                  : _PaymentColors.body,
+            const SizedBox(height: 8),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 12,
+                height: 16 / 12,
+                fontWeight: FontWeight.w500,
+                color: active || completed
+                    ? _PaymentColors.primary
+                    : _PaymentColors.body,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 12,
-              height: 16 / 12,
-              fontWeight: FontWeight.w500,
-              color: active || completed
-                  ? _PaymentColors.primary
-                  : _PaymentColors.body,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

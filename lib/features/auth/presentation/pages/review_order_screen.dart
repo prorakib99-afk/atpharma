@@ -335,14 +335,18 @@ class _OrderItemTile extends StatelessWidget {
                 const Spacer(),
                 Row(
                   children: [
-                    Text(
-                      _ReviewMoney.format(item.unitPrice),
-                      style: const TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 14,
-                        height: 20 / 14,
-                        fontWeight: FontWeight.w600,
-                        color: _ReviewColors.title,
+                    Flexible(
+                      child: Text(
+                        _ReviewMoney.format(item.unitPrice),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 14,
+                          height: 20 / 14,
+                          fontWeight: FontWeight.w600,
+                          color: _ReviewColors.title,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -366,6 +370,8 @@ class _OrderItemTile extends StatelessWidget {
                       ),
                       child: Text(
                         'Qty ${item.quantity}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontFamily: 'Poppins',
                           fontSize: 12,

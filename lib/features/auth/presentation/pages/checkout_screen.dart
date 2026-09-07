@@ -5,6 +5,7 @@ import '../../../../shared/widgets/navigation_page_scaffold.dart';
 import 'favorite_header_button.dart';
 import 'floating_profile_screen.dart';
 import 'notification_screen.dart';
+import 'review_order_screen.dart';
 import 'screen_product_details.dart';
 
 void _openNotifications(BuildContext context) {
@@ -61,6 +62,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               padding: EdgeInsets.fromLTRB(pagePadding, 8, pagePadding, 0),
               child: _CheckoutHeader(itemCount: itemCount),
             ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(pagePadding, 24, pagePadding, 0),
+              child: _CheckoutStepCard(purchaseItems: widget.purchaseItems),
+            ),
             Expanded(
               child: CustomScrollView(
                 physics: const BouncingScrollPhysics(),
@@ -74,8 +79,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     ),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
-                        const _CheckoutStepCard(),
-                        const SizedBox(height: 24),
                         const _ShippingSectionHeader(),
                         const SizedBox(height: 16),
                         Container(
@@ -341,7 +344,9 @@ class _ShippingSectionHeader extends StatelessWidget {
 }
 
 class _CheckoutStepCard extends StatelessWidget {
-  const _CheckoutStepCard();
+  const _CheckoutStepCard({this.purchaseItems});
+
+  final List<ProductCartItem>? purchaseItems;
 
   @override
   Widget build(BuildContext context) {
@@ -366,16 +371,32 @@ class _CheckoutStepCard extends StatelessWidget {
         ],
       ),
       child: Row(
-        children: const [
-          _StepItem(
+        children: [
+          const _StepItem(
             icon: Icons.local_shipping_outlined,
             label: 'Shipping',
             active: true,
           ),
-          _StepLine(),
-          _StepItem(icon: Icons.credit_card_rounded, label: 'Payment'),
-          _StepLine(),
-          _StepItem(icon: Icons.receipt_long_rounded, label: 'Review'),
+          const _StepLine(),
+          _StepItem(
+            icon: Icons.credit_card_rounded,
+            label: 'Payment',
+            onTap: () => Navigator.of(
+              context,
+            ).pushNamed(AppRoutes.stripePayment, arguments: purchaseItems),
+          ),
+          const _StepLine(),
+          _StepItem(
+            icon: Icons.receipt_long_rounded,
+            label: 'Review',
+            onTap: () => Navigator.of(context).pushNamed(
+              AppRoutes.reviewOrder,
+              arguments: ReviewOrderArguments(
+                purchaseItems: purchaseItems,
+                paymentMethod: 'Stripe',
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -387,48 +408,54 @@ class _StepItem extends StatelessWidget {
     required this.icon,
     required this.label,
     this.active = false,
+    this.onTap,
   });
 
   final IconData icon;
   final String label;
   final bool active;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 64,
-      child: Column(
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: active ? _CheckoutColors.primary : _CheckoutColors.white,
-              shape: BoxShape.circle,
-              border: active
-                  ? null
-                  : Border.all(color: _CheckoutColors.body, width: 1.6),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        width: 64,
+        child: Column(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: active ? _CheckoutColors.primary : _CheckoutColors.white,
+                shape: BoxShape.circle,
+                border: active
+                    ? null
+                    : Border.all(color: _CheckoutColors.body, width: 1.6),
+              ),
+              child: Icon(
+                icon,
+                size: 16,
+                color: active ? _CheckoutColors.white : _CheckoutColors.body,
+              ),
             ),
-            child: Icon(
-              icon,
-              size: 16,
-              color: active ? _CheckoutColors.white : _CheckoutColors.body,
+            const SizedBox(height: 8),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 12,
+                height: 16 / 12,
+                fontWeight: FontWeight.w500,
+                color: active ? _CheckoutColors.primary : _CheckoutColors.body,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 12,
-              height: 16 / 12,
-              fontWeight: FontWeight.w500,
-              color: active ? _CheckoutColors.primary : _CheckoutColors.body,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -833,35 +860,54 @@ class _TermsAndPrivacyText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return RichText(
-      textAlign: TextAlign.center,
-      text: const TextSpan(
-        style: TextStyle(
-          fontFamily: 'Poppins',
-          fontSize: 12,
-          height: 16 / 12,
-          fontWeight: FontWeight.w400,
-          color: _CheckoutColors.body,
+    const baseStyle = TextStyle(
+      fontFamily: 'Poppins',
+      fontSize: 12,
+      height: 16 / 12,
+      color: _CheckoutColors.body,
+    );
+    return Wrap(
+      alignment: WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        const Text('By continuing, you agree to our ', style: baseStyle),
+        InkWell(
+          onTap: () =>
+              Navigator.of(context).pushNamed(AppRoutes.termsAndConditions),
+          borderRadius: BorderRadius.circular(4),
+          child: const Padding(
+            padding: EdgeInsets.symmetric(vertical: 2),
+            child: Text(
+              'Terms & Conditions',
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 12,
+                height: 16 / 12,
+                fontWeight: FontWeight.w600,
+                color: _CheckoutColors.primary,
+              ),
+            ),
+          ),
         ),
-        children: [
-          TextSpan(text: 'By continuing, you agree to our '),
-          TextSpan(
-            text: 'Terms & Conditions',
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: _CheckoutColors.primary,
+        const Text(' and ', style: baseStyle),
+        InkWell(
+          onTap: () => Navigator.of(context).pushNamed(AppRoutes.privacyPolicy),
+          borderRadius: BorderRadius.circular(4),
+          child: const Padding(
+            padding: EdgeInsets.symmetric(vertical: 2),
+            child: Text(
+              'Privacy Policy',
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 12,
+                height: 16 / 12,
+                fontWeight: FontWeight.w600,
+                color: _CheckoutColors.primary,
+              ),
             ),
           ),
-          TextSpan(text: '\nand '),
-          TextSpan(
-            text: 'Privacy Policy',
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: _CheckoutColors.primary,
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

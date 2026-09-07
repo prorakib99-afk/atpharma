@@ -4,6 +4,7 @@ import '../../../../core/di/injection_container.dart';
 import '../../../../core/error/app_result.dart';
 import '../../../../core/pagination/paginated_result.dart';
 import '../../../../core/utils/currency_display.dart';
+import '../../../../shared/widgets/app_shimmer.dart';
 import '../../../../shared/widgets/fly_to_cart.dart';
 import '../../../shop/domain/entities/shop_product_entity.dart';
 import '../../../shop/domain/entities/shop_product_query.dart';
@@ -134,9 +135,7 @@ class _FloatingBuyAgainScreenState extends State<FloatingBuyAgainScreen> {
 
   Widget _buildContent(ScrollController controller) {
     if (_isLoading && _page.isEmpty) {
-      return const Center(
-        child: CircularProgressIndicator(color: _Colors.blue, strokeWidth: 2),
-      );
+      return const _BuyAgainSkeletonGrid();
     }
 
     if (_errorMessage != null && _page.isEmpty) {
@@ -204,6 +203,35 @@ class _FloatingBuyAgainScreenState extends State<FloatingBuyAgainScreen> {
             child: LinearProgressIndicator(color: _Colors.blue, minHeight: 2),
           ),
       ],
+    );
+  }
+}
+
+class _BuyAgainSkeletonGrid extends StatelessWidget {
+  const _BuyAgainSkeletonGrid();
+
+  @override
+  Widget build(BuildContext context) {
+    final double textScale = MediaQuery.textScalerOf(context).scale(12) / 12;
+    final double cardExtent =
+        280 + (textScale - 1).clamp(0.0, 1.0).toDouble() * 52;
+    final int columns = MediaQuery.sizeOf(context).width >= 650 ? 3 : 2;
+
+    return AppShimmer(
+      child: GridView.builder(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: columns * 2,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: columns,
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 8,
+          mainAxisExtent: cardExtent,
+        ),
+        itemBuilder: (BuildContext context, int index) {
+          return const ProductCardSkeleton(cardColor: _Colors.card);
+        },
+      ),
     );
   }
 }

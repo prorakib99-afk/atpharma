@@ -20,6 +20,7 @@ import 'features/auth/presentation/pages/home_screen.dart';
 import 'features/auth/presentation/pages/login_screen.dart';
 import 'features/auth/presentation/pages/otp_screen.dart';
 import 'features/auth/presentation/pages/prescription_screen.dart';
+import 'features/auth/presentation/pages/privacy_policy_screen.dart';
 import 'features/auth/presentation/pages/profile_screen.dart';
 import 'features/auth/presentation/pages/recovery_screen.dart';
 import 'features/auth/presentation/pages/register_screen.dart';
@@ -31,6 +32,7 @@ import 'features/auth/presentation/pages/splash_screen.dart';
 import 'features/auth/presentation/pages/start_page.dart';
 import 'features/auth/presentation/pages/stripe_payment_nav_screen.dart';
 import 'features/auth/presentation/pages/success_reset_pass_screen.dart';
+import 'features/auth/presentation/pages/terms_and_conditions_screen.dart';
 import 'features/auth/presentation/bloc/login/login_bloc.dart';
 import 'features/auth/presentation/bloc/login/login_event.dart';
 import 'features/auth/presentation/bloc/login/login_state.dart';
@@ -171,6 +173,12 @@ class AtPharmaApp extends StatelessWidget {
                 ? arguments
                 : null,
           );
+        },
+        AppRoutes.termsAndConditions: (BuildContext context) {
+          return const TermsAndConditionsScreen();
+        },
+        AppRoutes.privacyPolicy: (BuildContext context) {
+          return const PrivacyPolicyScreen();
         },
         AppRoutes.stripePayment: (BuildContext context) {
           final Object? arguments = ModalRoute.settingsOf(context)?.arguments;

@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../../../../shared/widgets/skeleton_loader.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/error/app_result.dart';
@@ -605,11 +607,12 @@ class _ExploreProductsContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (loading && page.isEmpty) {
-      return const SizedBox(
-        height: 320,
-        child: Center(
-          child: CircularProgressIndicator(color: _ExploreColors.primary),
-        ),
+      return ProductGridSkeleton(
+        columns: _Responsive.productCrossAxisCount(context),
+        mainAxisExtent: null,
+        childAspectRatio: _Responsive.productAspectRatio(context),
+        spacing: 12,
+        runSpacing: 14,
       );
     }
     if (error != null && page.isEmpty) {
@@ -1003,14 +1006,17 @@ class _FilterPanel extends StatelessWidget {
             children: [
               const Expanded(
                 child: _ActionChipButton(
-                  icon: Icons.swap_vert_rounded,
+                  iconAsset: 'assets/icons/explore_sort.svg',
+                  iconSize: 20,
+                  iconQuarterTurns: 1,
                   label: 'Sort: Popular',
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: _ActionChipButton(
-                  icon: Icons.filter_alt_outlined,
+                  iconAsset: 'assets/icons/explore_filter.svg',
+                  iconSize: 16,
                   label: 'More Filters',
                   badge: '$activeFilterCount',
                   onTap: onFilterTap,
@@ -1026,71 +1032,93 @@ class _FilterPanel extends StatelessWidget {
 
 class _ActionChipButton extends StatelessWidget {
   const _ActionChipButton({
-    required this.icon,
+    required this.iconAsset,
+    required this.iconSize,
     required this.label,
+    this.iconQuarterTurns = 0,
     this.badge,
     this.onTap,
   });
 
-  final IconData icon;
+  final String iconAsset;
+  final double iconSize;
+  final int iconQuarterTurns;
   final String label;
   final String? badge;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final isSmall = MediaQuery.sizeOf(context).width <= 360;
-
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        height: 40,
-        padding: EdgeInsets.symmetric(horizontal: isSmall ? 10 : 14),
+        constraints: const BoxConstraints(minHeight: 40),
         decoration: BoxDecoration(
           color: _ExploreColors.card,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 21, color: _ExploreColors.title),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: isSmall ? 11 : 12,
-                  height: 16 / 12,
-                  fontWeight: FontWeight.w600,
-                  color: _ExploreColors.title,
-                ),
-              ),
-            ),
-            if (badge != null) ...[
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: const BoxDecoration(
-                  color: _ExploreColors.border,
-                  shape: BoxShape.circle,
-                ),
-                child: Text(
-                  badge!,
-                  style: const TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 10,
-                    height: 16 / 10,
-                    fontWeight: FontWeight.w500,
-                    color: _ExploreColors.title,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // Keep both actions on one row; reduce padding before scaling.
+            final padding = constraints.maxWidth >= 164 ? 16.0 : 8.0;
+            return Padding(
+              padding: EdgeInsets.symmetric(horizontal: padding, vertical: 10),
+              child: Center(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      RotatedBox(
+                        quarterTurns: iconQuarterTurns,
+                        child: SvgPicture.asset(
+                          iconAsset,
+                          width: iconSize,
+                          height: iconSize,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        label,
+                        maxLines: 1,
+                        style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 12,
+                          height: 16 / 12,
+                          fontWeight: FontWeight.w500,
+                          color: _ExploreColors.title,
+                        ),
+                      ),
+                      if (badge != null) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _ExploreColors.border,
+                            borderRadius: BorderRadius.circular(100),
+                          ),
+                          child: Text(
+                            badge!,
+                            style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 10,
+                              height: 16 / 10,
+                              fontWeight: FontWeight.w400,
+                              color: _ExploreColors.title,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ),
-            ],
-          ],
+            );
+          },
         ),
       ),
     );
