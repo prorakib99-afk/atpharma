@@ -41,7 +41,7 @@ class SuccessResetPassScreen extends StatelessWidget {
                     ),
                     SizedBox(height: compact ? 36 : 60),
                     const Text(
-                      'Password Changed!',
+                      'Verification Successful!',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontFamily: 'Poppins',
@@ -55,7 +55,7 @@ class SuccessResetPassScreen extends StatelessWidget {
                     const SizedBox(
                       width: 249,
                       child: Text(
-                        'Your password has been changed successfully',
+                        'Your email has been verified successfully',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontFamily: 'Poppins',
@@ -73,10 +73,7 @@ class SuccessResetPassScreen extends StatelessWidget {
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(16),
                           gradient: const LinearGradient(
-                            colors: [
-                              _SuccessColors.primary,
-                              Color(0xff0968c3),
-                            ],
+                            colors: [_SuccessColors.primary, Color(0xff0968c3)],
                           ),
                         ),
                         child: ElevatedButton(
@@ -96,7 +93,7 @@ class SuccessResetPassScreen extends StatelessWidget {
                             ),
                           ),
                           child: const Text(
-                            'Sign In to your account',
+                            'Go to Home',
                             style: TextStyle(
                               fontFamily: 'Poppins',
                               fontSize: 14,

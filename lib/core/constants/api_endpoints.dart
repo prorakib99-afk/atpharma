@@ -9,8 +9,15 @@ String _pathSegment(Object value) {
 abstract final class AuthEndpoints {
   AuthEndpoints._();
 
-  static const String login = '/auth/login'; // POST
+  static const String login = '/shop/auth/login'; // POST
+  static const String forgotPassword = '/auth/forgot-password'; // POST
+  static const String verifyForgotPasswordCode =
+      '/auth/forgot-password/verify-code'; // POST
+  static const String resetPassword = '/auth/reset-password'; // POST
   static const String verifyLoginCode = '/auth/login/verify-code'; // POST
+  static const String register = '/shop/auth/register'; // POST
+  static const String verifyEmail = '/shop/auth/verify-email'; // POST
+  static const String requestCode = '/shop/auth/request-code'; // POST
   static const String me = '/auth/me'; // GET
   static const String logout = '/auth/logout'; // POST
 }
@@ -267,6 +274,8 @@ abstract final class ShopOrderEndpoints {
 
   static const String config = '/shop/orders/config'; // GET
   static const String createOrder = '/shop/orders'; // POST
+
+  static const String validateCoupon = '/shop/coupons/validate'; // POST
 
   static String pay(String orderNumber) {
     return '/shop/orders/${_pathSegment(orderNumber)}/pay'; // POST

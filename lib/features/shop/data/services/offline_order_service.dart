@@ -32,6 +32,18 @@ final class StorefrontOrderConfig {
   final double deliveryCharge;
 }
 
+final class CouponValidationResult {
+  const CouponValidationResult({
+    required this.valid,
+    this.discount = 0,
+    this.message,
+  });
+
+  final bool valid;
+  final double discount;
+  final String? message;
+}
+
 final class OfflineOrderItem {
   const OfflineOrderItem({required this.productId, required this.quantity});
 
@@ -197,6 +209,67 @@ final class OfflineOrderService extends ChangeNotifier {
       currency: row['currency']! as String,
       taxPercent: (row['tax_percent']! as num).toDouble(),
       deliveryCharge: (row['delivery_charge']! as num).toDouble(),
+    );
+  }
+
+  Future<StorefrontOrderConfig> fetchConfig() async {
+    final Response<dynamic> response = await _dioClient.get<dynamic>(
+      ShopOrderEndpoints.config,
+      options: ApiRequestOptions.publicRequest(allowRetry: false),
+    );
+    final Map<String, dynamic>? root = JsonValueParser.map(response.data);
+    final Map<String, dynamic>? data =
+        JsonValueParser.map(root?['data']) ?? root;
+    if (data == null) return StorefrontOrderConfig.fallback;
+    final StorefrontOrderConfig value = StorefrontOrderConfig(
+      currency: JsonValueParser.string(
+        data['currency'],
+        fallback: StorefrontOrderConfig.fallback.currency,
+      ),
+      taxPercent: JsonValueParser.decimal(data['taxPercent']),
+      deliveryCharge: JsonValueParser.decimal(data['deliveryCharge']),
+    );
+    if (_storageAvailable) {
+      await (await _database.instance)
+          .insert('storefront_config', <String, Object?>{
+            'id': 1,
+            'currency': value.currency,
+            'tax_percent': value.taxPercent,
+            'delivery_charge': value.deliveryCharge,
+            'updated_at': DateTime.now().millisecondsSinceEpoch,
+          }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    return value;
+  }
+
+  Future<CouponValidationResult> validateCoupon({
+    required String code,
+    required double subtotal,
+    required List<OfflineOrderItem> items,
+  }) async {
+    final Response<dynamic> response = await _dioClient.post<dynamic>(
+      ShopOrderEndpoints.validateCoupon,
+      data: <String, Object?>{
+        'code': code.trim().toUpperCase(),
+        'subtotal': subtotal,
+        'items': items
+            .map(
+              (OfflineOrderItem item) => <String, Object?>{
+                'productId': item.productId,
+                'quantity': item.quantity,
+              },
+            )
+            .toList(growable: false),
+      },
+      options: ApiRequestOptions.publicRequest(allowRetry: false),
+    );
+    final Map<String, dynamic>? root = JsonValueParser.map(response.data);
+    final Map<String, dynamic>? data =
+        JsonValueParser.map(root?['data']) ?? root;
+    return CouponValidationResult(
+      valid: data?['valid'] == true,
+      discount: JsonValueParser.decimal(data?['discount']),
+      message: JsonValueParser.string(data?['message']),
     );
   }
 

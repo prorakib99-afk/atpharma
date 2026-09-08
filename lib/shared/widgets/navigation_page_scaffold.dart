@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -55,10 +57,18 @@ class _NavigationBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.paddingOf(context).bottom;
-    return Container(
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        child: Container(
       height: 104 + bottom,
       padding: EdgeInsets.fromLTRB(20, 8, 20, 16 + bottom),
-      color: Colors.transparent,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.35),
+        border: const Border(
+          top: BorderSide(color: Color(0x33FFFFFF), width: 1),
+        ),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -192,6 +202,8 @@ class _NavigationBar extends StatelessWidget {
             ],
           ),
         ],
+      ),
+        ),
       ),
     );
   }

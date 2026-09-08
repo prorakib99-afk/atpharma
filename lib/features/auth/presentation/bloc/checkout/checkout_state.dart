@@ -21,6 +21,12 @@ final class CheckoutState extends Equatable {
     this.fieldErrors = const <String, String>{},
     this.message,
     this.orderNumber,
+    this.fullName = '',
+    this.phone = '',
+    this.addressLine1 = '',
+    this.addressLine2 = '',
+    this.district = '',
+    this.postalCode = '',
   });
 
   final CheckoutStatus status;
@@ -33,6 +39,12 @@ final class CheckoutState extends Equatable {
   final Map<String, String> fieldErrors;
   final String? message;
   final String? orderNumber;
+  final String fullName;
+  final String phone;
+  final String addressLine1;
+  final String addressLine2;
+  final String district;
+  final String postalCode;
 
   bool get isSubmitting => status == CheckoutStatus.submitting;
 
@@ -50,6 +62,12 @@ final class CheckoutState extends Equatable {
     bool clearMessage = false,
     String? orderNumber,
     bool clearOrderNumber = false,
+    String? fullName,
+    String? phone,
+    String? addressLine1,
+    String? addressLine2,
+    String? district,
+    String? postalCode,
   }) {
     return CheckoutState(
       status: status ?? this.status,
@@ -62,6 +80,12 @@ final class CheckoutState extends Equatable {
       fieldErrors: fieldErrors ?? this.fieldErrors,
       message: clearMessage ? null : message ?? this.message,
       orderNumber: clearOrderNumber ? null : orderNumber ?? this.orderNumber,
+      fullName: fullName ?? this.fullName,
+      phone: phone ?? this.phone,
+      addressLine1: addressLine1 ?? this.addressLine1,
+      addressLine2: addressLine2 ?? this.addressLine2,
+      district: district ?? this.district,
+      postalCode: postalCode ?? this.postalCode,
     );
   }
 
@@ -77,5 +101,11 @@ final class CheckoutState extends Equatable {
     fieldErrors,
     message,
     orderNumber,
+    fullName,
+    phone,
+    addressLine1,
+    addressLine2,
+    district,
+    postalCode,
   ];
 }

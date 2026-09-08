@@ -1,15 +1,13 @@
 import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:phone_numbers_parser/phone_numbers_parser.dart';
 
 import '../../../../shop/data/services/checkout_location_service.dart';
-import '../../../../shop/data/services/offline_order_service.dart';
+import '../../../../../core/validation/checkout_validation.dart';
 import 'checkout_event.dart';
 import 'checkout_state.dart';
 
 final class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
-  CheckoutBloc(this._locationService, this._orderService)
-    : super(const CheckoutState()) {
+  CheckoutBloc(this._locationService) : super(const CheckoutState()) {
     on<CheckoutStarted>(_onStarted);
     on<CheckoutCountryChanged>(_onCountryChanged, transformer: restartable());
     on<CheckoutCityChanged>(_onCityChanged);
@@ -17,7 +15,6 @@ final class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
   }
 
   final CheckoutLocationService _locationService;
-  final OfflineOrderService _orderService;
 
   Future<void> _onStarted(
     CheckoutStarted event,
@@ -69,6 +66,7 @@ final class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
       final List<String> cities = await _locationService.citiesForCountry(
         countryCode,
       );
+      if (emit.isDone) return;
       final String? city =
           preferredCity != null && cities.contains(preferredCity)
           ? preferredCity
@@ -103,20 +101,13 @@ final class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
         state.copyWith(
           status: CheckoutStatus.failure,
           fieldErrors: errors,
-          message: 'Please complete all required shipping details.',
+          message: 'Please correct the highlighted shipping details.',
           clearOrderNumber: true,
         ),
       );
       return;
     }
 
-    final IsoCode isoCode = IsoCode.values.firstWhere(
-      (IsoCode value) => value.name == state.countryCode,
-    );
-    final PhoneNumber phone = PhoneNumber.parse(
-      event.phone.trim(),
-      destinationCountry: isoCode,
-    );
     emit(
       state.copyWith(
         status: CheckoutStatus.submitting,
@@ -126,51 +117,18 @@ final class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
       ),
     );
 
-    try {
-      final String address = <String>[
-        event.addressLine1.trim(),
-        if (event.addressLine2.trim().isNotEmpty) event.addressLine2.trim(),
-        event.district.trim(),
-        event.postalCode.trim(),
-        state.countryName,
-      ].join(', ');
-      final String orderNumber = await _orderService.createOrder(
-        OfflineOrderDraft(
-          items: event.items
-              .map(
-                (item) => OfflineOrderItem(
-                  productId: item.product.id ?? '',
-                  quantity: item.quantity,
-                ),
-              )
-              .toList(growable: false),
-          shippingName: event.fullName,
-          shippingPhone: phone.international,
-          shippingAddress: address,
-          shippingArea: event.district,
-          shippingCity: state.city,
-          paymentMethod: 'stripe',
-          notes:
-              'Postal code: ${event.postalCode.trim()}; '
-              'Country: ${state.countryName}',
-        ),
-      );
-      emit(
-        state.copyWith(
-          status: CheckoutStatus.success,
-          orderNumber: orderNumber,
-          clearMessage: true,
-        ),
-      );
-    } catch (error) {
-      emit(
-        state.copyWith(
-          status: CheckoutStatus.failure,
-          message: _messageFor(error),
-          clearOrderNumber: true,
-        ),
-      );
-    }
+    emit(
+      state.copyWith(
+        status: CheckoutStatus.success,
+        fullName: event.fullName,
+        phone: event.phone,
+        addressLine1: event.addressLine1,
+        addressLine2: event.addressLine2,
+        district: event.district,
+        postalCode: event.postalCode,
+        clearMessage: true,
+      ),
+    );
   }
 
   Map<String, String> _validate(CheckoutSubmitted event) {
@@ -182,12 +140,14 @@ final class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
     )) {
       errors['items'] = 'A cart item is missing its product ID.';
     }
-    if (event.fullName.trim().length < 2) {
-      errors['fullName'] = 'Enter your full name.';
-    }
-    if (!_isValidPhone(event.phone)) {
-      errors['phone'] = 'Enter a valid ${state.countryName} phone number.';
-    }
+    final String? nameError = CheckoutValidation.fullName(event.fullName);
+    if (nameError != null) errors['fullName'] = nameError;
+    final String? phoneError = CheckoutValidation.phone(
+      event.phone,
+      countryCode: state.countryCode,
+      countryName: state.countryName,
+    );
+    if (phoneError != null) errors['phone'] = phoneError;
     if (state.countryCode.trim().isEmpty) {
       errors['country'] = 'Select a country.';
     }
@@ -202,21 +162,6 @@ final class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
       errors['postalCode'] = 'Enter your postal code.';
     }
     return errors;
-  }
-
-  bool _isValidPhone(String value) {
-    try {
-      final IsoCode isoCode = IsoCode.values.firstWhere(
-        (IsoCode code) => code.name == state.countryCode,
-      );
-      final PhoneNumber phone = PhoneNumber.parse(
-        value.trim(),
-        destinationCountry: isoCode,
-      );
-      return phone.isoCode == isoCode && phone.isValid();
-    } catch (_) {
-      return false;
-    }
   }
 
   String _messageFor(Object error) {

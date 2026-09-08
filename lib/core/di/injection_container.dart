@@ -1,4 +1,8 @@
 import 'dart:async';
+import '../../features/auth/domain/usecases/forgot_password_use_case.dart';
+import '../../features/auth/presentation/bloc/recovery/recovery_bloc.dart';
+import '../../features/auth/domain/usecases/registration_use_cases.dart';
+import '../../features/auth/presentation/bloc/registration/registration_bloc.dart';
 
 import 'package:atpharma/features/shop/domain/repositories/shop_product_repository_impl.dart';
 import 'package:dio/dio.dart';
@@ -10,6 +14,7 @@ import '../../features/auth/domain/usecases/login_use_case.dart';
 import '../../features/auth/domain/usecases/logout_use_case.dart';
 import '../../features/auth/presentation/bloc/login/login_bloc.dart';
 import '../../features/auth/presentation/bloc/checkout/checkout_bloc.dart';
+import '../../features/auth/presentation/bloc/review_order/review_order_bloc.dart';
 import '../../features/shop/data/services/checkout_location_service.dart';
 import '../../features/shop/data/datasources/shop_product_remote_data_source.dart';
 import '../../features/shop/data/services/offline_order_service.dart';
@@ -117,6 +122,31 @@ Future<void> configureDependencies() async {
         sessionManager: sl<SessionManager>(),
       ),
     )
+    ..registerLazySingleton<ForgotPasswordUseCase>(
+      () => ForgotPasswordUseCase(repository: sl<AuthRepository>()),
+    )
+    ..registerFactory<RecoveryBloc>(
+      () => RecoveryBloc(
+        forgotPasswordUseCase: sl<ForgotPasswordUseCase>(),
+        repository: sl<AuthRepository>(),
+      ),
+    )
+    ..registerLazySingleton<RegisterUseCase>(
+      () => RegisterUseCase(repository: sl<AuthRepository>()),
+    )
+    ..registerLazySingleton<VerifyCodeUseCase>(
+      () => VerifyCodeUseCase(repository: sl<AuthRepository>()),
+    )
+    ..registerLazySingleton<ResendRegistrationCodeUseCase>(
+      () => ResendRegistrationCodeUseCase(repository: sl<AuthRepository>()),
+    )
+    ..registerFactory<RegistrationBloc>(
+      () => RegistrationBloc(
+        registerUseCase: sl<RegisterUseCase>(),
+        verifyCodeUseCase: sl<VerifyCodeUseCase>(),
+        resendCodeUseCase: sl<ResendRegistrationCodeUseCase>(),
+      ),
+    )
     ..registerLazySingleton<LoginUseCase>(
       () => LoginUseCase(repository: sl<AuthRepository>()),
     )
@@ -127,10 +157,10 @@ Future<void> configureDependencies() async {
       () => LoginBloc(loginUseCase: sl<LoginUseCase>()),
     )
     ..registerFactory<CheckoutBloc>(
-      () => CheckoutBloc(
-        sl<CheckoutLocationService>(),
-        sl<OfflineOrderService>(),
-      ),
+      () => CheckoutBloc(sl<CheckoutLocationService>()),
+    )
+    ..registerFactory<ReviewOrderBloc>(
+      () => ReviewOrderBloc(sl<OfflineOrderService>()),
     );
 
   /*

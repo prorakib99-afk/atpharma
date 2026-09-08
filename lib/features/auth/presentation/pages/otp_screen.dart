@@ -8,7 +8,9 @@ import '../../../../core/routes/app_routes.dart';
 class OtpScreen extends StatefulWidget {
   const OtpScreen({
     super.key,
-    this.destination = '+880123-56*****',
+    this.destination = '',
+    this.isLoading = false,
+    this.resendGeneration = 0,
     this.onVerify,
     this.onResend,
   });
@@ -16,6 +18,8 @@ class OtpScreen extends StatefulWidget {
   static const String routeName = '/otp';
 
   final String destination;
+  final bool isLoading;
+  final int resendGeneration;
   final Future<void> Function(String code)? onVerify;
   final Future<void> Function()? onResend;
 
@@ -24,11 +28,21 @@ class OtpScreen extends StatefulWidget {
 }
 
 class _OtpScreenState extends State<OtpScreen> {
-  final _controllers = List.generate(4, (_) => TextEditingController());
-  final _focusNodes = List.generate(4, (_) => FocusNode());
+  final _controllers = List.generate(6, (_) => TextEditingController());
+  final _focusNodes = List.generate(6, (_) => FocusNode());
   Timer? _timer;
   int _secondsLeft = 90;
-  bool _isVerifying = false;
+  @override
+  void didUpdateWidget(covariant OtpScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.resendGeneration != widget.resendGeneration) {
+      for (final controller in _controllers) {
+        controller.clear();
+      }
+      _focusNodes.first.requestFocus();
+      _startTimer();
+    }
+  }
 
   @override
   void initState() {
@@ -71,16 +85,21 @@ class _OtpScreenState extends State<OtpScreen> {
 
   void _onChanged(int index, String value) {
     if (value.length > 1) {
-      final digits = value.replaceAll(RegExp(r'\D'), '').split('').take(4);
+      final digits = value.replaceAll(RegExp(r'\D'), '').split('').take(6);
       var target = 0;
       for (final digit in digits) {
         _controllers[target++].text = digit;
       }
-      final focusIndex = target <= 1 ? 0 : target >= 4 ? 3 : target - 1;
+      final focusIndex = target <= 1
+          ? 0
+          : target >= 6
+          ? 5
+          : target - 1;
       _focusNodes[focusIndex].requestFocus();
+      setState(() {});
       return;
     }
-    if (value.isNotEmpty && index < 3) {
+    if (value.isNotEmpty && index < 5) {
       _focusNodes[index + 1].requestFocus();
     } else if (value.isEmpty && index > 0) {
       _focusNodes[index - 1].requestFocus();
@@ -89,31 +108,30 @@ class _OtpScreenState extends State<OtpScreen> {
   }
 
   Future<void> _verify() async {
-    if (_code.length != 4 || _isVerifying) {
+    if (widget.isLoading) return;
+    if (_code.length != 6) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter the 4-digit verification code.')),
+        const SnackBar(content: Text('Enter the 6-digit verification code.')),
+      );
+      return;
+    }
+    if (widget.onVerify == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Please request a verification code from Sign In or Sign Up.',
+          ),
+        ),
       );
       return;
     }
     FocusScope.of(context).unfocus();
-    setState(() => _isVerifying = true);
-    try {
-      await widget.onVerify?.call(_code);
-      if (!mounted) return;
-      await Navigator.of(context).pushNamed(AppRoutes.resetPassword);
-    } finally {
-      if (mounted) setState(() => _isVerifying = false);
-    }
+    await widget.onVerify!(_code);
   }
 
   Future<void> _resend() async {
-    if (_secondsLeft > 0) return;
-    await widget.onResend?.call();
-    for (final controller in _controllers) {
-      controller.clear();
-    }
-    _focusNodes.first.requestFocus();
-    _startTimer();
+    if (_secondsLeft > 0 || widget.isLoading || widget.onResend == null) return;
+    await widget.onResend!();
   }
 
   @override
@@ -143,7 +161,8 @@ class _OtpScreenState extends State<OtpScreen> {
                   constraints: BoxConstraints(
                     minHeight: constraints.maxHeight - (compact ? 32 : 46),
                   ),
-                  child: IntrinsicHeight(
+                  child: Padding(
+                    padding: EdgeInsets.zero,
                     child: Column(
                       children: [
                         Image.asset(
@@ -165,20 +184,24 @@ class _OtpScreenState extends State<OtpScreen> {
                         ),
                         const SizedBox(height: 24),
                         _VerifyButton(
-                          loading: _isVerifying,
+                          loading: widget.isLoading,
                           onPressed: _verify,
                         ),
                         const SizedBox(height: 16),
                         _ResendButton(
-                          enabled: _secondsLeft == 0,
+                          enabled:
+                              _secondsLeft == 0 &&
+                              !widget.isLoading &&
+                              widget.onResend != null,
                           onPressed: _resend,
                         ),
-                        const Spacer(),
                         const SizedBox(height: 36),
                         TextButton.icon(
-                          onPressed: () => Navigator.of(context).popUntil(
-                            (route) => route.settings.name == AppRoutes.login,
-                          ),
+                          onPressed: () =>
+                              Navigator.of(context).pushNamedAndRemoveUntil(
+                                AppRoutes.login,
+                                (route) => route.isFirst,
+                              ),
                           icon: const Icon(
                             Icons.arrow_back_ios_new_rounded,
                             size: 15,
@@ -219,7 +242,7 @@ class _OtpHeading extends StatelessWidget {
         const SizedBox(
           width: 249,
           child: Text(
-            'Enter 4-digit\nVerification Code',
+            'Enter 6-digit\nVerification Code',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontFamily: 'Poppins',
@@ -237,7 +260,8 @@ class _OtpHeading extends StatelessWidget {
             TextSpan(
               children: [
                 TextSpan(
-                  text: 'Code sent to $destination. This code\nwill expire in ',
+                  text:
+                      'Check your email for the code sent for $destination.\nResend available in ',
                 ),
                 TextSpan(
                   text: timerText,
@@ -277,11 +301,15 @@ class _OtpFields extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(4, (index) {
+      children: List.generate(6, (index) {
         return Padding(
           padding: EdgeInsets.only(left: index == 0 ? 0 : 8),
           child: SizedBox(
-            width: 48,
+            width:
+                (MediaQuery.sizeOf(context).width - 88)
+                    .clamp(180, 288)
+                    .toDouble() /
+                6,
             height: 48,
             child: TextField(
               controller: controllers[index],
@@ -289,7 +317,7 @@ class _OtpFields extends StatelessWidget {
               autofocus: index == 0,
               keyboardType: TextInputType.number,
               textAlign: TextAlign.center,
-              maxLength: index == 0 ? 4 : 1,
+              maxLength: index == 0 ? 6 : 1,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               onChanged: (value) => onChanged(index, value),
               style: const TextStyle(

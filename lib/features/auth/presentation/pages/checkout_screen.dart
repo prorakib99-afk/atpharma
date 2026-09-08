@@ -1,5 +1,8 @@
 import 'package:country_picker/country_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../../../../core/validation/checkout_validation.dart';
+import '../../../../core/validation/checkout_phone_input_formatter.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/routes/app_routes.dart';
@@ -10,6 +13,7 @@ import '../bloc/checkout/checkout_state.dart';
 import 'favorite_header_button.dart';
 import 'floating_profile_screen.dart';
 import 'notification_screen.dart';
+import 'review_order_screen.dart';
 import 'screen_product_details.dart';
 
 void _openNotifications(BuildContext context) {
@@ -29,10 +33,11 @@ void _openNotifications(BuildContext context) {
 }
 
 class CheckoutScreen extends StatefulWidget {
-  const CheckoutScreen({super.key, this.purchaseItems});
+  const CheckoutScreen({super.key, this.purchaseItems, this.initialArguments});
 
   static const String routeName = '/checkout';
   final List<ProductCartItem>? purchaseItems;
+  final ReviewOrderArguments? initialArguments;
 
   @override
   State<CheckoutScreen> createState() => _CheckoutScreenState();
@@ -45,6 +50,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final TextEditingController _address2Controller = TextEditingController();
   final TextEditingController _districtController = TextEditingController();
   final TextEditingController _postalCodeController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    final ReviewOrderArguments? initial = widget.initialArguments;
+    if (initial != null) {
+      _fullNameController.text = initial.fullName;
+      _phoneController.text = initial.phone;
+      _address1Controller.text = initial.addressLine1;
+      _address2Controller.text = initial.addressLine2;
+      _districtController.text = initial.district;
+      _postalCodeController.text = initial.postalCode;
+    }
+  }
 
   List<ProductCartItem> get _items =>
       widget.purchaseItems ?? ProductCart.instance.items;
@@ -75,10 +94,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  void _selectCountry() {
+  void _selectCountry({bool forPhone = false}) {
     showCountryPicker(
       context: context,
-      showPhoneCode: true,
+      showPhoneCode: forPhone,
       favorite: const <String>['SA', 'AE', 'BD', 'IN', 'GB', 'US'],
       countryListTheme: CountryListThemeData(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -140,9 +159,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           previous.message != current.message,
       listener: (BuildContext context, CheckoutState state) {
         if (state.status == CheckoutStatus.success) {
-          Navigator.of(
-            context,
-          ).pushNamed(AppRoutes.stripePayment, arguments: widget.purchaseItems);
+          Navigator.of(context).pushNamed(
+            AppRoutes.stripePayment,
+            arguments: ReviewOrderArguments(
+              purchaseItems: widget.purchaseItems,
+              fullName: state.fullName,
+              phone: state.phone,
+              addressLine1: state.addressLine1,
+              addressLine2: state.addressLine2,
+              district: state.district,
+              postalCode: state.postalCode,
+              countryName: state.countryName,
+              city: state.city,
+            ),
+          );
         } else if (state.status == CheckoutStatus.failure &&
             state.message != null) {
           ScaffoldMessenger.of(
@@ -211,7 +241,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                     _PhoneInputField(
                                       controller: _phoneController,
                                       state: state,
-                                      onCountryTap: _selectCountry,
+                                      onCountryTap: () =>
+                                          _selectCountry(forPhone: true),
                                       errorText: state.fieldErrors['phone'],
                                     ),
                                     const SizedBox(height: 16),
@@ -220,10 +251,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                         label: 'Country',
                                         value: state.countryName,
                                         required: true,
-                                        leading: Text(
-                                          state.flagEmoji,
-                                          style: const TextStyle(fontSize: 18),
-                                        ),
                                         onTap: _selectCountry,
                                         errorText: state.fieldErrors['country'],
                                       ),
@@ -664,60 +691,58 @@ class _PhoneInputField extends StatelessWidget {
   Widget build(BuildContext context) {
     final isSmall = MediaQuery.sizeOf(context).width <= 340;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const _FieldLabel(label: 'Phone Number', required: true),
-        const SizedBox(height: 4),
-        Container(
-          height: 44,
-          padding: EdgeInsets.symmetric(horizontal: isSmall ? 10 : 16),
-          decoration: BoxDecoration(
-            color: _CheckoutColors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: _CheckoutColors.border, width: 1),
-          ),
-          child: Row(
-            children: [
-              InkWell(
-                onTap: onCountryTap,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    Text(state.flagEmoji, style: const TextStyle(fontSize: 20)),
-                    const SizedBox(width: 4),
-                    const Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      size: 20,
-                      color: _CheckoutColors.title,
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: controller,
+      builder: (context, value, child) {
+        final errorText = value.text.isEmpty
+            ? this.errorText
+            : CheckoutValidation.phone(
+                value.text,
+                countryCode: state.countryCode,
+                countryName: state.countryName,
+              );
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _FieldLabel(label: 'Phone Number', required: true),
+            const SizedBox(height: 4),
+            Container(
+              height: 44,
+              padding: EdgeInsets.symmetric(horizontal: isSmall ? 10 : 16),
+              decoration: BoxDecoration(
+                color: _CheckoutColors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: errorText == null
+                      ? _CheckoutColors.border
+                      : _CheckoutColors.danger,
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  InkWell(
+                    onTap: onCountryTap,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Text(
+                          state.flagEmoji,
+                          style: const TextStyle(fontSize: 20),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          size: 20,
+                          color: _CheckoutColors.title,
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                '+${state.phoneCode}',
-                style: const TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 14,
-                  height: 20 / 14,
-                  fontWeight: FontWeight.w400,
-                  color: _CheckoutColors.muted,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Container(width: 1, height: 24, color: _CheckoutColors.border),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextField(
-                  controller: controller,
-                  keyboardType: TextInputType.phone,
-                  textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    isDense: true,
-                    hintText: 'Enter phone number',
-                    hintStyle: TextStyle(
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '+${state.phoneCode}',
+                    style: const TextStyle(
                       fontFamily: 'Poppins',
                       fontSize: 14,
                       height: 20 / 14,
@@ -725,23 +750,52 @@ class _PhoneInputField extends StatelessWidget {
                       color: _CheckoutColors.muted,
                     ),
                   ),
-                  style: const TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 14,
-                    height: 20 / 14,
-                    fontWeight: FontWeight.w400,
-                    color: _CheckoutColors.title,
+                  const SizedBox(width: 10),
+                  Container(
+                    width: 1,
+                    height: 24,
+                    color: _CheckoutColors.border,
                   ),
-                ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: TextField(
+                      controller: controller,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: <TextInputFormatter>[
+                        CheckoutPhoneInputFormatter(state.countryCode),
+                      ],
+                      textInputAction: TextInputAction.next,
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        isDense: true,
+                        hintText: 'Number without country code',
+                        hintStyle: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 14,
+                          height: 20 / 14,
+                          fontWeight: FontWeight.w400,
+                          color: _CheckoutColors.muted,
+                        ),
+                      ),
+                      style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 14,
+                        height: 20 / 14,
+                        fontWeight: FontWeight.w400,
+                        color: _CheckoutColors.title,
+                      ),
+                    ),
+                  ),
+                ],
               ),
+            ),
+            if (errorText != null) ...<Widget>[
+              const SizedBox(height: 6),
+              Text(errorText, style: _CheckoutInputDecoration.errorStyle),
             ],
-          ),
-        ),
-        if (errorText != null) ...<Widget>[
-          const SizedBox(height: 6),
-          Text(errorText!, style: _CheckoutInputDecoration.errorStyle),
-        ],
-      ],
+          ],
+        );
+      },
     );
   }
 }
@@ -752,7 +806,6 @@ class _SelectField extends StatelessWidget {
     required this.value,
     this.required = false,
     this.onTap,
-    this.leading,
     this.loading = false,
     this.errorText,
   });
@@ -761,7 +814,6 @@ class _SelectField extends StatelessWidget {
   final String value;
   final bool required;
   final VoidCallback? onTap;
-  final Widget? leading;
   final bool loading;
   final String? errorText;
 
@@ -785,10 +837,6 @@ class _SelectField extends StatelessWidget {
             ),
             child: Row(
               children: [
-                if (leading != null) ...<Widget>[
-                  leading!,
-                  const SizedBox(width: 8),
-                ],
                 Expanded(
                   child: Text(
                     value,
@@ -796,8 +844,8 @@ class _SelectField extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontFamily: 'Poppins',
-                      fontSize: 14,
-                      height: 20 / 14,
+                      fontSize: 12,
+                      height: 16 / 12,
                       fontWeight: FontWeight.w400,
                       color: _CheckoutColors.title,
                     ),

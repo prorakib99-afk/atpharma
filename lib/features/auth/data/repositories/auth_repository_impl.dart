@@ -26,8 +26,9 @@ final class AuthRepositoryImpl implements AuthRepository {
         password: password,
       );
       final bool requiresTwoFactor = json['requiresTwoFactor'] == true;
-      final Map<String, dynamic> user = json['user'] is Map
-          ? Map<String, dynamic>.from(json['user'] as Map)
+      final Object? profile = json['user'] ?? json['customer'];
+      final Map<String, dynamic> user = profile is Map
+          ? Map<String, dynamic>.from(profile)
           : <String, dynamic>{};
       final String? token = json['accessToken']?.toString().trim();
 
@@ -53,6 +54,130 @@ final class AuthRepositoryImpl implements AuthRepository {
       return AppSuccess<AuthSession>(session);
     } catch (error) {
       return AppError<AuthSession>(FailureMapper.fromException(error));
+    }
+  }
+
+  @override
+  Future<AppResult<void>> register({
+    required String name,
+    required String phone,
+    required String email,
+    required String password,
+  }) async {
+    try {
+      await _remoteDataSource.register(
+        name: name,
+        phone: phone,
+        email: email,
+        password: password,
+      );
+      return const AppSuccess<void>(null);
+    } catch (error) {
+      return AppError<void>(FailureMapper.fromException(error));
+    }
+  }
+
+  @override
+  Future<AppResult<AuthSession>> verifyCode({
+    required String identifier,
+    required String code,
+    required bool registration,
+    required bool rememberMe,
+  }) async {
+    try {
+      final response = await _remoteDataSource.verifyCode(
+        identifier: identifier,
+        code: code,
+        registration: registration,
+      );
+      final json = response['data'] is Map
+          ? Map<String, dynamic>.from(response['data'] as Map)
+          : response;
+      final token =
+          json['accessToken'] ?? json['access_token'] ?? json['token'];
+      final profile = json['user'] ?? json['customer'];
+      if (token is! String ||
+          token.trim().isEmpty ||
+          profile is! Map ||
+          profile.isEmpty ||
+          json['requiresTwoFactor'] == true) {
+        throw const FormatException(
+          'Incomplete verification response. Please sign in again.',
+        );
+      }
+      final user = Map<String, dynamic>.from(profile);
+      await _sessionManager.saveAuthenticatedSession(
+        accessToken: token,
+        user: user,
+        rememberMe: rememberMe,
+        identifier: identifier,
+      );
+      return AppSuccess<AuthSession>(
+        AuthSession(
+          requiresTwoFactor: false,
+          accessToken: token,
+          user: user,
+          message: json['message']?.toString(),
+        ),
+      );
+    } catch (error) {
+      return AppError<AuthSession>(FailureMapper.fromException(error));
+    }
+  }
+
+  @override
+  Future<AppResult<void>> resendRegistrationCode({
+    required String email,
+  }) async {
+    try {
+      await _remoteDataSource.resendRegistrationCode(email: email);
+      return const AppSuccess<void>(null);
+    } catch (error) {
+      return AppError<void>(FailureMapper.fromException(error));
+    }
+  }
+
+  @override
+  Future<AppResult<String>> forgotPassword({required String email}) async {
+    try {
+      return AppSuccess<String>(
+        await _remoteDataSource.forgotPassword(email: email),
+      );
+    } catch (error) {
+      return AppError<String>(FailureMapper.fromException(error));
+    }
+  }
+
+  @override
+  Future<AppResult<String>> verifyForgotPasswordCode({
+    required String email,
+    required String code,
+  }) async {
+    try {
+      return AppSuccess<String>(
+        await _remoteDataSource.verifyForgotPasswordCode(
+          email: email,
+          code: code,
+        ),
+      );
+    } catch (error) {
+      return AppError<String>(FailureMapper.fromException(error));
+    }
+  }
+
+  @override
+  Future<AppResult<void>> resetPassword({
+    required String resetToken,
+    required String password,
+  }) async {
+    try {
+      await _remoteDataSource.resetPassword(
+        resetToken: resetToken,
+        password: password,
+      );
+      return const AppSuccess<void>(null);
+    } catch (error) {
+      return AppError<void>(FailureMapper.fromException(error));
     }
   }
 

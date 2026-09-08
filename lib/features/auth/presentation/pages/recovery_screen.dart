@@ -2,14 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-import '../../../../core/routes/app_routes.dart';
+import '../../../../core/validation/email_validation.dart';
 
 class RecoveryScreen extends StatefulWidget {
-  const RecoveryScreen({super.key, this.onSendCode});
+  const RecoveryScreen({
+    super.key,
+    this.onSendCode,
+    this.isLoading = false,
+    this.message,
+    this.isError = false,
+  });
 
   static const String routeName = '/recovery';
 
-  final Future<void> Function(String value, bool usePhone)? onSendCode;
+  final ValueChanged<String>? onSendCode;
+  final bool isLoading;
+  final String? message;
+  final bool isError;
 
   @override
   State<RecoveryScreen> createState() => _RecoveryScreenState();
@@ -18,8 +27,6 @@ class RecoveryScreen extends StatefulWidget {
 class _RecoveryScreenState extends State<RecoveryScreen> {
   final _controller = TextEditingController();
   final _formKey = GlobalKey<FormState>();
-  bool _usePhone = true;
-  bool _isSubmitting = false;
 
   @override
   void dispose() {
@@ -27,44 +34,10 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
     super.dispose();
   }
 
-  void _changeMethod(bool usePhone) {
-    if (_usePhone == usePhone) return;
-    _formKey.currentState?.reset();
-    setState(() {
-      _usePhone = usePhone;
-      _controller.clear();
-    });
-  }
-
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate() || _isSubmitting) return;
+  void _submit() {
+    if (widget.isLoading || !_formKey.currentState!.validate()) return;
     FocusScope.of(context).unfocus();
-    setState(() => _isSubmitting = true);
-    try {
-      final value = _controller.text.trim();
-      await widget.onSendCode?.call(value, _usePhone);
-      if (!mounted) return;
-      await Navigator.of(context).pushNamed(
-        AppRoutes.otp,
-        arguments: _maskedDestination(value),
-      );
-    } finally {
-      if (mounted) setState(() => _isSubmitting = false);
-    }
-  }
-
-  String _maskedDestination(String value) {
-    if (_usePhone) {
-      final visible = value.length <= 3 ? value : value.substring(0, 3);
-      final hidden = List.filled(value.length - visible.length, '*').join();
-      return '+966 $visible$hidden';
-    }
-    final parts = value.split('@');
-    if (parts.length != 2) return value;
-    final name = parts.first;
-    final visible = name.isEmpty ? '' : name[0];
-    final hidden = List.filled(name.length - visible.length, '*').join();
-    return '$visible$hidden@${parts.last}';
+    widget.onSendCode?.call(_controller.text.trim());
   }
 
   @override
@@ -111,19 +84,30 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
                           SizedBox(height: compact ? 24 : 40),
                           _RecoveryField(
                             controller: _controller,
-                            usePhone: _usePhone,
+                            enabled: !widget.isLoading,
                             onSubmit: _submit,
-                          ),
-                          const SizedBox(height: 12),
-                          _MethodSwitch(
-                            usePhone: _usePhone,
-                            onChanged: _changeMethod,
                           ),
                           const SizedBox(height: 24),
                           _PrimaryButton(
-                            loading: _isSubmitting,
+                            loading: widget.isLoading,
                             onPressed: _submit,
                           ),
+                          if (widget.message != null) ...[
+                            const SizedBox(height: 16),
+                            Semantics(
+                              liveRegion: true,
+                              child: Text(
+                                widget.message!,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: widget.isError
+                                      ? const Color(0xffd92d20)
+                                      : _RecoveryColors.body,
+                                ),
+                              ),
+                            ),
+                          ],
                           const Spacer(),
                           const SizedBox(height: 36),
                           TextButton.icon(
@@ -178,7 +162,7 @@ class _RecoveryHeading extends StatelessWidget {
         SizedBox(
           width: 249,
           child: Text(
-            'Enter your registered phone no. or email to get reset code',
+            'Enter your registered email to receive a verification code',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontFamily: 'Poppins',
@@ -196,57 +180,47 @@ class _RecoveryHeading extends StatelessWidget {
 class _RecoveryField extends StatelessWidget {
   const _RecoveryField({
     required this.controller,
-    required this.usePhone,
+    required this.enabled,
     required this.onSubmit,
   });
 
   final TextEditingController controller;
-  final bool usePhone;
+  final bool enabled;
   final VoidCallback onSubmit;
 
   @override
   Widget build(BuildContext context) {
     return TextFormField(
-      key: ValueKey<bool>(usePhone),
+      enabled: enabled,
+      autofillHints: const [AutofillHints.email],
+      autocorrect: false,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
       controller: controller,
-      keyboardType: usePhone ? TextInputType.phone : TextInputType.emailAddress,
+      keyboardType: TextInputType.emailAddress,
       textInputAction: TextInputAction.done,
-      inputFormatters: usePhone
-          ? <TextInputFormatter>[FilteringTextInputFormatter.digitsOnly]
-          : null,
       onFieldSubmitted: (_) => onSubmit(),
-      validator: (value) {
-        final input = value?.trim() ?? '';
-        if (input.isEmpty) {
-          return usePhone
-              ? 'Enter your registered phone number'
-              : 'Enter your registered email';
-        }
-        if (usePhone && input.length < 8) return 'Enter a valid phone number';
-        if (!usePhone &&
-            !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(input)) {
-          return 'Enter a valid email address';
-        }
-        return null;
-      },
+      validator: EmailValidation.validate,
       style: const TextStyle(
         fontFamily: 'Poppins',
         fontSize: 12,
         color: _RecoveryColors.title,
       ),
       decoration: InputDecoration(
-        hintText: usePhone ? 'Enter phone number' : 'Enter email address',
+        hintText: 'Enter email address',
         hintStyle: const TextStyle(
           fontFamily: 'Poppins',
           fontSize: 12,
           color: _RecoveryColors.muted,
         ),
-        prefixIcon: usePhone ? const _PhonePrefix() : const _EmailPrefix(),
-        prefixIconConstraints: BoxConstraints(
-          minWidth: usePhone ? 116 : 48,
+        prefixIcon: const _EmailPrefix(),
+        prefixIconConstraints: const BoxConstraints(
+          minWidth: 48,
           minHeight: 48,
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         enabledBorder: _border(_RecoveryColors.border),
         focusedBorder: _border(_RecoveryColors.primary, width: 1.2),
         errorBorder: _border(const Color(0xffd92d20)),
@@ -259,48 +233,6 @@ class _RecoveryField extends StatelessWidget {
     return OutlineInputBorder(
       borderRadius: BorderRadius.circular(16),
       borderSide: BorderSide(color: color, width: width),
-    );
-  }
-}
-
-class _PhonePrefix extends StatelessWidget {
-  const _PhonePrefix();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 16, right: 8),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: Image.asset(
-              'assets/images/saudi_flag.png',
-              width: 24,
-              height: 16,
-              fit: BoxFit.cover,
-            ),
-          ),
-          const SizedBox(width: 4),
-          const Icon(
-            Icons.keyboard_arrow_down_rounded,
-            size: 20,
-            color: _RecoveryColors.title,
-          ),
-          const SizedBox(width: 8),
-          const Text(
-            '+966',
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 12,
-              color: _RecoveryColors.muted,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Container(width: 1, height: 18, color: _RecoveryColors.border),
-        ],
-      ),
     );
   }
 }
@@ -321,71 +253,6 @@ class _EmailPrefix extends StatelessWidget {
           colorFilter: const ColorFilter.mode(
             _RecoveryColors.title,
             BlendMode.srcIn,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MethodSwitch extends StatelessWidget {
-  const _MethodSwitch({required this.usePhone, required this.onChanged});
-
-  final bool usePhone;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _MethodItem(
-          label: 'Phone',
-          selected: usePhone,
-          onTap: () => onChanged(true),
-        ),
-        _MethodItem(
-          label: 'Email',
-          selected: !usePhone,
-          onTap: () => onChanged(false),
-        ),
-      ],
-    );
-  }
-}
-
-class _MethodItem extends StatelessWidget {
-  const _MethodItem({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: selected ? _RecoveryColors.primaryLight : Colors.white,
-      borderRadius: BorderRadius.circular(8),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 12,
-              height: 16 / 12,
-              fontWeight: FontWeight.w500,
-              color: selected
-                  ? _RecoveryColors.primary
-                  : _RecoveryColors.title,
-            ),
           ),
         ),
       ),
@@ -461,5 +328,4 @@ abstract final class _RecoveryColors {
   static const Color muted = Color(0xff98a1b3);
   static const Color border = Color(0xffe1e2e6);
   static const Color primary = Color(0xff0b83d9);
-  static const Color primaryLight = Color(0xffe7f3fb);
 }

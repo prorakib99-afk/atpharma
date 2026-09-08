@@ -37,8 +37,15 @@ class _ResetPassScreenState extends State<ResetPassScreen> {
     try {
       await widget.onResetPassword?.call(_passwordController.text);
       if (!mounted) return;
-      await Navigator.of(context).pushReplacementNamed(
-        AppRoutes.resetPasswordSuccess,
+      await Navigator.of(
+        context,
+      ).pushReplacementNamed(AppRoutes.resetPasswordSuccess);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Bad state: ', '')),
+        ),
       );
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
@@ -101,9 +108,8 @@ class _ResetPassScreenState extends State<ResetPassScreen> {
                             hint: 'New Password',
                             controller: _passwordController,
                             obscureText: _hidePassword,
-                            onVisibilityTap: () => setState(
-                              () => _hidePassword = !_hidePassword,
-                            ),
+                            onVisibilityTap: () =>
+                                setState(() => _hidePassword = !_hidePassword),
                             validator: (value) {
                               if ((value ?? '').length < 8) {
                                 return 'Password must be at least 8 characters';
@@ -255,10 +261,7 @@ class _PasswordField extends StatelessWidget {
             enabledBorder: _border(_ResetColors.border),
             focusedBorder: _border(_ResetColors.primary, width: 1.2),
             errorBorder: _border(const Color(0xffd92d20)),
-            focusedErrorBorder: _border(
-              const Color(0xffd92d20),
-              width: 1.2,
-            ),
+            focusedErrorBorder: _border(const Color(0xffd92d20), width: 1.2),
           ),
         ),
       ],

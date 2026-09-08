@@ -45,6 +45,8 @@ final class LoginBloc extends Bloc<LoginEvent, LoginState> {
                 ? LoginStatus.twoFactorRequired
                 : LoginStatus.success,
             message: session.message,
+            identifier: identifier,
+            rememberMe: event.rememberMe,
           ),
         );
       },

@@ -5,6 +5,7 @@ class RegisterScreen extends StatefulWidget {
   const RegisterScreen({
     super.key,
     this.onSignUp,
+    this.isLoading = false,
     this.onGuestTap,
     this.onSignInTap,
     this.onGoogleTap,
@@ -19,6 +20,7 @@ class RegisterScreen extends StatefulWidget {
     String password,
   )?
   onSignUp;
+  final bool isLoading;
   final VoidCallback? onGuestTap;
   final VoidCallback? onSignInTap;
   final VoidCallback? onGoogleTap;
@@ -293,14 +295,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               const SizedBox(height: 28),
                               _AuthButton(
                                 label: 'Sign Up',
+                                loading: widget.isLoading,
                                 backgroundColor: _primary,
                                 textColor: Colors.white,
-                                onTap: () => widget.onSignUp?.call(
-                                  _nameController.text,
-                                  _phoneController.text,
-                                  _emailController.text,
-                                  _passwordController.text,
-                                ),
+                                onTap: widget.isLoading
+                                    ? null
+                                    : () => widget.onSignUp?.call(
+                                        _nameController.text,
+                                        _phoneController.text,
+                                        _emailController.text,
+                                        _passwordController.text,
+                                      ),
                               ),
                               if (widget.onGuestTap != null) ...[
                                 const SizedBox(height: 16),
@@ -496,12 +501,14 @@ class _InputField extends StatelessWidget {
 class _AuthButton extends StatelessWidget {
   const _AuthButton({
     required this.label,
+    this.loading = false,
     required this.backgroundColor,
     required this.textColor,
     required this.onTap,
   });
 
   final String label;
+  final bool loading;
   final Color backgroundColor;
   final Color textColor;
   final VoidCallback? onTap;
@@ -520,14 +527,22 @@ class _AuthButton extends StatelessWidget {
           ),
         ),
         onPressed: onTap,
-        child: Text(
-          label,
-          style: const TextStyle(
-            fontFamily: 'Poppins',
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        child: loading
+            ? SizedBox.square(
+                dimension: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: textColor,
+                ),
+              )
+            : Text(
+                label,
+                style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
       ),
     );
   }

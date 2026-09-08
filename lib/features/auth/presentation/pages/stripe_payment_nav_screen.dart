@@ -27,17 +27,17 @@ void _openNotifications(BuildContext context) {
 }
 
 class StripePaymentNavScreen extends StatefulWidget {
-  const StripePaymentNavScreen({super.key, this.purchaseItems});
+  const StripePaymentNavScreen({super.key, required this.reviewArguments});
 
   static const String routeName = '/stripe-payment';
-  final List<ProductCartItem>? purchaseItems;
+  final ReviewOrderArguments reviewArguments;
 
   @override
   State<StripePaymentNavScreen> createState() => _StripePaymentNavScreenState();
 }
 
 class _StripePaymentNavScreenState extends State<StripePaymentNavScreen> {
-  String _selectedPaymentMethod = 'Stripe';
+  String _selectedPaymentMethod = 'COD';
   bool _saveCard = true;
   bool _showReview = false;
 
@@ -46,7 +46,7 @@ class _StripePaymentNavScreenState extends State<StripePaymentNavScreen> {
     final bottomSafe = MediaQuery.paddingOf(context).bottom;
     final pagePadding = _PaymentResponsive.pagePadding(context);
     final List<ProductCartItem> items =
-        widget.purchaseItems ?? ProductCart.instance.items;
+        widget.reviewArguments.purchaseItems ?? ProductCart.instance.items;
     final int itemCount = items.fold<int>(
       0,
       (int sum, ProductCartItem item) => sum + item.quantity,
@@ -102,8 +102,10 @@ class _StripePaymentNavScreenState extends State<StripePaymentNavScreen> {
                           if (_showReview)
                             ReviewOrderScreen(
                               embedded: true,
-                              purchaseItems: widget.purchaseItems,
+                              purchaseItems:
+                                  widget.reviewArguments.purchaseItems,
                               paymentMethod: _selectedPaymentMethod,
+                              arguments: widget.reviewArguments,
                               onBack: () {
                                 setState(() {
                                   _showReview = false;
@@ -513,35 +515,17 @@ class _PaymentMethodSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const List<_PaymentMethodData> methods = <_PaymentMethodData>[
-      _PaymentMethodData(
-        name: 'Stripe',
-        asset: 'assets/icons/stripe_icon.svg',
-        logoBackgroundColor: Color(0xff635bff),
-        logoPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      ),
-      _PaymentMethodData(name: 'Mada', asset: 'assets/icons/mada_icon.svg'),
-      _PaymentMethodData(
-        name: 'COD',
-        asset: 'assets/icons/cod_icon.png',
-        logoBackgroundColor: Color(0xfff59e0b),
-        logoPadding: EdgeInsets.all(6),
-      ),
-    ];
+    const _PaymentMethodData cod = _PaymentMethodData(
+      name: 'COD',
+      asset: 'assets/icons/cod_icon.png',
+      logoBackgroundColor: Color(0xfff59e0b),
+      logoPadding: EdgeInsets.all(6),
+    );
 
-    return Row(
-      children: [
-        for (int index = 0; index < methods.length; index++) ...[
-          Expanded(
-            child: _PaymentMethodCard(
-              data: methods[index],
-              selected: selectedPaymentMethod == methods[index].name,
-              onTap: () => onChanged(methods[index].name),
-            ),
-          ),
-          if (index != methods.length - 1) const SizedBox(width: 8),
-        ],
-      ],
+    return _PaymentMethodCard(
+      data: cod,
+      selected: selectedPaymentMethod == cod.name,
+      onTap: () => onChanged(cod.name),
     );
   }
 }

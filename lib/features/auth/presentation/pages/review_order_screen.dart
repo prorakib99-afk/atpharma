@@ -1,20 +1,41 @@
 import 'dart:math' as math;
 
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../core/routes/app_routes.dart';
+import '../../../../core/utils/currency_display.dart';
+import '../bloc/review_order/review_order_bloc.dart';
+import '../bloc/review_order/review_order_event.dart';
+import '../bloc/review_order/review_order_state.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../shop/data/services/offline_order_service.dart';
 import 'screen_product_details.dart';
 
 class ReviewOrderArguments {
   const ReviewOrderArguments({
     this.purchaseItems,
-    this.paymentMethod = 'Stripe',
+    this.paymentMethod = 'COD',
+    this.fullName = '',
+    this.phone = '',
+    this.addressLine1 = '',
+    this.addressLine2 = '',
+    this.district = '',
+    this.postalCode = '',
+    this.countryName = 'Saudi Arabia',
+    this.city,
   });
 
   final List<ProductCartItem>? purchaseItems;
   final String paymentMethod;
+  final String fullName;
+  final String phone;
+  final String addressLine1;
+  final String addressLine2;
+  final String district;
+  final String postalCode;
+  final String countryName;
+  final String? city;
 }
 
 class ReviewOrderScreen extends StatefulWidget {
@@ -23,7 +44,8 @@ class ReviewOrderScreen extends StatefulWidget {
     this.embedded = false,
     this.onBack,
     this.purchaseItems,
-    this.paymentMethod = 'Stripe',
+    this.paymentMethod = 'COD',
+    this.arguments,
   });
 
   static const String routeName = '/review-order';
@@ -31,6 +53,7 @@ class ReviewOrderScreen extends StatefulWidget {
   final VoidCallback? onBack;
   final List<ProductCartItem>? purchaseItems;
   final String paymentMethod;
+  final ReviewOrderArguments? arguments;
 
   @override
   State<ReviewOrderScreen> createState() => _ReviewOrderScreenState();
@@ -40,12 +63,34 @@ class _ReviewOrderScreenState extends State<ReviewOrderScreen> {
   final TextEditingController _couponController = TextEditingController();
   String? _couponError;
   bool _couponApplied = false;
+  bool _isEditingItems = false;
+  late List<ProductCartItem> _editableItems;
+
+  @override
+  void initState() {
+    super.initState();
+    _editableItems = List<ProductCartItem>.of(
+      widget.purchaseItems ?? ProductCart.instance.items,
+    );
+    context.read<ReviewOrderBloc>().add(
+      ReviewOrderStarted(items: _offlineItems),
+    );
+  }
+
+  List<OfflineOrderItem> get _offlineItems => _editableItems
+      .map(
+        (ProductCartItem item) => OfflineOrderItem(
+          productId: item.product.id ?? item.id,
+          quantity: item.quantity,
+        ),
+      )
+      .toList(growable: false);
   List<_ReviewOrderItem> get _items {
-    final List<ProductCartItem> cartItems =
-        widget.purchaseItems ?? ProductCart.instance.items;
+    final List<ProductCartItem> cartItems = _editableItems;
     return List<_ReviewOrderItem>.generate(cartItems.length, (int index) {
       final ProductCartItem cartItem = cartItems[index];
       return _ReviewOrderItem(
+        id: cartItem.id,
         index: index + 1,
         title: cartItem.product.name,
         type: cartItem.product.brand,
@@ -63,9 +108,10 @@ class _ReviewOrderScreenState extends State<ReviewOrderScreen> {
     );
   }
 
-  double get _deliveryCharge => 10;
+  double get _deliveryCharge =>
+      context.read<ReviewOrderBloc>().state.config.deliveryCharge;
 
-  double get _discount => _couponApplied ? _subtotal * 0.10 : 0;
+  double get _discount => context.read<ReviewOrderBloc>().state.discount;
 
   double get _totalPayable => _subtotal + _deliveryCharge - _discount;
 
@@ -78,19 +124,20 @@ class _ReviewOrderScreenState extends State<ReviewOrderScreen> {
   void _applyCoupon() {
     FocusScope.of(context).unfocus();
     final code = _couponController.text.trim().toUpperCase();
-
-    setState(() {
-      _couponApplied = code == 'SAVE10';
-      _couponError = code.isEmpty
-          ? 'Please enter a coupon code'
-          : _couponApplied
-          ? null
-          : 'Coupon code is not valid';
-    });
+    context.read<ReviewOrderBloc>().add(
+      ReviewCouponSubmitted(
+        code: code,
+        subtotal: _subtotal,
+        items: _offlineItems,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final ReviewOrderState reviewState = context.watch<ReviewOrderBloc>().state;
+    _couponApplied = reviewState.couponCode != null;
+    _couponError = reviewState.message;
     final bottomSafe = MediaQuery.paddingOf(context).bottom;
     final List<Widget> content = <Widget>[
       Align(
@@ -102,9 +149,11 @@ class _ReviewOrderScreenState extends State<ReviewOrderScreen> {
       const SizedBox(height: 24),
       _OrderItemsCard(
         items: _items,
-        onEdit: widget.purchaseItems == null
-            ? () => Navigator.of(context).pushNamed(AppRoutes.cart)
-            : (widget.onBack ?? () => Navigator.maybePop(context)),
+        isEditing: _isEditingItems,
+        onEdit: () => setState(() => _isEditingItems = !_isEditingItems),
+        onIncrease: _increaseItem,
+        onDecrease: _decreaseItem,
+        onRemove: _removeItem,
       ),
       const SizedBox(height: 14),
       Padding(
@@ -133,7 +182,12 @@ class _ReviewOrderScreenState extends State<ReviewOrderScreen> {
         couponApplied: _couponApplied,
       ),
       const SizedBox(height: 22),
-      const _ShippingAddressCard(),
+      _ShippingAddressCard(
+        name: widget.arguments?.fullName,
+        phone: widget.arguments?.phone,
+        address: _formattedAddress(widget.arguments),
+        onEdit: _editShippingAddress,
+      ),
       const SizedBox(height: 22),
       _PaymentMethodCard(paymentMethod: widget.paymentMethod),
       const SizedBox(height: 22),
@@ -141,38 +195,127 @@ class _ReviewOrderScreenState extends State<ReviewOrderScreen> {
       const SizedBox(height: 28),
       const _TermsText(),
       const SizedBox(height: 22),
-      _PlaceOrderButton(total: _totalPayable),
+      _PlaceOrderButton(
+        total: _totalPayable,
+        isSubmitting: reviewState.status == ReviewOrderStatus.submitting,
+        onPressed: _placeOrder,
+      ),
     ];
 
-    if (widget.embedded) {
-      return Column(children: content);
-    }
-
-    return MediaQuery(
-      data: MediaQuery.of(
-        context,
-      ).copyWith(textScaler: const TextScaler.linear(1)),
-      child: Scaffold(
-        backgroundColor: _ReviewColors.white,
-        resizeToAvoidBottomInset: true,
-        body: SafeArea(
-          bottom: false,
-          child: CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              SliverPadding(
-                padding: EdgeInsets.fromLTRB(
-                  _ReviewResponsive.pagePadding(context),
-                  18,
-                  _ReviewResponsive.pagePadding(context),
-                  24 + bottomSafe,
+    final Widget page = widget.embedded
+        ? Column(children: content)
+        : MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: const TextScaler.linear(1)),
+            child: Scaffold(
+              backgroundColor: _ReviewColors.white,
+              resizeToAvoidBottomInset: true,
+              body: SafeArea(
+                bottom: false,
+                child: CustomScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  slivers: [
+                    SliverPadding(
+                      padding: EdgeInsets.fromLTRB(
+                        _ReviewResponsive.pagePadding(context),
+                        18,
+                        _ReviewResponsive.pagePadding(context),
+                        24 + bottomSafe,
+                      ),
+                      sliver: SliverList(
+                        delegate: SliverChildListDelegate(content),
+                      ),
+                    ),
+                  ],
                 ),
-                sliver: SliverList(delegate: SliverChildListDelegate(content)),
               ),
-            ],
-          ),
+            ),
+          );
+    return BlocListener<ReviewOrderBloc, ReviewOrderState>(
+      listener: (BuildContext context, ReviewOrderState state) {
+        if (state.status == ReviewOrderStatus.success) {
+          Navigator.of(context).pushReplacementNamed(AppRoutes.completedOrder);
+        } else if (state.status == ReviewOrderStatus.failure &&
+            state.message != null) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(state.message!)));
+        }
+      },
+      child: page,
+    );
+  }
+
+  void _increaseItem(String id) {
+    setState(() {
+      final int index = _editableItems.indexWhere((item) => item.id == id);
+      if (index >= 0) {
+        _editableItems[index] = _editableItems[index].copyWith(
+          quantity: _editableItems[index].quantity + 1,
+        );
+      }
+    });
+  }
+
+  void _decreaseItem(String id) {
+    setState(() {
+      final int index = _editableItems.indexWhere((item) => item.id == id);
+      if (index >= 0 && _editableItems[index].quantity > 1) {
+        _editableItems[index] = _editableItems[index].copyWith(
+          quantity: _editableItems[index].quantity - 1,
+        );
+      }
+    });
+  }
+
+  void _removeItem(String id) {
+    setState(() => _editableItems.removeWhere((item) => item.id == id));
+  }
+
+  void _placeOrder() {
+    final ReviewOrderArguments data =
+        widget.arguments ?? const ReviewOrderArguments();
+    final String address = <String>[
+      data.addressLine1,
+      if (data.addressLine2.trim().isNotEmpty) data.addressLine2,
+      data.district,
+      data.postalCode,
+      data.countryName,
+    ].where((value) => value.trim().isNotEmpty).join(', ');
+    context.read<ReviewOrderBloc>().add(
+      ReviewOrderSubmitted(
+        draft: OfflineOrderDraft(
+          items: _offlineItems,
+          shippingName: data.fullName,
+          shippingPhone: data.phone,
+          shippingAddress: address,
+          shippingArea: data.district,
+          shippingCity: data.city,
+          paymentMethod: 'COD',
+          couponCode: context.read<ReviewOrderBloc>().state.couponCode,
         ),
       ),
+    );
+  }
+
+  String _formattedAddress(ReviewOrderArguments? data) {
+    if (data == null) return 'Shipping address not provided';
+    return <String>[
+      data.addressLine1,
+      if (data.addressLine2.trim().isNotEmpty) data.addressLine2,
+      data.district,
+      data.city ?? '',
+      data.countryName,
+    ].where((value) => value.trim().isNotEmpty).join(', ');
+  }
+
+  void _editShippingAddress() {
+    Navigator.of(context).pushNamed(
+      AppRoutes.checkout,
+      arguments:
+          widget.arguments ??
+          ReviewOrderArguments(purchaseItems: _editableItems),
     );
   }
 }
@@ -216,10 +359,21 @@ class _BackButton extends StatelessWidget {
 }
 
 class _OrderItemsCard extends StatelessWidget {
-  const _OrderItemsCard({required this.items, required this.onEdit});
+  const _OrderItemsCard({
+    required this.items,
+    required this.isEditing,
+    required this.onEdit,
+    required this.onIncrease,
+    required this.onDecrease,
+    required this.onRemove,
+  });
 
   final List<_ReviewOrderItem> items;
+  final bool isEditing;
   final VoidCallback onEdit;
+  final ValueChanged<String> onIncrease;
+  final ValueChanged<String> onDecrease;
+  final ValueChanged<String> onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -242,15 +396,18 @@ class _OrderItemsCard extends StatelessWidget {
                   ),
                 ),
               ),
-              _SmallOutlineIconButton(
-                icon: Icons.edit_outlined,
-                onTap: onEdit,
-              ),
+              _SmallOutlineIconButton(icon: Icons.edit_outlined, onTap: onEdit),
             ],
           ),
           const SizedBox(height: 22),
           for (int index = 0; index < items.length; index++) ...[
-            _OrderItemTile(item: items[index]),
+            _OrderItemTile(
+              item: items[index],
+              isEditing: isEditing,
+              onIncrease: onIncrease,
+              onDecrease: onDecrease,
+              onRemove: onRemove,
+            ),
             if (index != items.length - 1) const _ThinDivider(height: 18),
           ],
         ],
@@ -260,9 +417,19 @@ class _OrderItemsCard extends StatelessWidget {
 }
 
 class _OrderItemTile extends StatelessWidget {
-  const _OrderItemTile({required this.item});
+  const _OrderItemTile({
+    required this.item,
+    required this.isEditing,
+    required this.onIncrease,
+    required this.onDecrease,
+    required this.onRemove,
+  });
 
   final _ReviewOrderItem item;
+  final bool isEditing;
+  final ValueChanged<String> onIncrease;
+  final ValueChanged<String> onDecrease;
+  final ValueChanged<String> onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -295,10 +462,7 @@ class _OrderItemTile extends StatelessWidget {
         const SizedBox(width: 10),
         ClipRRect(
           borderRadius: BorderRadius.circular(9),
-          child: _ReviewProductImage(
-            source: item.imageUrl,
-            size: imageSize,
-          ),
+          child: _ReviewProductImage(source: item.imageUrl, size: imageSize),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -387,17 +551,61 @@ class _OrderItemTile extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(width: 10),
-        Text(
-          _ReviewMoney.format(item.totalPrice),
-          style: const TextStyle(
-            fontFamily: 'Poppins',
-            fontSize: 16,
-            height: 22 / 16,
-            fontWeight: FontWeight.w700,
-            color: _ReviewColors.title,
+        if (isEditing) ...[
+          const SizedBox(width: 6),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                onPressed: () => onRemove(item.id),
+                icon: const Icon(Icons.close_rounded),
+                iconSize: 18,
+                color: _ReviewColors.muted,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                tooltip: 'Remove item',
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _QuantityIconButton(
+                    icon: Icons.remove,
+                    onTap: () => onDecrease(item.id),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 5),
+                    child: Text(
+                      '${item.quantity}',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  _QuantityIconButton(
+                    icon: Icons.add,
+                    onTap: () => onIncrease(item.id),
+                  ),
+                ],
+              ),
+              Text(
+                _ReviewMoney.format(item.totalPrice),
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
-        ),
+        ] else
+          Padding(
+            padding: const EdgeInsets.only(left: 6),
+            child: Text(
+              _ReviewMoney.format(item.totalPrice),
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: _ReviewColors.title,
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -416,15 +624,14 @@ class _ReviewProductImage extends StatelessWidget {
         uri != null &&
         (uri.scheme == 'http' || uri.scheme == 'https') &&
         uri.host.isNotEmpty;
-    final Widget fallback = Container(
+    final Widget fallback = Image.asset(
+      'assets/images/dummy_image.png',
       width: size,
       height: size,
-      color: _ReviewColors.primaryLight,
-      child: const Icon(
-        Icons.medication_outlined,
-        color: _ReviewColors.primary,
-      ),
+      fit: BoxFit.cover,
     );
+
+    if (source.trim().isEmpty) return fallback;
 
     return isNetwork
         ? Image.network(
@@ -441,6 +648,31 @@ class _ReviewProductImage extends StatelessWidget {
             fit: BoxFit.cover,
             errorBuilder: (_, _, _) => fallback,
           );
+  }
+}
+
+class _QuantityIconButton extends StatelessWidget {
+  const _QuantityIconButton({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        width: 24,
+        height: 24,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          border: Border.all(color: _ReviewColors.border),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Icon(icon, size: 14, color: _ReviewColors.title),
+      ),
+    );
   }
 }
 
@@ -504,7 +736,9 @@ class _CouponCodeField extends StatelessWidget {
                     decoration: InputDecoration(
                       isDense: true,
                       border: InputBorder.none,
-                      hintText: isApplied ? 'Coupon applied' : 'Enter Coupon Code',
+                      hintText: isApplied
+                          ? 'Coupon applied'
+                          : 'Enter Coupon Code',
                       hintStyle: TextStyle(
                         fontFamily: 'Poppins',
                         fontSize: 13,
@@ -577,10 +811,7 @@ class _DashedRoundedBorderPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final path = Path()
       ..addRRect(
-        RRect.fromRectAndRadius(
-          Offset.zero & size,
-          Radius.circular(radius),
-        ),
+        RRect.fromRectAndRadius(Offset.zero & size, Radius.circular(radius)),
       );
     final paint = Paint()
       ..color = color
@@ -801,7 +1032,17 @@ class _SavingNotice extends StatelessWidget {
 }
 
 class _ShippingAddressCard extends StatelessWidget {
-  const _ShippingAddressCard();
+  const _ShippingAddressCard({
+    required this.name,
+    required this.phone,
+    required this.address,
+    required this.onEdit,
+  });
+
+  final String? name;
+  final String? phone;
+  final String address;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -844,34 +1085,30 @@ class _ShippingAddressCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 10),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Wrap(
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        spacing: 8,
-                        runSpacing: 4,
-                        children: [
-                          Text(
-                            'AH JOY',
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 13,
-                              height: 16 / 13,
-                              fontWeight: FontWeight.w700,
-                              color: _ReviewColors.title,
-                            ),
-                          ),
-                          _DefaultBadge(),
-                        ],
-                      ),
-                      SizedBox(height: 5),
                       Text(
-                        '+966 567 6789',
+                        name?.trim().isNotEmpty == true ? name! : 'Customer',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
+                        style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 13,
+                          height: 16 / 13,
+                          fontWeight: FontWeight.w700,
+                          color: _ReviewColors.title,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        phone?.trim().isNotEmpty == true
+                            ? phone!
+                            : 'Phone not provided',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
                           fontFamily: 'Poppins',
                           fontSize: 11,
                           height: 16 / 11,
@@ -879,12 +1116,12 @@ class _ShippingAddressCard extends StatelessWidget {
                           color: _ReviewColors.body,
                         ),
                       ),
-                      SizedBox(height: 2),
+                      const SizedBox(height: 2),
                       Text(
-                        'Al Oyala, Riyadh, Saudi Arabia',
-                        maxLines: 1,
+                        address,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontFamily: 'Poppins',
                           fontSize: 11,
                           height: 16 / 11,
@@ -896,7 +1133,10 @@ class _ShippingAddressCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 10),
-                _SmallOutlineIconButton(icon: Icons.edit_outlined, onTap: null),
+                _SmallOutlineIconButton(
+                  icon: Icons.edit_outlined,
+                  onTap: onEdit,
+                ),
               ],
             ),
           ),
@@ -1173,9 +1413,15 @@ class _TermsText extends StatelessWidget {
 }
 
 class _PlaceOrderButton extends StatelessWidget {
-  const _PlaceOrderButton({required this.total});
+  const _PlaceOrderButton({
+    required this.total,
+    required this.onPressed,
+    required this.isSubmitting,
+  });
 
   final double total;
+  final VoidCallback onPressed;
+  final bool isSubmitting;
 
   @override
   Widget build(BuildContext context) {
@@ -1185,23 +1431,7 @@ class _PlaceOrderButton extends StatelessWidget {
       height: 56,
       width: double.infinity,
       child: ElevatedButton(
-        onPressed: () async {
-          final List<ConnectivityResult> connectivity = await Connectivity()
-              .checkConnectivity();
-          final bool isOffline = connectivity.every(
-            (ConnectivityResult result) => result == ConnectivityResult.none,
-          );
-          if (!context.mounted) return;
-          if (isOffline) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Internet connection is required to order.'),
-              ),
-            );
-            return;
-          }
-          Navigator.of(context).pushReplacementNamed(AppRoutes.completedOrder);
-        },
+        onPressed: isSubmitting ? null : onPressed,
         style: ElevatedButton.styleFrom(
           elevation: 0,
           shadowColor: Colors.transparent,
@@ -1232,9 +1462,11 @@ class _PlaceOrderButton extends StatelessWidget {
                 const SizedBox(width: 10),
                 Flexible(
                   child: Text(
-                    isSmall
-                        ? 'Place Order  •  \$${total.toStringAsFixed(2)}'
-                        : 'Place Order  •  \$${total.toStringAsFixed(2)}',
+                    isSubmitting
+                        ? 'Placing Order...'
+                        : isSmall
+                        ? 'Place Order  •  ${_ReviewMoney.format(total)}'
+                        : 'Place Order  •  ${_ReviewMoney.format(total)}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -1332,6 +1564,7 @@ class _ThinDivider extends StatelessWidget {
 
 class _ReviewOrderItem {
   const _ReviewOrderItem({
+    required this.id,
     required this.index,
     required this.title,
     required this.type,
@@ -1340,6 +1573,7 @@ class _ReviewOrderItem {
     required this.quantity,
   });
 
+  final String id;
   final int index;
   final String title;
   final String type;
@@ -1352,7 +1586,7 @@ class _ReviewOrderItem {
 
 class _ReviewMoney {
   static String format(double value) {
-    return '\$${value.toStringAsFixed(2)}';
+    return CurrencyDisplay.format(value, currencyCode: 'SAR');
   }
 }
 
