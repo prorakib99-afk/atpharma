@@ -169,6 +169,24 @@ final class OfflineOrderService extends ChangeNotifier {
     return localId;
   }
 
+  Future<String> createOrder(OfflineOrderDraft draft) async {
+    final Response<dynamic> response = await _dioClient.post<dynamic>(
+      ShopOrderEndpoints.createOrder,
+      data: draft.toJson(),
+      options: ApiRequestOptions.publicRequest(allowRetry: false),
+    );
+    final Map<String, dynamic>? root = JsonValueParser.map(response.data);
+    final Map<String, dynamic>? data =
+        JsonValueParser.map(root?['data']) ?? root;
+    final String orderNumber = JsonValueParser.string(
+      data?['orderNumber'] ?? data?['number'],
+    );
+    if (orderNumber.isEmpty) {
+      throw const FormatException('Order number is missing from the response.');
+    }
+    return orderNumber;
+  }
+
   Future<StorefrontOrderConfig> config() async {
     if (!_storageAvailable) return StorefrontOrderConfig.fallback;
     final List<Map<String, Object?>> rows = await (await _database.instance)

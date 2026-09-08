@@ -152,10 +152,10 @@ final class ShopProductModel {
           ) ??
           ShopProductCompanyModel.fromBrand(json['brand']),
       currencyCode: JsonValueParser.string(
-        json['currencyCode'] ?? json['currency'],
+        json['currencyCode'] ?? json['currency_code'] ?? json['currency'],
       ),
       countryCode: JsonValueParser.string(
-        json['countryCode'] ?? json['country'],
+        json['countryCode'] ?? json['country_code'] ?? json['country'],
       ),
     );
   }

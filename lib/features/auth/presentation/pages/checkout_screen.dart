@@ -1,11 +1,15 @@
+import 'package:country_picker/country_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/routes/app_routes.dart';
 import '../../../../shared/widgets/navigation_page_scaffold.dart';
+import '../bloc/checkout/checkout_bloc.dart';
+import '../bloc/checkout/checkout_event.dart';
+import '../bloc/checkout/checkout_state.dart';
 import 'favorite_header_button.dart';
 import 'floating_profile_screen.dart';
 import 'notification_screen.dart';
-import 'review_order_screen.dart';
 import 'screen_product_details.dart';
 
 void _openNotifications(BuildContext context) {
@@ -35,12 +39,91 @@ class CheckoutScreen extends StatefulWidget {
 }
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
+  final TextEditingController _fullNameController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _address1Controller = TextEditingController();
+  final TextEditingController _address2Controller = TextEditingController();
+  final TextEditingController _districtController = TextEditingController();
+  final TextEditingController _postalCodeController = TextEditingController();
+
+  List<ProductCartItem> get _items =>
+      widget.purchaseItems ?? ProductCart.instance.items;
+
+  @override
+  void dispose() {
+    _fullNameController.dispose();
+    _phoneController.dispose();
+    _address1Controller.dispose();
+    _address2Controller.dispose();
+    _districtController.dispose();
+    _postalCodeController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    FocusScope.of(context).unfocus();
+    context.read<CheckoutBloc>().add(
+      CheckoutSubmitted(
+        items: _items,
+        fullName: _fullNameController.text,
+        phone: _phoneController.text,
+        addressLine1: _address1Controller.text,
+        addressLine2: _address2Controller.text,
+        district: _districtController.text,
+        postalCode: _postalCodeController.text,
+      ),
+    );
+  }
+
+  void _selectCountry() {
+    showCountryPicker(
+      context: context,
+      showPhoneCode: true,
+      favorite: const <String>['SA', 'AE', 'BD', 'IN', 'GB', 'US'],
+      countryListTheme: CountryListThemeData(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        bottomSheetHeight: MediaQuery.sizeOf(context).height * .72,
+        inputDecoration: _CheckoutInputDecoration.inputDecoration(
+          hint: 'Search country',
+        ),
+      ),
+      onSelect: (Country country) {
+        _phoneController.clear();
+        context.read<CheckoutBloc>().add(
+          CheckoutCountryChanged(
+            name: country.name,
+            countryCode: country.countryCode,
+            phoneCode: country.phoneCode,
+            flagEmoji: country.flagEmoji,
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _selectCity(CheckoutState state) async {
+    if (state.status == CheckoutStatus.loadingCities || state.cities.isEmpty) {
+      return;
+    }
+    final String? city = await showModalBottomSheet<String>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      builder: (BuildContext context) => _CityPickerSheet(
+        countryName: state.countryName,
+        cities: state.cities,
+      ),
+    );
+    if (city != null && mounted) {
+      context.read<CheckoutBloc>().add(CheckoutCityChanged(city));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final bottomSafe = MediaQuery.paddingOf(context).bottom;
     final pagePadding = _CheckoutResponsive.pagePadding(context);
-    final List<ProductCartItem> cartItems =
-        widget.purchaseItems ?? ProductCart.instance.items;
+    final List<ProductCartItem> cartItems = _items;
     final int itemCount = cartItems.fold<int>(
       0,
       (int sum, ProductCartItem item) => sum + item.quantity,
@@ -51,113 +134,171 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           sum + (item.product.price * item.quantity),
     );
 
-    return NavigationPageScaffold(
-      currentPage: NavigationPage.cart,
-      backgroundColor: _CheckoutColors.white,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            Padding(
-              padding: EdgeInsets.fromLTRB(pagePadding, 8, pagePadding, 0),
-              child: _CheckoutHeader(itemCount: itemCount),
-            ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(pagePadding, 24, pagePadding, 0),
-              child: _CheckoutStepCard(purchaseItems: widget.purchaseItems),
-            ),
-            Expanded(
-              child: CustomScrollView(
-                physics: const BouncingScrollPhysics(),
-                slivers: [
-                  SliverPadding(
+    return BlocConsumer<CheckoutBloc, CheckoutState>(
+      listenWhen: (CheckoutState previous, CheckoutState current) =>
+          previous.status != current.status ||
+          previous.message != current.message,
+      listener: (BuildContext context, CheckoutState state) {
+        if (state.status == CheckoutStatus.success) {
+          Navigator.of(
+            context,
+          ).pushNamed(AppRoutes.stripePayment, arguments: widget.purchaseItems);
+        } else if (state.status == CheckoutStatus.failure &&
+            state.message != null) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(state.message!)));
+        }
+      },
+      builder: (BuildContext context, CheckoutState state) =>
+          NavigationPageScaffold(
+            currentPage: NavigationPage.cart,
+            backgroundColor: _CheckoutColors.white,
+            body: SafeArea(
+              bottom: false,
+              child: Column(
+                children: [
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      pagePadding,
+                      8,
+                      pagePadding,
+                      0,
+                    ),
+                    child: _CheckoutHeader(itemCount: itemCount),
+                  ),
+                  Padding(
                     padding: EdgeInsets.fromLTRB(
                       pagePadding,
                       24,
                       pagePadding,
-                      120 + bottomSafe,
+                      0,
                     ),
-                    sliver: SliverList(
-                      delegate: SliverChildListDelegate([
-                        const _ShippingSectionHeader(),
-                        const SizedBox(height: 16),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: _CheckoutColors.card,
-                            borderRadius: BorderRadius.circular(16),
+                    child: const _CheckoutStepCard(),
+                  ),
+                  Expanded(
+                    child: CustomScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      slivers: [
+                        SliverPadding(
+                          padding: EdgeInsets.fromLTRB(
+                            pagePadding,
+                            24,
+                            pagePadding,
+                            120 + bottomSafe,
                           ),
-                          child: Column(
-                            children: <Widget>[
-                              const _InputField(
-                                label: 'Full Name',
-                                hint: 'Enter your full name',
-                                required: true,
-                                textInputAction: TextInputAction.next,
-                              ),
+                          sliver: SliverList(
+                            delegate: SliverChildListDelegate([
+                              _ShippingSectionHeader(onNext: _submit),
                               const SizedBox(height: 16),
-                              const _PhoneInputField(),
-                              const SizedBox(height: 16),
-                              const _ResponsiveTwoColumn(
-                                left: _SelectField(
-                                  label: 'Country',
-                                  value: 'Saudi Arabia',
-                                  required: true,
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: _CheckoutColors.card,
+                                  borderRadius: BorderRadius.circular(16),
                                 ),
-                                right: _SelectField(
-                                  label: 'City',
-                                  value: 'Riyadh',
-                                  required: true,
+                                child: Column(
+                                  children: <Widget>[
+                                    _InputField(
+                                      label: 'Full Name',
+                                      hint: 'Enter your full name',
+                                      required: true,
+                                      controller: _fullNameController,
+                                      errorText: state.fieldErrors['fullName'],
+                                      textInputAction: TextInputAction.next,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    _PhoneInputField(
+                                      controller: _phoneController,
+                                      state: state,
+                                      onCountryTap: _selectCountry,
+                                      errorText: state.fieldErrors['phone'],
+                                    ),
+                                    const SizedBox(height: 16),
+                                    _ResponsiveTwoColumn(
+                                      left: _SelectField(
+                                        label: 'Country',
+                                        value: state.countryName,
+                                        required: true,
+                                        leading: Text(
+                                          state.flagEmoji,
+                                          style: const TextStyle(fontSize: 18),
+                                        ),
+                                        onTap: _selectCountry,
+                                        errorText: state.fieldErrors['country'],
+                                      ),
+                                      right: _SelectField(
+                                        label: 'City',
+                                        value: state.city ?? 'Select city',
+                                        required: true,
+                                        loading:
+                                            state.status ==
+                                            CheckoutStatus.loadingCities,
+                                        onTap: () => _selectCity(state),
+                                        errorText: state.fieldErrors['city'],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    _InputField(
+                                      label: 'Address Line 1',
+                                      hint:
+                                          'House/Building No, Street Name, Area',
+                                      required: true,
+                                      controller: _address1Controller,
+                                      errorText:
+                                          state.fieldErrors['addressLine1'],
+                                      textInputAction: TextInputAction.next,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    _InputField(
+                                      label: 'Address Line 2 (Optional)',
+                                      hint: 'Apartment, Suite, Floor, Landmark',
+                                      controller: _address2Controller,
+                                      textInputAction: TextInputAction.next,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    _ResponsiveTwoColumn(
+                                      left: _InputField(
+                                        label: 'District',
+                                        hint: 'Enter your district',
+                                        required: true,
+                                        controller: _districtController,
+                                        errorText:
+                                            state.fieldErrors['district'],
+                                        textInputAction: TextInputAction.next,
+                                      ),
+                                      right: _InputField(
+                                        label: 'Postal Code',
+                                        hint: 'Enter postal code',
+                                        required: true,
+                                        controller: _postalCodeController,
+                                        errorText:
+                                            state.fieldErrors['postalCode'],
+                                        keyboardType: TextInputType.number,
+                                        textInputAction: TextInputAction.done,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              const SizedBox(height: 16),
-                              const _InputField(
-                                label: 'Address Line 1',
-                                hint: 'House/Building No, Street Name, Area',
-                                required: true,
-                                textInputAction: TextInputAction.next,
+                              const SizedBox(height: 24),
+                              const _TermsAndPrivacyText(),
+                              const SizedBox(height: 24),
+                              _ContinueButton(
+                                total: total,
+                                isLoading: state.isSubmitting,
+                                onPressed: _submit,
                               ),
-                              const SizedBox(height: 16),
-                              const _InputField(
-                                label: 'Address Line 2 (Optional)',
-                                hint: 'Apartment, Suite, Floor, Landmark',
-                                textInputAction: TextInputAction.next,
-                              ),
-                              const SizedBox(height: 16),
-                              const _ResponsiveTwoColumn(
-                                left: _InputField(
-                                  label: 'District',
-                                  hint: 'Enter your district',
-                                  required: true,
-                                  textInputAction: TextInputAction.next,
-                                ),
-                                right: _InputField(
-                                  label: 'Postal Code',
-                                  hint: 'Enter postal code',
-                                  required: true,
-                                  keyboardType: TextInputType.number,
-                                  textInputAction: TextInputAction.done,
-                                ),
-                              ),
-                            ],
+                            ]),
                           ),
                         ),
-                        const SizedBox(height: 24),
-                        const _TermsAndPrivacyText(),
-                        const SizedBox(height: 24),
-                        _ContinueButton(
-                          total: total,
-                          purchaseItems: widget.purchaseItems,
-                        ),
-                      ]),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
-          ],
-        ),
-      ),
+          ),
     );
   }
 }
@@ -298,7 +439,9 @@ class _ProfileAvatar extends StatelessWidget {
 }
 
 class _ShippingSectionHeader extends StatelessWidget {
-  const _ShippingSectionHeader();
+  const _ShippingSectionHeader({required this.onNext});
+
+  final VoidCallback onNext;
 
   @override
   Widget build(BuildContext context) {
@@ -317,7 +460,7 @@ class _ShippingSectionHeader extends StatelessWidget {
           ),
         ),
         InkWell(
-          onTap: () {},
+          onTap: onNext,
           borderRadius: BorderRadius.circular(8),
           child: const Padding(
             padding: EdgeInsets.symmetric(horizontal: 4, vertical: 3),
@@ -344,9 +487,7 @@ class _ShippingSectionHeader extends StatelessWidget {
 }
 
 class _CheckoutStepCard extends StatelessWidget {
-  const _CheckoutStepCard({this.purchaseItems});
-
-  final List<ProductCartItem>? purchaseItems;
+  const _CheckoutStepCard();
 
   @override
   Widget build(BuildContext context) {
@@ -378,25 +519,9 @@ class _CheckoutStepCard extends StatelessWidget {
             active: true,
           ),
           const _StepLine(),
-          _StepItem(
-            icon: Icons.credit_card_rounded,
-            label: 'Payment',
-            onTap: () => Navigator.of(
-              context,
-            ).pushNamed(AppRoutes.stripePayment, arguments: purchaseItems),
-          ),
+          const _StepItem(icon: Icons.credit_card_rounded, label: 'Payment'),
           const _StepLine(),
-          _StepItem(
-            icon: Icons.receipt_long_rounded,
-            label: 'Review',
-            onTap: () => Navigator.of(context).pushNamed(
-              AppRoutes.reviewOrder,
-              arguments: ReviewOrderArguments(
-                purchaseItems: purchaseItems,
-                paymentMethod: 'Stripe',
-              ),
-            ),
-          ),
+          const _StepItem(icon: Icons.receipt_long_rounded, label: 'Review'),
         ],
       ),
     );
@@ -408,54 +533,48 @@ class _StepItem extends StatelessWidget {
     required this.icon,
     required this.label,
     this.active = false,
-    this.onTap,
   });
 
   final IconData icon;
   final String label;
   final bool active;
-  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: SizedBox(
-        width: 64,
-        child: Column(
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: active ? _CheckoutColors.primary : _CheckoutColors.white,
-                shape: BoxShape.circle,
-                border: active
-                    ? null
-                    : Border.all(color: _CheckoutColors.body, width: 1.6),
-              ),
-              child: Icon(
-                icon,
-                size: 16,
-                color: active ? _CheckoutColors.white : _CheckoutColors.body,
-              ),
+    return SizedBox(
+      width: 64,
+      child: Column(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: active ? _CheckoutColors.primary : _CheckoutColors.white,
+              shape: BoxShape.circle,
+              border: active
+                  ? null
+                  : Border.all(color: _CheckoutColors.body, width: 1.6),
             ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 12,
-                height: 16 / 12,
-                fontWeight: FontWeight.w500,
-                color: active ? _CheckoutColors.primary : _CheckoutColors.body,
-              ),
+            child: Icon(
+              icon,
+              size: 16,
+              color: active ? _CheckoutColors.white : _CheckoutColors.body,
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 12,
+              height: 16 / 12,
+              fontWeight: FontWeight.w500,
+              color: active ? _CheckoutColors.primary : _CheckoutColors.body,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -488,6 +607,8 @@ class _InputField extends StatelessWidget {
     this.required = false,
     this.keyboardType,
     this.textInputAction,
+    this.controller,
+    this.errorText,
   });
 
   final String label;
@@ -495,6 +616,8 @@ class _InputField extends StatelessWidget {
   final bool required;
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
+  final TextEditingController? controller;
+  final String? errorText;
 
   @override
   Widget build(BuildContext context) {
@@ -504,6 +627,7 @@ class _InputField extends StatelessWidget {
         _FieldLabel(label: label, required: required),
         const SizedBox(height: 4),
         TextFormField(
+          controller: controller,
           keyboardType: keyboardType,
           textInputAction: textInputAction,
           style: const TextStyle(
@@ -513,7 +637,10 @@ class _InputField extends StatelessWidget {
             fontWeight: FontWeight.w400,
             color: _CheckoutColors.title,
           ),
-          decoration: _CheckoutInputDecoration.inputDecoration(hint: hint),
+          decoration: _CheckoutInputDecoration.inputDecoration(
+            hint: hint,
+            errorText: errorText,
+          ),
         ),
       ],
     );
@@ -521,7 +648,17 @@ class _InputField extends StatelessWidget {
 }
 
 class _PhoneInputField extends StatelessWidget {
-  const _PhoneInputField();
+  const _PhoneInputField({
+    required this.controller,
+    required this.state,
+    required this.onCountryTap,
+    this.errorText,
+  });
+
+  final TextEditingController controller;
+  final CheckoutState state;
+  final VoidCallback onCountryTap;
+  final String? errorText;
 
   @override
   Widget build(BuildContext context) {
@@ -542,26 +679,25 @@ class _PhoneInputField extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Container(
-                width: 34,
-                height: 22,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: const Color(0xff006c35),
-                  borderRadius: BorderRadius.circular(4),
+              InkWell(
+                onTap: onCountryTap,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text(state.flagEmoji, style: const TextStyle(fontSize: 20)),
+                    const SizedBox(width: 4),
+                    const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      size: 20,
+                      color: _CheckoutColors.title,
+                    ),
+                  ],
                 ),
-                child: const Text('🇸🇦', style: TextStyle(fontSize: 13)),
               ),
-              const SizedBox(width: 6),
-              const Icon(
-                Icons.keyboard_arrow_down_rounded,
-                size: 22,
-                color: _CheckoutColors.title,
-              ),
-              const SizedBox(width: 10),
-              const Text(
-                '+966',
-                style: TextStyle(
+              const SizedBox(width: 8),
+              Text(
+                '+${state.phoneCode}',
+                style: const TextStyle(
                   fontFamily: 'Poppins',
                   fontSize: 14,
                   height: 20 / 14,
@@ -572,11 +708,12 @@ class _PhoneInputField extends StatelessWidget {
               const SizedBox(width: 10),
               Container(width: 1, height: 24, color: _CheckoutColors.border),
               const SizedBox(width: 10),
-              const Expanded(
+              Expanded(
                 child: TextField(
+                  controller: controller,
                   keyboardType: TextInputType.phone,
                   textInputAction: TextInputAction.next,
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     border: InputBorder.none,
                     isDense: true,
                     hintText: 'Enter phone number',
@@ -588,7 +725,7 @@ class _PhoneInputField extends StatelessWidget {
                       color: _CheckoutColors.muted,
                     ),
                   ),
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontFamily: 'Poppins',
                     fontSize: 14,
                     height: 20 / 14,
@@ -600,6 +737,10 @@ class _PhoneInputField extends StatelessWidget {
             ],
           ),
         ),
+        if (errorText != null) ...<Widget>[
+          const SizedBox(height: 6),
+          Text(errorText!, style: _CheckoutInputDecoration.errorStyle),
+        ],
       ],
     );
   }
@@ -610,11 +751,19 @@ class _SelectField extends StatelessWidget {
     required this.label,
     required this.value,
     this.required = false,
+    this.onTap,
+    this.leading,
+    this.loading = false,
+    this.errorText,
   });
 
   final String label;
   final String value;
   final bool required;
+  final VoidCallback? onTap;
+  final Widget? leading;
+  final bool loading;
+  final String? errorText;
 
   @override
   Widget build(BuildContext context) {
@@ -624,7 +773,7 @@ class _SelectField extends StatelessWidget {
         _FieldLabel(label: label, required: required),
         const SizedBox(height: 4),
         InkWell(
-          onTap: () {},
+          onTap: onTap,
           borderRadius: BorderRadius.circular(16),
           child: Container(
             height: 44,
@@ -636,6 +785,10 @@ class _SelectField extends StatelessWidget {
             ),
             child: Row(
               children: [
+                if (leading != null) ...<Widget>[
+                  leading!,
+                  const SizedBox(width: 8),
+                ],
                 Expanded(
                   child: Text(
                     value,
@@ -650,15 +803,25 @@ class _SelectField extends StatelessWidget {
                     ),
                   ),
                 ),
-                const Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  size: 22,
-                  color: _CheckoutColors.title,
-                ),
+                if (loading)
+                  const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else
+                  const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 22,
+                    color: _CheckoutColors.title,
+                  ),
               ],
             ),
           ),
         ),
+        if (errorText != null) ...<Widget>[
+          const SizedBox(height: 6),
+          Text(errorText!, style: _CheckoutInputDecoration.errorStyle),
+        ],
       ],
     );
   }
@@ -731,83 +894,16 @@ class _ResponsiveTwoColumn extends StatelessWidget {
   }
 }
 
-class _SaveCardOption extends StatelessWidget {
-  const _SaveCardOption({required this.value, required this.onChanged});
-
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => onChanged(!value),
-      borderRadius: BorderRadius.circular(8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
-            width: 24,
-            height: 24,
-            margin: const EdgeInsets.only(top: 2),
-            decoration: BoxDecoration(
-              color: value ? _CheckoutColors.primary : _CheckoutColors.white,
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(
-                color: value ? _CheckoutColors.primary : _CheckoutColors.border,
-                width: 1.5,
-              ),
-            ),
-            child: value
-                ? const Icon(
-                    Icons.check_rounded,
-                    size: 18,
-                    color: _CheckoutColors.white,
-                  )
-                : null,
-          ),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Save this card for faster checkout',
-                  style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 15,
-                    height: 20 / 15,
-                    fontWeight: FontWeight.w600,
-                    color: _CheckoutColors.title,
-                  ),
-                ),
-                SizedBox(height: 3),
-                Text(
-                  'Your card details will be securely saved by Stripe',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 14,
-                    height: 18 / 14,
-                    fontWeight: FontWeight.w400,
-                    color: _CheckoutColors.body,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _ContinueButton extends StatelessWidget {
-  const _ContinueButton({required this.total, this.purchaseItems});
+  const _ContinueButton({
+    required this.total,
+    required this.isLoading,
+    required this.onPressed,
+  });
 
   final double total;
-  final List<ProductCartItem>? purchaseItems;
+  final bool isLoading;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -815,9 +911,7 @@ class _ContinueButton extends StatelessWidget {
       height: 48,
       width: double.infinity,
       child: ElevatedButton(
-        onPressed: () => Navigator.of(
-          context,
-        ).pushNamed(AppRoutes.stripePayment, arguments: purchaseItems),
+        onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
           elevation: 0,
           backgroundColor: Colors.transparent,
@@ -836,18 +930,26 @@ class _ContinueButton extends StatelessWidget {
           ),
           child: Container(
             alignment: Alignment.center,
-            child: Text(
-              'Continue to Payment  •  \$${total.toStringAsFixed(2)}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 14,
-                height: 24 / 14,
-                fontWeight: FontWeight.w500,
-                color: _CheckoutColors.white,
-              ),
-            ),
+            child: isLoading
+                ? const SizedBox.square(
+                    dimension: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : Text(
+                    'Continue to Payment  •  SAR ${total.toStringAsFixed(2)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 14,
+                      height: 24 / 14,
+                      fontWeight: FontWeight.w500,
+                      color: _CheckoutColors.white,
+                    ),
+                  ),
           ),
         ),
       ),
@@ -912,8 +1014,83 @@ class _TermsAndPrivacyText extends StatelessWidget {
   }
 }
 
+class _CityPickerSheet extends StatefulWidget {
+  const _CityPickerSheet({required this.countryName, required this.cities});
+
+  final String countryName;
+  final List<String> cities;
+
+  @override
+  State<_CityPickerSheet> createState() => _CityPickerSheetState();
+}
+
+class _CityPickerSheetState extends State<_CityPickerSheet> {
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final List<String> visible = widget.cities
+        .where(
+          (String city) => city.toLowerCase().contains(_query.toLowerCase()),
+        )
+        .toList(growable: false);
+    return FractionallySizedBox(
+      heightFactor: .72,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              'Select city in ${widget.countryName}',
+              style: const TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              autofocus: true,
+              onChanged: (String value) => setState(() => _query = value),
+              decoration: _CheckoutInputDecoration.inputDecoration(
+                hint: 'Search city',
+              ).copyWith(prefixIcon: const Icon(Icons.search_rounded)),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: visible.isEmpty
+                  ? const Center(child: Text('No cities found.'))
+                  : ListView.separated(
+                      itemCount: visible.length,
+                      separatorBuilder: (_, _) => const Divider(height: 1),
+                      itemBuilder: (BuildContext context, int index) {
+                        final String city = visible[index];
+                        return ListTile(
+                          title: Text(city),
+                          onTap: () => Navigator.of(context).pop(city),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _CheckoutInputDecoration {
-  static InputDecoration inputDecoration({required String hint}) {
+  static const TextStyle errorStyle = TextStyle(
+    fontFamily: 'Poppins',
+    fontSize: 11,
+    color: _CheckoutColors.danger,
+  );
+
+  static InputDecoration inputDecoration({
+    required String hint,
+    String? errorText,
+  }) {
     return InputDecoration(
       hintText: hint,
       hintStyle: const TextStyle(
@@ -924,6 +1101,8 @@ class _CheckoutInputDecoration {
         color: _CheckoutColors.muted,
       ),
       filled: true,
+      errorText: errorText,
+      errorStyle: errorStyle,
       fillColor: _CheckoutColors.white,
       isDense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),

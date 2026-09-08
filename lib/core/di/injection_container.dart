@@ -9,6 +9,8 @@ import '../../features/auth/domain/repositories/auth_repository.dart';
 import '../../features/auth/domain/usecases/login_use_case.dart';
 import '../../features/auth/domain/usecases/logout_use_case.dart';
 import '../../features/auth/presentation/bloc/login/login_bloc.dart';
+import '../../features/auth/presentation/bloc/checkout/checkout_bloc.dart';
+import '../../features/shop/data/services/checkout_location_service.dart';
 import '../../features/shop/data/datasources/shop_product_remote_data_source.dart';
 import '../../features/shop/data/services/offline_order_service.dart';
 import '../../features/shop/domain/repositories/shop_product_repository.dart';
@@ -86,6 +88,8 @@ Future<void> configureDependencies() async {
     database: appDatabase,
     dioClient: dioClient,
   );
+  final CheckoutLocationService checkoutLocationService =
+      CheckoutLocationService();
 
   /*
    * Core singleton registrations
@@ -98,6 +102,7 @@ Future<void> configureDependencies() async {
     ..registerSingleton<Dio>(dio)
     ..registerSingleton<DioClient>(dioClient)
     ..registerSingleton<AppDatabase>(appDatabase)
+    ..registerSingleton<CheckoutLocationService>(checkoutLocationService)
     ..registerSingleton<OfflineOrderService>(offlineOrderService);
 
   unawaited(offlineOrderService.initialize());
@@ -120,6 +125,12 @@ Future<void> configureDependencies() async {
     )
     ..registerFactory<LoginBloc>(
       () => LoginBloc(loginUseCase: sl<LoginUseCase>()),
+    )
+    ..registerFactory<CheckoutBloc>(
+      () => CheckoutBloc(
+        sl<CheckoutLocationService>(),
+        sl<OfflineOrderService>(),
+      ),
     );
 
   /*

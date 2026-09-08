@@ -11,7 +11,7 @@ import '../../../../core/location/google_geocoding_service.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/storage/local_storage_service.dart';
 import '../../../../core/storage/storage_keys.dart';
-import '../../../../core/utils/currency_display.dart';
+import '../../../../shared/widgets/currency_amount.dart';
 import '../../../../shared/widgets/navigation_page_scaffold.dart';
 import '../../../../shared/widgets/fly_to_cart.dart';
 import '../../../shop/domain/entities/shop_product_entity.dart';
@@ -1113,12 +1113,10 @@ class _ProductCard extends StatelessWidget {
                         : _Text.stock10,
                   ),
                 ),
-                Text(
-                  _formatPrice(
-                    product.sellingPrice,
-                    currencyCode: product.currencyCode,
-                    countryCode: product.countryCode,
-                  ),
+                CurrencyAmount(
+                  value: product.sellingPrice,
+                  currencyCode: product.currencyCode,
+                  countryCode: product.countryCode,
                   style: _Text.price16,
                 ),
               ],
@@ -1373,14 +1371,6 @@ class _ArticleCard extends StatelessWidget {
       ),
     );
   }
-}
-
-String _formatPrice(double price, {String? currencyCode, String? countryCode}) {
-  return CurrencyDisplay.format(
-    price,
-    currencyCode: currencyCode,
-    countryCode: countryCode,
-  );
 }
 
 class _Article {

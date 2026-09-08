@@ -34,6 +34,8 @@ import 'features/auth/presentation/pages/stripe_payment_nav_screen.dart';
 import 'features/auth/presentation/pages/success_reset_pass_screen.dart';
 import 'features/auth/presentation/pages/terms_and_conditions_screen.dart';
 import 'features/auth/presentation/bloc/login/login_bloc.dart';
+import 'features/auth/presentation/bloc/checkout/checkout_bloc.dart';
+import 'features/auth/presentation/bloc/checkout/checkout_event.dart';
 import 'features/auth/presentation/bloc/login/login_event.dart';
 import 'features/auth/presentation/bloc/login/login_state.dart';
 
@@ -168,10 +170,13 @@ class AtPharmaApp extends StatelessWidget {
 
         AppRoutes.checkout: (BuildContext context) {
           final Object? arguments = ModalRoute.settingsOf(context)?.arguments;
-          return CheckoutScreen(
-            purchaseItems: arguments is List<ProductCartItem>
-                ? arguments
-                : null,
+          return BlocProvider<CheckoutBloc>(
+            create: (_) => sl<CheckoutBloc>()..add(const CheckoutStarted()),
+            child: CheckoutScreen(
+              purchaseItems: arguments is List<ProductCartItem>
+                  ? arguments
+                  : null,
+            ),
           );
         },
         AppRoutes.termsAndConditions: (BuildContext context) {
