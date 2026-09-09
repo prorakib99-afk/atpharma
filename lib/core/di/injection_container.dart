@@ -24,6 +24,11 @@ import '../../features/shop/domain/usecases/cancel_shop_products_request_use_cas
 import '../../features/shop/domain/usecases/get_shop_product_details_use_case.dart';
 import '../../features/shop/domain/usecases/get_shop_products_use_case.dart';
 import '../../features/shop/presentation/bloc/home_products/home_products_bloc.dart';
+import '../../features/track_order/data/datasources/track_order_remote_data_source.dart';
+import '../../features/track_order/domain/repositories/track_order_repository.dart';
+import '../../features/track_order/domain/repositories/track_order_repository_impl.dart';
+import '../../features/track_order/domain/usecases/track_order_use_case.dart';
+import '../../features/track_order/presentation/bloc/track_order_bloc.dart';
 import '../network/dio_client.dart';
 import '../network/interceptors/auth_interceptor.dart';
 import '../network/interceptors/retry_interceptor.dart';
@@ -218,6 +223,27 @@ Future<void> configureDependencies() async {
       featuredPerPage: 4,
       cacheDuration: const Duration(minutes: 2),
     ),
+  );
+
+  /*
+   * Track Order (public delivery tracking) dependencies.
+   */
+  sl.registerLazySingleton<TrackOrderRemoteDataSource>(
+    () => TrackOrderRemoteDataSourceImpl(dioClient: sl<DioClient>()),
+  );
+
+  sl.registerLazySingleton<TrackOrderRepository>(
+    () => TrackOrderRepositoryImpl(
+      remoteDataSource: sl<TrackOrderRemoteDataSource>(),
+    ),
+  );
+
+  sl.registerLazySingleton<TrackOrderUseCase>(
+    () => TrackOrderUseCase(repository: sl<TrackOrderRepository>()),
+  );
+
+  sl.registerFactory<TrackOrderBloc>(
+    () => TrackOrderBloc(trackOrderUseCase: sl<TrackOrderUseCase>()),
   );
 }
 

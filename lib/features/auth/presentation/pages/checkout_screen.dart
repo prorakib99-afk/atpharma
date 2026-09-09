@@ -1,11 +1,17 @@
+import 'dart:async';
+
 import 'package:country_picker/country_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geocoding/geocoding.dart';
 import '../../../../core/validation/checkout_validation.dart';
 import '../../../../core/validation/checkout_phone_input_formatter.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/di/injection_container.dart';
 import '../../../../core/routes/app_routes.dart';
+import '../../../../core/storage/local_storage_service.dart';
+import '../../../../core/storage/storage_keys.dart';
 import '../../../../shared/widgets/navigation_page_scaffold.dart';
 import '../bloc/checkout/checkout_bloc.dart';
 import '../bloc/checkout/checkout_event.dart';
@@ -62,6 +68,79 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _address2Controller.text = initial.addressLine2;
       _districtController.text = initial.district;
       _postalCodeController.text = initial.postalCode;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_autofillFromMapLocation());
+    });
+  }
+
+  Future<void> _autofillFromMapLocation() async {
+    final LocalStorageService storage = sl<LocalStorageService>();
+    final double? latitude = storage.readDouble(StorageKeys.lastKnownLatitude);
+    final double? longitude = storage.readDouble(
+      StorageKeys.lastKnownLongitude,
+    );
+    if (latitude == null || longitude == null) return;
+
+    try {
+      final List<Placemark> places = await Geocoding().placemarkFromCoordinates(
+        latitude,
+        longitude,
+      );
+      if (places.isEmpty || !mounted) return;
+      final Placemark place = places.first;
+      final Country? country = Country.tryParse(place.isoCountryCode ?? '');
+
+      if (_address1Controller.text.trim().isEmpty) {
+        _address1Controller.text =
+            <String>[
+                  place.name ?? '',
+                  place.street ?? '',
+                  place.subLocality ?? '',
+                ]
+                .map((String value) => value.trim())
+                .where((String value) {
+                  return value.isNotEmpty;
+                })
+                .toSet()
+                .join(', ');
+      }
+      if (_districtController.text.trim().isEmpty) {
+        _districtController.text =
+            (place.subAdministrativeArea ?? '').trim().isNotEmpty
+            ? place.subAdministrativeArea!.trim()
+            : (place.administrativeArea ?? '').trim();
+      }
+      if (_postalCodeController.text.trim().isEmpty) {
+        _postalCodeController.text = (place.postalCode ?? '').trim();
+      }
+
+      if (country != null) {
+        final CheckoutBloc bloc = context.read<CheckoutBloc>();
+        bloc.add(
+          CheckoutCountryChanged(
+            name: country.name,
+            countryCode: country.countryCode,
+            phoneCode: country.phoneCode,
+            flagEmoji: country.flagEmoji,
+          ),
+        );
+        await bloc.stream.firstWhere(
+          (CheckoutState state) =>
+              state.countryCode == country.countryCode &&
+              state.status != CheckoutStatus.loadingCities,
+        );
+      }
+
+      if (!mounted) return;
+      final String city = (place.locality ?? '').trim().isNotEmpty
+          ? place.locality!.trim()
+          : (place.subAdministrativeArea ?? '').trim();
+      if (city.isNotEmpty) {
+        context.read<CheckoutBloc>().add(CheckoutCityChanged(city));
+      }
+    } catch (_) {
+      // The form remains fully editable if reverse geocoding is unavailable.
     }
   }
 

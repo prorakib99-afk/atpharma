@@ -23,6 +23,7 @@ import 'features/auth/presentation/pages/home_screen.dart';
 import 'features/auth/presentation/pages/login_screen.dart';
 import 'features/auth/presentation/pages/otp_screen.dart';
 import 'features/auth/presentation/pages/prescription_screen.dart';
+import 'features/track_order/presentation/pages/track_order_screen.dart';
 import 'features/auth/presentation/pages/privacy_policy_screen.dart';
 import 'features/auth/presentation/pages/profile_screen.dart';
 import 'features/auth/presentation/pages/recovery_screen.dart';
@@ -226,10 +227,17 @@ class AtPharmaApp extends StatelessWidget {
           );
         },
         AppRoutes.completedOrder: (BuildContext context) {
-          return const CompletedOrderScreen();
+          final Object? arguments = ModalRoute.settingsOf(context)?.arguments;
+          if (arguments is! CompletedOrderArguments) {
+            return const HomeScreen();
+          }
+          return CompletedOrderScreen(arguments: arguments);
         },
         AppRoutes.contactSupport: (BuildContext context) {
           return const ContactSupportScreen();
+        },
+        AppRoutes.trackOrder: (BuildContext context) {
+          return const TrackOrderScreen();
         },
 
         AppRoutes.productDetails: (BuildContext context) {

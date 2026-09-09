@@ -23,4 +23,5 @@ abstract final class AppRoutes {
   static const String completedOrder = '/completed-order';
   static const String productDetails = '/product-details';
   static const String contactSupport = '/contact-support';
+  static const String trackOrder = '/track-order';
 }

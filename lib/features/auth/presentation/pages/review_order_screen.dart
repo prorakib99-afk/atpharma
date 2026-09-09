@@ -10,6 +10,7 @@ import '../bloc/review_order/review_order_event.dart';
 import '../bloc/review_order/review_order_state.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../shop/data/services/offline_order_service.dart';
+import 'completed_order_screen.dart';
 import 'screen_product_details.dart';
 
 class ReviewOrderArguments {
@@ -233,14 +234,49 @@ class _ReviewOrderScreenState extends State<ReviewOrderScreen> {
             ),
           );
     return BlocListener<ReviewOrderBloc, ReviewOrderState>(
-      listener: (BuildContext context, ReviewOrderState state) {
+      listener: (BuildContext context, ReviewOrderState state) async {
         if (state.status == ReviewOrderStatus.success) {
-          Navigator.of(context).pushReplacementNamed(AppRoutes.completedOrder);
+          if (widget.purchaseItems == null) {
+            await ProductCart.instance.clear();
+          }
+          if (!context.mounted) return;
+          Navigator.of(context).pushReplacementNamed(
+            AppRoutes.completedOrder,
+            arguments: CompletedOrderArguments(
+              receipt: state.receipt!,
+              paymentMethod: widget.paymentMethod,
+            ),
+          );
         } else if (state.status == ReviewOrderStatus.failure &&
             state.message != null) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(state.message!)));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: const Color(0xffdff4c7),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                side: const BorderSide(color: Color(0xffffc107), width: 2),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              content: Row(
+                children: [
+                  const Icon(
+                    Icons.warning_amber_rounded,
+                    color: Color(0xffffa000),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      state.message!,
+                      style: const TextStyle(
+                        color: Color(0xff245b25),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
         }
       },
       child: page,

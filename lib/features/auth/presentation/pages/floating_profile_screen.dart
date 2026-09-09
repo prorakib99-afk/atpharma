@@ -44,6 +44,7 @@ class FloatingProfileScreen extends StatelessWidget {
     this.role = 'Super Admin',
     this.width = 220,
     this.onProfileTap,
+    this.onTrackOrderTap,
     this.onAccountSettingsTap,
     this.onHelpCenterTap,
     this.onSignOutTap,
@@ -55,6 +56,7 @@ class FloatingProfileScreen extends StatelessWidget {
   final String role;
   final double width;
   final VoidCallback? onProfileTap;
+  final VoidCallback? onTrackOrderTap;
   final VoidCallback? onAccountSettingsTap;
   final VoidCallback? onHelpCenterTap;
   final VoidCallback? onSignOutTap;
@@ -71,6 +73,7 @@ class FloatingProfileScreen extends StatelessWidget {
     String name = 'Sabbir Shawon',
     String role = 'Super Admin',
     VoidCallback? onProfileTap,
+    VoidCallback? onTrackOrderTap,
     VoidCallback? onAccountSettingsTap,
     VoidCallback? onHelpCenterTap,
     VoidCallback? onSignOutTap,
@@ -106,6 +109,10 @@ class FloatingProfileScreen extends StatelessWidget {
                           onProfileTap: () {
                             Navigator.of(context).pop();
                             onProfileTap?.call();
+                          },
+                          onTrackOrderTap: () {
+                            Navigator.of(context).pop();
+                            onTrackOrderTap?.call();
                           },
                           onAccountSettingsTap: () {
                             Navigator.of(context).pop();
@@ -213,6 +220,12 @@ class FloatingProfileScreen extends StatelessWidget {
                       title: 'Profile',
                       subtitle: 'Manage your profile',
                       onTap: onProfileTap,
+                    ),
+                    _MenuRow(
+                      icon: Icons.local_shipping_outlined,
+                      title: 'Track Order',
+                      subtitle: 'See live delivery updates',
+                      onTap: onTrackOrderTap,
                     ),
                     _MenuRow(
                       icon: Icons.settings_outlined,

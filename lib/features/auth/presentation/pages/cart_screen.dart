@@ -285,6 +285,30 @@ class _CartItemView extends StatelessWidget {
     );
   }
 
+  void _increaseQuantity(BuildContext context) {
+    final int? remaining = ProductCart.instance.increase(item.id);
+    if (remaining == null) return;
+    ScaffoldMessenger.of(context)
+      ..removeCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: const Color(0xffdff4c7),
+          shape: RoundedRectangleBorder(
+            side: const BorderSide(color: Color(0xffffc107), width: 2),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          content: Text(
+            '${item.product.name} ($remaining left)',
+            style: const TextStyle(
+              color: Color(0xff245b25),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      );
+  }
+
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
@@ -366,8 +390,7 @@ class _CartItemView extends StatelessWidget {
                             quantity: item.quantity,
                             onDecrease: () =>
                                 ProductCart.instance.decrease(item.id),
-                            onIncrease: () =>
-                                ProductCart.instance.increase(item.id),
+                            onIncrease: () => _increaseQuantity(context),
                           ),
                           const Spacer(),
                           _DeleteButton(

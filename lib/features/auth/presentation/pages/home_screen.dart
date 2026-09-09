@@ -21,6 +21,7 @@ import '../../../shop/presentation/bloc/home_products/home_products_event.dart';
 import '../../../shop/presentation/bloc/home_products/home_products_state.dart';
 import 'buy_again_floating_screen.dart';
 import 'article_search_screen.dart';
+import 'address_map_picker_screen.dart';
 import 'favorite_store.dart';
 import 'favourite_screen.dart';
 import 'floating_category_screen.dart';
@@ -56,6 +57,7 @@ class _HomeBody extends StatefulWidget {
 class _HomeBodyState extends State<_HomeBody> with WidgetsBindingObserver {
   String _address = 'Finding your location...';
   bool _locationLoading = false;
+  bool _mapPickerOpening = false;
   final GoogleGeocodingService _googleGeocoder = GoogleGeocodingService();
 
   String get _greeting {
@@ -209,6 +211,32 @@ class _HomeBodyState extends State<_HomeBody> with WidgetsBindingObserver {
     setState(() => _address = value);
   }
 
+  Future<void> _openAddressPicker() async {
+    if (_mapPickerOpening) return;
+    _mapPickerOpening = true;
+
+    final AddressMapPickerResult? result;
+    try {
+      result = await Navigator.of(context).push<AddressMapPickerResult>(
+        MaterialPageRoute<AddressMapPickerResult>(
+          builder: (_) => const AddressMapPickerScreen(),
+        ),
+      );
+    } finally {
+      _mapPickerOpening = false;
+    }
+    if (result == null || !mounted) return;
+
+    final String address = _removePlusCode(result.address);
+    _updateAddress(address);
+    unawaited(
+      sl<LocalStorageService>().write<String>(
+        key: StorageKeys.lastKnownAddress,
+        value: address,
+      ),
+    );
+  }
+
   String _formatAddress(Placemark place) {
     final String country = (place.country ?? '').trim();
     final String locality = (place.locality ?? '').trim();
@@ -330,7 +358,7 @@ class _HomeBodyState extends State<_HomeBody> with WidgetsBindingObserver {
             child: _Header(
               greeting: _greeting,
               address: _address,
-              onAddressTap: _loadLocation,
+              onAddressTap: _openAddressPicker,
             ),
           ),
           Expanded(
@@ -400,17 +428,17 @@ class _Header extends StatelessWidget {
     return Row(
       children: <Widget>[
         Expanded(
-          child: InkWell(
-            onTap: onAddressTap,
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 2),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(greeting, style: _Text.title16),
-                  const SizedBox(height: 4),
-                  Row(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(greeting, style: _Text.title16),
+                const SizedBox(height: 4),
+                InkWell(
+                  onTap: onAddressTap,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Row(
                     children: <Widget>[
                       const Icon(
                         Icons.location_on_outlined,
@@ -428,8 +456,8 @@ class _Header extends StatelessWidget {
                       ),
                     ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
@@ -454,6 +482,8 @@ class _Header extends StatelessWidget {
               avatarAssetPath: 'assets/images/at_pharma_icon.png',
               onProfileTap: () =>
                   Navigator.of(context).pushNamed(AppRoutes.profile),
+              onTrackOrderTap: () =>
+                  Navigator.of(context).pushNamed(AppRoutes.trackOrder),
               onSignOutTap: () => signOutFromProfile(context),
             ),
           ),
@@ -613,7 +643,7 @@ class _FavouriteHeaderButton extends StatelessWidget {
                 child: Container(
                   constraints: const BoxConstraints(minWidth: 17),
                   height: 17,
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
                   alignment: Alignment.center,
                   decoration: const BoxDecoration(
                     color: _Colors.red,
@@ -636,31 +666,81 @@ class _FavouriteHeaderButton extends StatelessWidget {
   }
 }
 
-class _Banners extends StatelessWidget {
+class _Banners extends StatefulWidget {
   const _Banners();
 
   @override
+  State<_Banners> createState() => _BannersState();
+}
+
+class _BannersState extends State<_Banners> {
+  static const Duration _slideInterval = Duration(seconds: 3);
+  static const int _initialPage = 1000;
+
+  late final PageController _pageController;
+  Timer? _autoSlideTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(
+      initialPage: _initialPage,
+      viewportFraction: .5,
+    );
+    _autoSlideTimer = Timer.periodic(_slideInterval, (_) => _showNextBanner());
+  }
+
+  void _showNextBanner() {
+    if (!mounted || !_pageController.hasClients) return;
+
+    _pageController.nextPage(
+      duration: const Duration(milliseconds: 450),
+      curve: Curves.easeInOutCubic,
+    );
+  }
+
+  @override
+  void dispose() {
+    _autoSlideTimer?.cancel();
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 132,
-      child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        itemCount: _bannerImages.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (_, int index) {
-          return ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.asset(
-              _bannerImages[index],
-              width: 200,
-              height: 132,
-              fit: BoxFit.cover,
-              cacheWidth: 400,
-            ),
-          );
-        },
+    return AspectRatio(
+      aspectRatio: 3.38,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: PageView.builder(
+          controller: _pageController,
+          clipBehavior: Clip.none,
+          itemBuilder: (_, int page) {
+            final String image = _bannerImages[page % _bannerImages.length];
+            return AnimatedBuilder(
+              animation: _pageController,
+              builder: (_, Widget? child) {
+                final double currentPage = _pageController.hasClients
+                    ? (_pageController.page ?? _initialPage.toDouble())
+                    : _initialPage.toDouble();
+                final double distance = (currentPage - page).abs().clamp(
+                  0.0,
+                  1.0,
+                );
+                final double scale = 1.08 - (distance * .08);
+
+                return Transform.scale(scale: scale, child: child);
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.asset(image, fit: BoxFit.fill, cacheWidth: 500),
+                ),
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -965,6 +1045,7 @@ class _ProductCard extends StatelessWidget {
           description: product.displayDescription,
           brand: product.displayCompanyName,
           price: product.sellingPrice.round(),
+          stock: product.stock,
           prescriptionRequired: product.prescriptionRequired,
           isOutOfStock: product.isOutOfStock,
           currencyCode: product.currencyCode,
@@ -988,6 +1069,7 @@ class _ProductCard extends StatelessWidget {
               description: product.displayDescription,
               brand: product.displayCompanyName,
               price: product.sellingPrice.round(),
+              stock: product.stock,
               prescriptionRequired: product.prescriptionRequired,
               isOutOfStock: product.isOutOfStock,
               currencyCode: product.currencyCode,
@@ -1382,8 +1464,12 @@ class _Article {
 
 const List<String> _bannerImages = <String>[
   'assets/images/home_banner_1_opt.jpg',
-  'assets/images/home_banner_3_opt.jpg',
   'assets/images/home_banner_5_opt.jpg',
+  'assets/images/home_banner_free_delivery.png',
+  'assets/images/home_banner_daily_essentials.png',
+  'assets/images/home_banner_medicine_sale.png',
+  'assets/images/home_banner_grocery.png',
+  'assets/images/home_banner_baby_care.png',
 ];
 
 const List<_Article> _articles = <_Article>[

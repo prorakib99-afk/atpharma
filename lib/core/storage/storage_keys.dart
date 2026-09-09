@@ -15,6 +15,8 @@ abstract final class StorageKeys {
 
   /// Last successfully resolved delivery address shown on the home screen.
   static const String lastKnownAddress = 'last_known_address';
+  static const String lastKnownLatitude = 'last_known_latitude';
+  static const String lastKnownLongitude = 'last_known_longitude';
 
   /// Whether the user explicitly chose to browse without signing in.
   static const String guestMode = 'guest_mode';

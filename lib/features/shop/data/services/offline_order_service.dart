@@ -112,6 +112,18 @@ final class OfflineOrderDraft {
   }
 }
 
+final class CreatedOrderReceipt {
+  const CreatedOrderReceipt({
+    required this.id,
+    required this.orderNumber,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String orderNumber;
+  final DateTime createdAt;
+}
+
 final class OfflineOrderService extends ChangeNotifier {
   OfflineOrderService({
     required this._database,
@@ -181,7 +193,7 @@ final class OfflineOrderService extends ChangeNotifier {
     return localId;
   }
 
-  Future<String> createOrder(OfflineOrderDraft draft) async {
+  Future<CreatedOrderReceipt> createOrder(OfflineOrderDraft draft) async {
     final Response<dynamic> response = await _dioClient.post<dynamic>(
       ShopOrderEndpoints.createOrder,
       data: draft.toJson(),
@@ -190,13 +202,29 @@ final class OfflineOrderService extends ChangeNotifier {
     final Map<String, dynamic>? root = JsonValueParser.map(response.data);
     final Map<String, dynamic>? data =
         JsonValueParser.map(root?['data']) ?? root;
+    final String id = JsonValueParser.string(data?['id'] ?? data?['_id']);
     final String orderNumber = JsonValueParser.string(
       data?['orderNumber'] ?? data?['number'],
     );
-    if (orderNumber.isEmpty) {
-      throw const FormatException('Order number is missing from the response.');
+    if (id.isEmpty && orderNumber.isEmpty) {
+      throw const FormatException('Order ID is missing from the response.');
     }
-    return orderNumber;
+    final DateTime createdAt =
+        DateTime.tryParse(JsonValueParser.string(data?['createdAt'])) ??
+        DateTime.now();
+    return CreatedOrderReceipt(
+      id: id.isNotEmpty ? id : orderNumber,
+      orderNumber: orderNumber.isNotEmpty ? orderNumber : id,
+      createdAt: createdAt,
+    );
+  }
+
+  Future<void> cancelOrder(String orderId) async {
+    await _dioClient.patch<dynamic>(
+      OrderEndpoints.updateStatus(orderId),
+      data: const <String, String>{'status': 'CANCELED'},
+      options: ApiRequestOptions.authenticated(allowRetry: false),
+    );
   }
 
   Future<StorefrontOrderConfig> config() async {

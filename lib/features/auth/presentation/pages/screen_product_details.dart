@@ -25,6 +25,7 @@ class ProductDetailsData {
         'Helps prevent dehydration and restore body fluids quickly.',
     this.brand = 'FreshLife',
     this.price = 500,
+    this.stock,
     this.prescriptionRequired = false,
     this.isOutOfStock = false,
     this.currencyCode = '',
@@ -38,6 +39,7 @@ class ProductDetailsData {
   final String description;
   final String brand;
   final int price;
+  final int? stock;
   final bool prescriptionRequired;
   final bool isOutOfStock;
   final String currencyCode;
@@ -104,6 +106,7 @@ class ProductCart extends ChangeNotifier {
                 description: row['description']! as String,
                 brand: row['brand']! as String,
                 price: row['price']! as int,
+                stock: null,
                 prescriptionRequired:
                     (row['prescription_required']! as int) == 1,
                 currencyCode: row['currency_code']! as String,
@@ -124,12 +127,17 @@ class ProductCart extends ChangeNotifier {
   List<ProductCartItem> get items =>
       List<ProductCartItem>.unmodifiable(_items.values);
 
-  void add(ProductDetailsData product, int quantity) {
-    if (product.isOutOfStock || quantity < 1) return;
+  int? add(ProductDetailsData product, int quantity) {
+    if (product.isOutOfStock || quantity < 1) return product.stock ?? 0;
 
     final String id = product.id?.trim().isNotEmpty == true
         ? product.id!.trim()
         : product.name.trim();
+    final int currentQuantity = quantityFor(id);
+    final int? remaining = product.stock == null
+        ? null
+        : product.stock! - currentQuantity;
+    if (remaining != null && quantity > remaining) return remaining;
 
     _items.update(
       id,
@@ -140,14 +148,20 @@ class ProductCart extends ChangeNotifier {
     );
     notifyListeners();
     _persist();
+    return null;
   }
 
-  void increase(String id) {
+  int? increase(String id) {
     final ProductCartItem? item = _items[id];
-    if (item == null) return;
+    if (item == null) return null;
+    final int? remaining = item.product.stock == null
+        ? null
+        : item.product.stock! - item.quantity;
+    if (remaining != null && remaining < 1) return remaining;
     _items[id] = item.copyWith(quantity: item.quantity + 1);
     notifyListeners();
     _persist();
+    return null;
   }
 
   void decrease(String id) {
@@ -250,6 +264,11 @@ class _ScreenProductDetailsState extends State<ScreenProductDetails> {
   String get productId => product.id?.trim().isNotEmpty == true
       ? product.id!.trim()
       : product.name.trim();
+  int get cartQuantity => ProductCart.instance.quantityFor(productId);
+  int get remainingStock => (product.stock ?? 0) - cartQuantity;
+  bool get canAddToCart =>
+      !product.isOutOfStock &&
+      (product.stock == null || remainingStock >= quantity);
 
   Future<void> _toggleFavourite() async {
     await FavoriteStore.instance.toggle(
@@ -266,9 +285,30 @@ class _ScreenProductDetailsState extends State<ScreenProductDetails> {
   }
 
   void _addToCart() {
-    if (product.isOutOfStock) return;
-
-    ProductCart.instance.add(product, quantity);
+    final int? remaining = ProductCart.instance.add(product, quantity);
+    if (remaining != null) {
+      final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+      messenger
+        ..removeCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: const Color(0xffdff4c7),
+            shape: RoundedRectangleBorder(
+              side: const BorderSide(color: Color(0xffffc107), width: 2),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            content: Text(
+              '${product.name} ($remaining left)',
+              style: const TextStyle(
+                color: Color(0xff245b25),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        );
+      return;
+    }
 
     _addedButtonTimer?.cancel();
     setState(() => _showAddedConfirmation = true);
@@ -573,13 +613,16 @@ class _ScreenProductDetailsState extends State<ScreenProductDetails> {
                       onMinus: quantity > 1
                           ? () => setState(() => quantity--)
                           : null,
-                      onPlus: quantity < 31
+                      onPlus:
+                          quantity < 31 &&
+                              (product.stock == null ||
+                                  quantity < remainingStock)
                           ? () => setState(() => quantity++)
                           : null,
                     ),
                     const Spacer(),
-                    const Text(
-                      '(31 available)',
+                    Text(
+                      '(${product.stock == null ? 31 : remainingStock} available)',
                       style: TextStyle(color: _body),
                     ),
                   ],
@@ -694,7 +737,7 @@ class _ScreenProductDetailsState extends State<ScreenProductDetails> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: product.isOutOfStock ? null : _addToCart,
+                      onPressed: canAddToCart ? _addToCart : null,
                       style: FilledButton.styleFrom(
                         backgroundColor: _blue,
                         disabledBackgroundColor: const Color(0xFF98A1B3),
@@ -928,9 +971,7 @@ class _RoundIcon extends StatelessWidget {
       side: bordered
           ? const BorderSide(color: Color(0xFFF3F4F6))
           : BorderSide.none,
-      shadowColor: bordered
-          ? Colors.black12
-          : const Color(0x1F000000),
+      shadowColor: bordered ? Colors.black12 : const Color(0x1F000000),
       elevation: bordered ? 2 : 6,
     ),
   );
@@ -1297,7 +1338,8 @@ class _RelatedProductsState extends State<_RelatedProducts> {
       if (candidates.length < _targetCount) {
         try {
           var page = 1;
-          while (mounted && candidates.length + fallback.length < _targetCount) {
+          while (mounted &&
+              candidates.length + fallback.length < _targetCount) {
             final result = await _repository.getProducts(
               query: ShopProductQuery(page: page, perPage: 60),
               requestKey: _requestKey,

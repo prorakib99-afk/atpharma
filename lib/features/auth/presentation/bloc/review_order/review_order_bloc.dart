@@ -1,4 +1,5 @@
 import 'package:bloc_concurrency/bloc_concurrency.dart';
+import '../../../../../core/network/api_exception.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../shop/data/services/offline_order_service.dart';
@@ -92,11 +93,14 @@ final class ReviewOrderBloc extends Bloc<ReviewOrderEvent, ReviewOrderState> {
       state.copyWith(status: ReviewOrderStatus.submitting, clearMessage: true),
     );
     try {
-      final String orderNumber = await _service.createOrder(event.draft);
+      final CreatedOrderReceipt receipt = await _service.createOrder(
+        event.draft,
+      );
       emit(
         state.copyWith(
           status: ReviewOrderStatus.success,
-          orderNumber: orderNumber,
+          orderNumber: receipt.orderNumber,
+          receipt: receipt,
         ),
       );
     } catch (error) {
@@ -109,6 +113,8 @@ final class ReviewOrderBloc extends Bloc<ReviewOrderEvent, ReviewOrderState> {
     }
   }
 
-  String _message(Object error) =>
-      error.toString().replaceFirst('Exception: ', '');
+  String _message(Object error) {
+    if (error is ApiException) return error.message;
+    return error.toString().replaceFirst('Exception: ', '');
+  }
 }

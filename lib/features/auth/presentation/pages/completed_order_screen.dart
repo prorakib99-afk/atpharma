@@ -1,16 +1,157 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../../../core/di/injection_container.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../shared/widgets/navigation_page_scaffold.dart';
+import '../../../shop/data/services/offline_order_service.dart';
 
-class CompletedOrderScreen extends StatelessWidget {
-  const CompletedOrderScreen({super.key});
+class CompletedOrderArguments {
+  const CompletedOrderArguments({
+    required this.receipt,
+    required this.paymentMethod,
+  });
+
+  final CreatedOrderReceipt receipt;
+  final String paymentMethod;
+}
+
+class CompletedOrderScreen extends StatefulWidget {
+  const CompletedOrderScreen({super.key, required this.arguments});
 
   static const String routeName = '/completed-order';
+  final CompletedOrderArguments arguments;
+
+  @override
+  State<CompletedOrderScreen> createState() => _CompletedOrderScreenState();
+}
+
+class _CompletedOrderScreenState extends State<CompletedOrderScreen> {
+  static const Duration _cancelWindow = Duration(minutes: 15);
+  Timer? _timer;
+  late Duration _remaining;
+  bool _cancelling = false;
+  bool _cancelled = false;
+
+  CreatedOrderReceipt get _receipt => widget.arguments.receipt;
+  DateTime get _deadline => _receipt.createdAt.toLocal().add(_cancelWindow);
+  bool get _canCancel =>
+      !_cancelled && !_cancelling && _remaining > Duration.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _updateRemaining();
+    _timer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => _updateRemaining(),
+    );
+  }
+
+  void _updateRemaining() {
+    final Duration value = _deadline.difference(DateTime.now());
+    final Duration next = value.isNegative ? Duration.zero : value;
+    if (!mounted) {
+      _remaining = next;
+      return;
+    }
+    setState(() => _remaining = next);
+    if (next == Duration.zero) {
+      _timer?.cancel();
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _cancelOrder() async {
+    if (!_canCancel) return;
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: const Text('Cancel this order?'),
+        content: const Text(
+          'The order will be cancelled and its stock restored.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Keep Order'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: _CompletedColors.danger,
+            ),
+            child: const Text('Cancel Order'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _cancelling = true);
+    try {
+      await sl<OfflineOrderService>().cancelOrder(_receipt.id);
+      if (!mounted) return;
+      _timer?.cancel();
+      setState(() {
+        _cancelling = false;
+        _cancelled = true;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Order cancelled successfully.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _cancelling = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    }
+  }
+
+  String _formatDate(DateTime value) {
+    const List<String> months = <String>[
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    final DateTime local = value.toLocal();
+    final int hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
+    final String minute = local.minute.toString().padLeft(2, '0');
+    final String period = local.hour < 12 ? 'A.M' : 'P.M';
+    return '${months[local.month - 1]} ${local.day.toString().padLeft(2, '0')}, '
+        '${local.year}  •  $hour.$minute $period';
+  }
+
+  String get _remainingLabel {
+    final int minutes = _remaining.inMinutes;
+    final int seconds = _remaining.inSeconds.remainder(60);
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
 
   @override
   Widget build(BuildContext context) {
-    final bottomSafe = MediaQuery.paddingOf(context).bottom;
+    final double bottomSafe = MediaQuery.paddingOf(context).bottom;
+    final String payment = widget.arguments.paymentMethod.toUpperCase() == 'COD'
+        ? 'Cash On Delivery'
+        : widget.arguments.paymentMethod;
 
     return MediaQuery(
       data: MediaQuery.of(
@@ -23,7 +164,7 @@ class CompletedOrderScreen extends StatelessWidget {
           bottom: false,
           child: CustomScrollView(
             physics: const BouncingScrollPhysics(),
-            slivers: [
+            slivers: <Widget>[
               SliverPadding(
                 padding: EdgeInsets.fromLTRB(
                   _CompletedResponsive.pagePadding(context),
@@ -32,26 +173,37 @@ class CompletedOrderScreen extends StatelessWidget {
                   120 + bottomSafe,
                 ),
                 sliver: SliverList(
-                  delegate: SliverChildListDelegate([
+                  delegate: SliverChildListDelegate(<Widget>[
                     const _AtPharmaLogo(),
                     const SizedBox(height: 58),
                     const _SuccessIllustration(),
                     const SizedBox(height: 28),
                     const _SuccessTitle(),
                     const SizedBox(height: 34),
-                    const _OrderInfoCard(),
+                    _OrderInfoCard(
+                      orderNumber: _receipt.orderNumber,
+                      orderDate: _formatDate(_receipt.createdAt),
+                      paymentMethod: payment,
+                    ),
                     const SizedBox(height: 26),
-                    const _CancelNotice(),
+                    _CancelNotice(
+                      cancelled: _cancelled,
+                      canCancel: _remaining > Duration.zero,
+                      remaining: _remainingLabel,
+                    ),
                     const SizedBox(height: 34),
-                    _CancelOrderButton(onTap: () {}),
+                    _CancelOrderButton(
+                      onTap: _canCancel ? _cancelOrder : null,
+                      loading: _cancelling,
+                      cancelled: _cancelled,
+                    ),
                     const SizedBox(height: 16),
                     _ContinueShoppingButton(
-                      onTap: () {
-                        Navigator.of(context).pushNamedAndRemoveUntil(
-                          AppRoutes.home,
-                          (Route<dynamic> route) => false,
-                        );
-                      },
+                      onTap: () =>
+                          Navigator.of(context).pushNamedAndRemoveUntil(
+                            AppRoutes.home,
+                            (Route<dynamic> route) => false,
+                          ),
                     ),
                   ]),
                 ),
@@ -306,7 +458,15 @@ class _SuccessTitle extends StatelessWidget {
 }
 
 class _OrderInfoCard extends StatelessWidget {
-  const _OrderInfoCard();
+  const _OrderInfoCard({
+    required this.orderNumber,
+    required this.orderDate,
+    required this.paymentMethod,
+  });
+
+  final String orderNumber;
+  final String orderDate;
+  final String paymentMethod;
 
   @override
   Widget build(BuildContext context) {
@@ -317,7 +477,7 @@ class _OrderInfoCard extends StatelessWidget {
         color: _CompletedColors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: _CompletedColors.white, width: 2),
-        boxShadow: const [
+        boxShadow: const <BoxShadow>[
           BoxShadow(
             color: Color(0x0A000000),
             blurRadius: 28,
@@ -325,31 +485,31 @@ class _OrderInfoCard extends StatelessWidget {
           ),
         ],
       ),
-      child: const Column(
-        children: [
+      child: Column(
+        children: <Widget>[
           _InfoRow(
             icon: Icons.inventory_2_outlined,
             iconColor: _CompletedColors.primary,
             iconBackground: _CompletedColors.primaryLight,
             label: 'Order Number',
-            value: '#AT1234567890',
+            value: orderNumber.startsWith('#') ? orderNumber : '#$orderNumber',
             valueColor: _CompletedColors.primary,
           ),
-          SizedBox(height: 28),
+          const SizedBox(height: 28),
           _InfoRow(
             icon: Icons.calendar_month_outlined,
             iconColor: _CompletedColors.success,
-            iconBackground: Color(0xffe7fbf0),
+            iconBackground: const Color(0xffe7fbf0),
             label: 'Order Date',
-            value: 'May 04, 2026  •  10.00 A.M',
+            value: orderDate,
           ),
-          SizedBox(height: 28),
+          const SizedBox(height: 28),
           _InfoRow(
             icon: Icons.credit_card_rounded,
             iconColor: _CompletedColors.orange,
             iconBackground: _CompletedColors.orangeLight,
             label: 'Payment Method',
-            value: 'Cash On Delivery',
+            value: paymentMethod,
           ),
         ],
       ),
@@ -427,23 +587,36 @@ class _InfoRow extends StatelessWidget {
 }
 
 class _CancelNotice extends StatelessWidget {
-  const _CancelNotice();
+  const _CancelNotice({
+    required this.cancelled,
+    required this.canCancel,
+    required this.remaining,
+  });
+
+  final bool cancelled;
+  final bool canCancel;
+  final String remaining;
 
   @override
   Widget build(BuildContext context) {
-    return const Row(
+    final String message = cancelled
+        ? 'This order has been cancelled.'
+        : canCancel
+        ? 'You can cancel this order within $remaining'
+        : 'The 15-minute cancellation window has ended.';
+    return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+      children: <Widget>[
         Icon(
-          Icons.warning_amber_rounded,
+          cancelled ? Icons.check_circle_outline : Icons.warning_amber_rounded,
           size: 28,
-          color: _CompletedColors.orange,
+          color: cancelled ? _CompletedColors.success : _CompletedColors.orange,
         ),
-        SizedBox(width: 14),
+        const SizedBox(width: 14),
         Expanded(
           child: Text(
-            'You can cancel your order within 15\nmintues',
-            style: TextStyle(
+            message,
+            style: const TextStyle(
               fontFamily: 'Poppins',
               fontSize: 16,
               height: 28 / 16,
@@ -458,9 +631,15 @@ class _CancelNotice extends StatelessWidget {
 }
 
 class _CancelOrderButton extends StatelessWidget {
-  const _CancelOrderButton({required this.onTap});
+  const _CancelOrderButton({
+    required this.onTap,
+    required this.loading,
+    required this.cancelled,
+  });
 
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final bool loading;
+  final bool cancelled;
 
   @override
   Widget build(BuildContext context) {
@@ -469,23 +648,37 @@ class _CancelOrderButton extends StatelessWidget {
       width: double.infinity,
       child: OutlinedButton.icon(
         onPressed: onTap,
-        icon: const Icon(
-          Icons.close_rounded,
-          size: 26,
-          color: _CompletedColors.danger,
-        ),
-        label: const Text(
-          'Cancel Order',
-          style: TextStyle(
+        icon: loading
+            ? const SizedBox.square(
+                dimension: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Icon(
+                cancelled ? Icons.check_rounded : Icons.close_rounded,
+                size: 26,
+              ),
+        label: Text(
+          loading
+              ? 'Cancelling...'
+              : cancelled
+              ? 'Order Cancelled'
+              : 'Cancel Order',
+          style: const TextStyle(
             fontFamily: 'Poppins',
             fontSize: 17,
             height: 24 / 17,
             fontWeight: FontWeight.w600,
-            color: _CompletedColors.danger,
           ),
         ),
         style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: _CompletedColors.danger, width: 1.8),
+          foregroundColor: _CompletedColors.danger,
+          disabledForegroundColor: _CompletedColors.muted,
+          side: BorderSide(
+            color: onTap == null
+                ? _CompletedColors.muted
+                : _CompletedColors.danger,
+            width: 1.8,
+          ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),

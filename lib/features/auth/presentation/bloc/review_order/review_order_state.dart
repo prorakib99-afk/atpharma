@@ -20,6 +20,7 @@ final class ReviewOrderState extends Equatable {
     this.couponCode,
     this.message,
     this.orderNumber,
+    this.receipt,
   });
 
   final ReviewOrderStatus status;
@@ -28,6 +29,7 @@ final class ReviewOrderState extends Equatable {
   final String? couponCode;
   final String? message;
   final String? orderNumber;
+  final CreatedOrderReceipt? receipt;
 
   ReviewOrderState copyWith({
     ReviewOrderStatus? status,
@@ -38,6 +40,7 @@ final class ReviewOrderState extends Equatable {
     String? message,
     bool clearMessage = false,
     String? orderNumber,
+    CreatedOrderReceipt? receipt,
   }) => ReviewOrderState(
     status: status ?? this.status,
     config: config ?? this.config,
@@ -45,6 +48,7 @@ final class ReviewOrderState extends Equatable {
     couponCode: clearCoupon ? null : couponCode ?? this.couponCode,
     message: clearMessage ? null : message ?? this.message,
     orderNumber: orderNumber ?? this.orderNumber,
+    receipt: receipt ?? this.receipt,
   );
 
   @override
