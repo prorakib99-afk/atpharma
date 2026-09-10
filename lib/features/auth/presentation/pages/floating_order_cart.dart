@@ -223,7 +223,9 @@ class FloatingOrderCart extends StatelessWidget {
               onDecrease: item.quantity > 1
                   ? () => onDecreaseQuantity(item.id)
                   : null,
-              onIncrease: () => onIncreaseQuantity(item.id),
+              onIncrease: item.stock == null || item.quantity < item.stock!
+                  ? () => onIncreaseQuantity(item.id)
+                  : null,
             ),
             const Spacer(),
             _DeleteButton(onPressed: () => onRemoveItem(item.id)),
@@ -323,6 +325,7 @@ class FloatingCartItem {
     required this.productImage,
     required this.unitPrice,
     required this.quantity,
+    required this.stock,
   });
 
   final String id;
@@ -331,6 +334,7 @@ class FloatingCartItem {
   final String productImage;
   final double unitPrice;
   final int quantity;
+  final int? stock;
 }
 
 class _ProductImage extends StatelessWidget {
@@ -395,7 +399,7 @@ class _QuantitySelector extends StatelessWidget {
 
   final int quantity;
   final VoidCallback? onDecrease;
-  final VoidCallback onIncrease;
+  final VoidCallback? onIncrease;
 
   static const Color _borderColor = Color(0xFF98A1B3);
   static const Color _textColor = Color(0xFF131314);

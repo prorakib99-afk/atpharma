@@ -2,10 +2,16 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/routes/app_routes.dart';
+import '../../../../core/session/session_manager.dart';
 import '../../domain/usecases/logout_use_case.dart';
+import '../bloc/profile/profile_state.dart';
+import 'favorite_store.dart';
+import 'screen_product_details.dart';
 
 Future<void> signOutFromProfile(BuildContext context) async {
   await sl<LogoutUseCase>()();
+  await FavoriteStore.instance.clear();
+  await ProductCart.instance.clear();
   if (!context.mounted) return;
   Navigator.of(context).pushNamedAndRemoveUntil(
     AppRoutes.startpage,
@@ -40,25 +46,25 @@ class FloatingProfileScreen extends StatelessWidget {
   const FloatingProfileScreen({
     super.key,
     this.avatarAssetPath,
+    this.avatarUrl,
     this.name = 'Sabbir Shawon',
     this.role = 'Super Admin',
     this.width = 220,
     this.onProfileTap,
     this.onTrackOrderTap,
-    this.onAccountSettingsTap,
-    this.onHelpCenterTap,
+    this.onMyOrdersTap,
     this.onSignOutTap,
     this.showAccentTab = true,
   });
 
   final String? avatarAssetPath;
+  final String? avatarUrl;
   final String name;
   final String role;
   final double width;
   final VoidCallback? onProfileTap;
   final VoidCallback? onTrackOrderTap;
-  final VoidCallback? onAccountSettingsTap;
-  final VoidCallback? onHelpCenterTap;
+  final VoidCallback? onMyOrdersTap;
   final VoidCallback? onSignOutTap;
   final bool showAccentTab;
 
@@ -74,10 +80,13 @@ class FloatingProfileScreen extends StatelessWidget {
     String role = 'Super Admin',
     VoidCallback? onProfileTap,
     VoidCallback? onTrackOrderTap,
-    VoidCallback? onAccountSettingsTap,
-    VoidCallback? onHelpCenterTap,
+    VoidCallback? onMyOrdersTap,
     VoidCallback? onSignOutTap,
   }) {
+    final ProfileData profile = ProfileData.fromSession(
+      sl<SessionManager>().currentUser,
+      isGuest: sl<SessionManager>().isGuestMode,
+    );
     return Navigator.of(context).push(
       PageRouteBuilder(
         opaque: false,
@@ -103,24 +112,23 @@ class FloatingProfileScreen extends StatelessWidget {
                       child: GestureDetector(
                         onTap: () {},
                         child: FloatingProfileScreen(
-                          avatarAssetPath: avatarAssetPath,
-                          name: name,
-                          role: role,
+                          avatarAssetPath: profile.isGuest
+                              ? null
+                              : avatarAssetPath,
+                          avatarUrl: profile.isGuest ? null : profile.avatarUrl,
+                          name: profile.name,
+                          role: profile.roleLine,
                           onProfileTap: () {
                             Navigator.of(context).pop();
                             onProfileTap?.call();
                           },
+                          onMyOrdersTap: () {
+                            Navigator.of(context).pop();
+                            onMyOrdersTap?.call();
+                          },
                           onTrackOrderTap: () {
                             Navigator.of(context).pop();
                             onTrackOrderTap?.call();
-                          },
-                          onAccountSettingsTap: () {
-                            Navigator.of(context).pop();
-                            onAccountSettingsTap?.call();
-                          },
-                          onHelpCenterTap: () {
-                            Navigator.of(context).pop();
-                            onHelpCenterTap?.call();
                           },
                           onSignOutTap: () {
                             Navigator.of(context).pop();
@@ -171,10 +179,14 @@ class FloatingProfileScreen extends StatelessWidget {
                     CircleAvatar(
                       radius: 18,
                       backgroundColor: const Color(0xffe5e7eb),
-                      backgroundImage: avatarAssetPath != null
+                      backgroundImage: avatarUrl?.trim().isNotEmpty == true
+                          ? NetworkImage(avatarUrl!)
+                          : avatarAssetPath != null
                           ? AssetImage(avatarAssetPath!)
                           : null,
-                      child: avatarAssetPath == null
+                      child:
+                          avatarUrl?.trim().isNotEmpty != true &&
+                              avatarAssetPath == null
                           ? const Icon(
                               Icons.person,
                               color: Colors.white,
@@ -222,22 +234,16 @@ class FloatingProfileScreen extends StatelessWidget {
                       onTap: onProfileTap,
                     ),
                     _MenuRow(
+                      icon: Icons.receipt_long_outlined,
+                      title: 'My Orders',
+                      subtitle: 'View your order history',
+                      onTap: onMyOrdersTap,
+                    ),
+                    _MenuRow(
                       icon: Icons.local_shipping_outlined,
                       title: 'Track Order',
                       subtitle: 'See live delivery updates',
                       onTap: onTrackOrderTap,
-                    ),
-                    _MenuRow(
-                      icon: Icons.settings_outlined,
-                      title: 'Account settings',
-                      subtitle: 'Preferences and access',
-                      onTap: onAccountSettingsTap,
-                    ),
-                    _MenuRow(
-                      icon: Icons.help_outline,
-                      title: 'Help center',
-                      subtitle: 'Support and documentation',
-                      onTap: onHelpCenterTap,
                     ),
                   ],
                 ),

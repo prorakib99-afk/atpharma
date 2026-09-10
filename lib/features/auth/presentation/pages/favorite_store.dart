@@ -37,27 +37,32 @@ class FavoriteStore extends ChangeNotifier {
     final List<dynamic> rows = storage.readList(_storageKey) ?? <dynamic>[];
     _items
       ..clear()
-      ..addEntries(rows.whereType<Map>().map((Map<dynamic, dynamic> rawRow) {
-        final Map<String, dynamic> row = rawRow.map(
-          (dynamic key, dynamic value) =>
-              MapEntry<String, dynamic>(key.toString(), value),
-        );
-        final String id = row['id']?.toString() ?? '';
-        return MapEntry<String, FavoriteProduct>(
-          id,
-          FavoriteProduct(
-            id: id,
-            name: row['name']?.toString() ?? '',
-            image: row['image']?.toString() ?? '',
-            description: row['description']?.toString() ?? '',
-            brand: row['brand']?.toString() ?? '',
-            price: (row['price'] as num?)?.toInt() ?? 0,
-            isOutOfStock: row['isOutOfStock'] == true,
-          ),
-        );
-      }).where((MapEntry<String, FavoriteProduct> entry) {
-        return entry.key.isNotEmpty;
-      }));
+      ..addEntries(
+        rows
+            .whereType<Map>()
+            .map((Map<dynamic, dynamic> rawRow) {
+              final Map<String, dynamic> row = rawRow.map(
+                (dynamic key, dynamic value) =>
+                    MapEntry<String, dynamic>(key.toString(), value),
+              );
+              final String id = row['id']?.toString() ?? '';
+              return MapEntry<String, FavoriteProduct>(
+                id,
+                FavoriteProduct(
+                  id: id,
+                  name: row['name']?.toString() ?? '',
+                  image: row['image']?.toString() ?? '',
+                  description: row['description']?.toString() ?? '',
+                  brand: row['brand']?.toString() ?? '',
+                  price: (row['price'] as num?)?.toInt() ?? 0,
+                  isOutOfStock: row['isOutOfStock'] == true,
+                ),
+              );
+            })
+            .where((MapEntry<String, FavoriteProduct> entry) {
+              return entry.key.isNotEmpty;
+            }),
+      );
     notifyListeners();
   }
 
@@ -86,22 +91,31 @@ class FavoriteStore extends ChangeNotifier {
     }
   }
 
+  Future<void> clear() async {
+    if (_items.isEmpty) return;
+    _items.clear();
+    notifyListeners();
+    await _persist();
+  }
+
   Future<void> _persist() async {
     final LocalStorageService? storage = _storage;
     if (storage == null) return;
     await storage.write<List<Map<String, Object?>>>(
       key: _storageKey,
-      value: _items.values.map((FavoriteProduct product) {
-        return <String, Object?>{
-          'id': product.id,
-          'name': product.name,
-          'image': product.image,
-          'description': product.description,
-          'brand': product.brand,
-          'price': product.price,
-          'isOutOfStock': product.isOutOfStock,
-        };
-      }).toList(growable: false),
+      value: _items.values
+          .map((FavoriteProduct product) {
+            return <String, Object?>{
+              'id': product.id,
+              'name': product.name,
+              'image': product.image,
+              'description': product.description,
+              'brand': product.brand,
+              'price': product.price,
+              'isOutOfStock': product.isOutOfStock,
+            };
+          })
+          .toList(growable: false),
     );
   }
 }

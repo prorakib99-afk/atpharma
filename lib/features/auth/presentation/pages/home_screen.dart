@@ -482,6 +482,8 @@ class _Header extends StatelessWidget {
               avatarAssetPath: 'assets/images/at_pharma_icon.png',
               onProfileTap: () =>
                   Navigator.of(context).pushNamed(AppRoutes.profile),
+              onMyOrdersTap: () =>
+                  Navigator.of(context).pushNamed(AppRoutes.myOrders),
               onTrackOrderTap: () =>
                   Navigator.of(context).pushNamed(AppRoutes.trackOrder),
               onSignOutTap: () => signOutFromProfile(context),
@@ -1014,10 +1016,13 @@ class _ProductSection extends StatelessWidget {
             itemBuilder: (BuildContext context, int index) {
               final ShopProductEntity product = products[index];
 
-              return _ProductCard(
-                key: ValueKey<String>(product.id),
-                product: product,
-                compact: compact,
+              return AnimatedBuilder(
+                animation: ProductCart.instance,
+                builder: (_, _) => _ProductCard(
+                  key: ValueKey<String>(product.id),
+                  product: product,
+                  compact: compact,
+                ),
               );
             },
           ),
@@ -1084,6 +1089,9 @@ class _ProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool outOfStock = product.isOutOfStock;
+    final bool addDisabled =
+        outOfStock ||
+        ProductCart.instance.isAtStockLimit(product.id, product.stock);
     final bool isSmall = MediaQuery.sizeOf(context).width <= 360;
 
     return InkWell(
@@ -1121,14 +1129,14 @@ class _ProductCard extends StatelessWidget {
                     bottom: -16,
                     child: Builder(
                       builder: (BuildContext buttonContext) => Material(
-                        color: outOfStock
+                        color: addDisabled
                             ? const Color(0xFF98A1B3)
                             : _Colors.blue,
                         elevation: 7,
                         shadowColor: const Color(0x300B83D9),
                         shape: const CircleBorder(),
                         child: InkWell(
-                          onTap: outOfStock
+                          onTap: addDisabled
                               ? null
                               : () => _addToCart(buttonContext),
                           customBorder: const CircleBorder(),

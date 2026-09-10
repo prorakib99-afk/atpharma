@@ -198,4 +198,15 @@ final class AuthRepositoryImpl implements AuthRepository {
         ? const AppSuccess<void>(null)
         : AppError<void>(FailureMapper.fromException(failure));
   }
+
+  @override
+  Future<AppResult<Map<String, dynamic>>> getMyProfile() async {
+    try {
+      final user = await _remoteDataSource.getMyProfile();
+      await _sessionManager.updateCurrentUser(user);
+      return AppSuccess<Map<String, dynamic>>(user);
+    } catch (error) {
+      return AppError<Map<String, dynamic>>(FailureMapper.fromException(error));
+    }
+  }
 }

@@ -9,6 +9,8 @@ abstract interface class AuthRemoteDataSource {
     required String password,
   });
 
+  Future<Map<String, dynamic>> getMyProfile();
+
   Future<Map<String, dynamic>> register({
     required String name,
     required String phone,
@@ -152,5 +154,22 @@ final class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       AuthEndpoints.logout,
       options: ApiRequestOptions.authenticated(allowRetry: false),
     );
+  }
+
+  @override
+  Future<Map<String, dynamic>> getMyProfile() async {
+    final response = await _dioClient.get<dynamic>(
+      UserEndpoints.me,
+      options: ApiRequestOptions.authenticated(),
+    );
+    if (response.data is! Map)
+      throw const FormatException('Invalid profile response.');
+    final root = Map<String, dynamic>.from(response.data as Map);
+    final dynamic data = root['data'];
+    final dynamic value = data is Map
+        ? (data['user'] ?? data['customer'] ?? data)
+        : (root['user'] ?? root['customer'] ?? root);
+    if (value is! Map) throw const FormatException('Profile was not returned.');
+    return Map<String, dynamic>.from(value);
   }
 }

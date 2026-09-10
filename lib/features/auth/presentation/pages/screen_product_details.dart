@@ -1,8 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:share_plus/share_plus.dart';
 
+import '../../../../core/constants/api_constants.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/storage/app_database.dart';
 import '../../../../core/utils/currency_display.dart';
@@ -11,13 +14,18 @@ import '../../../../shared/widgets/skeleton_loader.dart';
 import '../../../shop/domain/entities/shop_product_entity.dart';
 import '../../../shop/domain/entities/shop_product_query.dart';
 import '../../../shop/domain/repositories/shop_product_repository.dart';
+import '../../../shop_reviews/presentation/bloc/shop_reviews_bloc.dart';
+import '../../../shop_reviews/presentation/bloc/shop_reviews_event.dart';
+import '../../../shop_reviews/presentation/bloc/shop_reviews_state.dart';
 import 'favorite_store.dart';
 import 'favourite_screen.dart';
 import 'floating_order_cart.dart';
+import 'product_detail_tabs.dart';
 
 class ProductDetailsData {
   const ProductDetailsData({
     this.id,
+    this.slug = '',
     required this.name,
     required this.image,
     this.galleryImages = const <String>[],
@@ -30,9 +38,47 @@ class ProductDetailsData {
     this.isOutOfStock = false,
     this.currencyCode = '',
     this.countryCode = '',
+    this.productCode = '',
+    this.genericName = '',
+    this.categoryName = '',
+    this.tags = const <String>[],
+    this.dosageUsage = '',
+    this.substituteMedicines = '',
   });
 
+  factory ProductDetailsData.fromShopProduct(ShopProductEntity product) {
+    return ProductDetailsData(
+      id: product.id,
+      slug: product.slug,
+      name: product.name,
+      image: product.primaryImageUrl,
+      galleryImages: product.allImageUrls,
+      description: product.displayDescription,
+      brand: product.displayCompanyName,
+      price: product.sellingPrice.round(),
+      stock: product.stock,
+      prescriptionRequired: product.prescriptionRequired,
+      isOutOfStock: product.isOutOfStock,
+      currencyCode: product.currencyCode,
+      countryCode: product.countryCode,
+      productCode: product.productCode,
+      genericName: product.genericName,
+      categoryName: product.displayCategoryName,
+      tags: product.tags,
+      dosageUsage: _sectionText(product, const <String>[
+        'dosage',
+        'usage',
+        'how to use',
+      ]),
+      substituteMedicines: _sectionText(product, const <String>[
+        'substitute',
+        'alternative medicine',
+      ]),
+    );
+  }
+
   final String? id;
+  final String slug;
   final String name;
   final String image;
   final List<String> galleryImages;
@@ -44,11 +90,35 @@ class ProductDetailsData {
   final bool isOutOfStock;
   final String currencyCode;
   final String countryCode;
+  final String dosageUsage;
+  final String substituteMedicines;
+  final String productCode;
+  final String genericName;
+  final String categoryName;
+  final List<String> tags;
 
   String get currencySymbol => CurrencyDisplay.symbol(
     currencyCode: currencyCode,
     countryCode: countryCode,
   );
+
+  static String _sectionText(ShopProductEntity product, List<String> keywords) {
+    final matches = product.sections
+        .where((section) {
+          final title = section.title.toLowerCase();
+          return keywords.any(title.contains);
+        })
+        .map((section) {
+          return section.content
+              .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
+              .replaceAll(RegExp(r'</p>|</li>', caseSensitive: false), '\n')
+              .replaceAll(RegExp(r'<[^>]+>'), '')
+              .replaceAll('&nbsp;', ' ')
+              .trim();
+        })
+        .where((value) => value.isNotEmpty);
+    return matches.join('\n\n');
+  }
 
   List<String> get displayImages {
     final Set<String> images = <String>{};
@@ -106,7 +176,8 @@ class ProductCart extends ChangeNotifier {
                 description: row['description']! as String,
                 brand: row['brand']! as String,
                 price: row['price']! as int,
-                stock: null,
+                stock: row['stock'] as int?,
+                isOutOfStock: (row['is_out_of_stock'] as int? ?? 0) == 1,
                 prescriptionRequired:
                     (row['prescription_required']! as int) == 1,
                 currencyCode: row['currency_code']! as String,
@@ -121,6 +192,10 @@ class ProductCart extends ChangeNotifier {
   }
 
   int quantityFor(String id) => _items[id]?.quantity ?? 0;
+  bool isAtStockLimit(String id, int? stock) {
+    return stock != null && quantityFor(id) >= stock;
+  }
+
   int get totalCount => _items.values.fold(0, (int sum, ProductCartItem item) {
     return sum + item.quantity;
   });
@@ -141,8 +216,11 @@ class ProductCart extends ChangeNotifier {
 
     _items.update(
       id,
-      (ProductCartItem value) =>
-          value.copyWith(quantity: value.quantity + quantity),
+      (ProductCartItem value) => ProductCartItem(
+        id: id,
+        product: product,
+        quantity: value.quantity + quantity,
+      ),
       ifAbsent: () =>
           ProductCartItem(id: id, product: product, quantity: quantity),
     );
@@ -207,6 +285,8 @@ class ProductCart extends ChangeNotifier {
                 'description': item.product.description,
                 'brand': item.product.brand,
                 'price': item.product.price,
+                'stock': item.product.stock,
+                'is_out_of_stock': item.product.isOutOfStock ? 1 : 0,
                 'prescription_required': item.product.prescriptionRequired
                     ? 1
                     : 0,
@@ -255,12 +335,14 @@ class ScreenProductDetails extends StatefulWidget {
 
 class _ScreenProductDetailsState extends State<ScreenProductDetails> {
   int quantity = 1;
+  late ProductDetailsData _product;
+  late final ShopReviewsBloc _reviewsBloc = sl<ShopReviewsBloc>();
   static Timer? _cartSnackBarTimer;
   static int _cartSnackBarGeneration = 0;
   Timer? _addedButtonTimer;
   bool _showAddedConfirmation = false;
 
-  ProductDetailsData get product => widget.product;
+  ProductDetailsData get product => _product;
   String get productId => product.id?.trim().isNotEmpty == true
       ? product.id!.trim()
       : product.name.trim();
@@ -269,6 +351,51 @@ class _ScreenProductDetailsState extends State<ScreenProductDetails> {
   bool get canAddToCart =>
       !product.isOutOfStock &&
       (product.stock == null || remainingStock >= quantity);
+
+  @override
+  void initState() {
+    super.initState();
+    _product = widget.product;
+    final id = productId;
+    if (id.isNotEmpty) _reviewsBloc.add(ShopReviewsRequested(id));
+  }
+
+  @override
+  void didUpdateWidget(covariant ScreenProductDetails oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.product.id != widget.product.id) {
+      _product = widget.product;
+      quantity = 1;
+      final id = productId;
+      if (id.isNotEmpty) _reviewsBloc.add(ShopReviewsRequested(id));
+    }
+  }
+
+  void _applyFreshProduct(ShopProductEntity freshProduct) {
+    if (!mounted || freshProduct.id != productId) return;
+    setState(() {
+      _product = ProductDetailsData.fromShopProduct(freshProduct);
+    });
+  }
+
+  Future<void> _shareProduct(BuildContext buttonContext) async {
+    final String pathValue = product.slug.trim().isNotEmpty
+        ? product.slug.trim()
+        : productId;
+    final String productUrl =
+        '${ApiConstants.storefrontBaseUrl}/products/${Uri.encodeComponent(pathValue)}';
+    final RenderBox? box = buttonContext.findRenderObject() as RenderBox?;
+
+    await SharePlus.instance.share(
+      ShareParams(
+        subject: product.name,
+        text: '${product.name}\n$productUrl',
+        sharePositionOrigin: box == null
+            ? null
+            : box.localToGlobal(Offset.zero) & box.size,
+      ),
+    );
+  }
 
   Future<void> _toggleFavourite() async {
     await FavoriteStore.instance.toggle(
@@ -378,6 +505,7 @@ class _ScreenProductDetailsState extends State<ScreenProductDetails> {
   @override
   void dispose() {
     _addedButtonTimer?.cancel();
+    _reviewsBloc.close();
     super.dispose();
   }
 
@@ -418,6 +546,7 @@ class _ScreenProductDetailsState extends State<ScreenProductDetails> {
                       productImage: item.product.image,
                       unitPrice: item.product.price.toDouble(),
                       quantity: item.quantity,
+                      stock: item.product.stock,
                     );
                   })
                   .toList(growable: false),
@@ -547,25 +676,19 @@ class _ScreenProductDetailsState extends State<ScreenProductDetails> {
                   style: const TextStyle(color: _body, height: 1.55),
                 ),
                 const SizedBox(height: 12),
-                const Row(
-                  children: [
-                    Text('★★★★', style: TextStyle(color: Color(0xFFFFA000))),
-                    Text('☆', style: TextStyle(color: _body)),
-                    SizedBox(width: 8),
-                    Text('4.7', style: TextStyle(fontWeight: FontWeight.w600)),
-                    SizedBox(width: 8),
-                    Text(
-                      '(120 reviews)',
-                      style: TextStyle(decoration: TextDecoration.underline),
-                    ),
-                  ],
+                BlocProvider.value(
+                  value: _reviewsBloc,
+                  child: const _BackendRatingLine(),
                 ),
                 const SizedBox(height: 12),
-                const Wrap(
+                Wrap(
                   spacing: 8,
+                  runSpacing: 8,
                   children: [
-                    _Badge('Medicine', blue: true),
-                    _Badge('Acetaminophen'),
+                    if (product.categoryName.trim().isNotEmpty)
+                      _Badge(product.categoryName, blue: true),
+                    if (product.genericName.trim().isNotEmpty)
+                      _Badge(product.genericName),
                   ],
                 ),
                 const SizedBox(height: 20),
@@ -630,11 +753,18 @@ class _ScreenProductDetailsState extends State<ScreenProductDetails> {
                 const SizedBox(height: 22),
                 const Divider(color: _border),
                 const SizedBox(height: 12),
-                const _LabelValue(label: 'Product Code:', value: 'MDC051'),
+                _LabelValue(
+                  label: 'Product Code:',
+                  value: product.productCode.trim().isEmpty
+                      ? 'Not available'
+                      : product.productCode,
+                ),
                 const SizedBox(height: 12),
-                const _LabelValue(
+                _LabelValue(
                   label: 'Tags:',
-                  value: 'Medicine, Fever, Health, Medicare',
+                  value: product.tags.isEmpty
+                      ? 'Not available'
+                      : product.tags.join(', '),
                 ),
                 const SizedBox(height: 20),
                 Row(
@@ -649,62 +779,30 @@ class _ScreenProductDetailsState extends State<ScreenProductDetails> {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: _SoftButton(
-                        icon: Icons.share_outlined,
-                        onTap: () {},
+                      child: Builder(
+                        builder: (BuildContext shareContext) => _SoftButton(
+                          icon: Icons.share_outlined,
+                          onTap: () => _shareProduct(shareContext),
+                        ),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 28),
-                const _TabStrip(),
-                const SizedBox(height: 26),
-                const _InfoBlock(
-                  icon: Icons.medical_information_outlined,
-                  color: Color(0xFF72B5F0),
-                  title: 'How to Use:',
-                  lines: [
-                    'Empty one sachet into 1 liter of clean, safe drinking water',
-                    'Stir well until the powder is completely dissolved',
-                    'Do not boil after mixing',
-                  ],
-                ),
-                const _InfoBlock(
-                  icon: Icons.assignment_outlined,
-                  color: Color(0xFF61C87A),
-                  title: 'Recommended Dosage:',
-                  prefix: 'For Adults–',
-                  lines: [
-                    'Drink frequently as needed to maintain hydration',
-                    'Continue use until dehydration symptoms improve',
-                    'For children, give small sips frequently',
-                  ],
-                ),
-                const _InfoBlock(
-                  icon: Icons.lightbulb_outline,
-                  color: Color(0xFFFFC65B),
-                  title: 'Usage Tips:',
-                  lines: [
-                    'Start taking ORS at the first sign of dehydration',
-                    'Continue alongside normal diet (if possible)',
-                    'Especially useful during diarrhea, vomiting, fever, or heat exposure',
-                  ],
-                ),
-                const _InfoBlock(
-                  icon: Icons.shield_outlined,
-                  color: Color(0xFFA982E8),
-                  title: 'Important Instructions:',
-                  lines: [
-                    'Use prepared solution within 24 hours',
-                    'Store in a clean, covered container',
-                    'Do not mix with milk, juice, or flavored drinks',
-                    'Always consult a doctor in case of severe dehydration',
-                  ],
+                BlocProvider.value(
+                  value: _reviewsBloc,
+                  child: ProductDetailTabs(
+                    productId: productId,
+                    description: product.description,
+                    dosageUsage: product.dosageUsage,
+                    substituteMedicines: product.substituteMedicines,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 _RelatedProducts(
                   key: ValueKey(product.id ?? product.name),
                   current: product,
+                  onCurrentLoaded: _applyFreshProduct,
                 ),
               ],
             ),
@@ -1021,6 +1119,45 @@ class _FavouriteShortcut extends StatelessWidget {
   }
 }
 
+class _BackendRatingLine extends StatelessWidget {
+  const _BackendRatingLine();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<ShopReviewsBloc, ShopReviewsState>(
+      builder: (context, state) {
+        final summary = state.page?.summary;
+        final double average = summary?.average ?? 0;
+        final int count = summary?.count ?? 0;
+        return Row(
+          children: [
+            ...List<Widget>.generate(
+              5,
+              (index) => Icon(
+                index < average.round()
+                    ? Icons.star_rounded
+                    : Icons.star_border_rounded,
+                color: const Color(0xFFFFA000),
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              average.toStringAsFixed(1),
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '($count ${count == 1 ? 'review' : 'reviews'})',
+              style: const TextStyle(decoration: TextDecoration.underline),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
 class _Badge extends StatelessWidget {
   const _Badge(
     this.text, {
@@ -1149,103 +1286,14 @@ class _SoftButton extends StatelessWidget {
   );
 }
 
-class _TabStrip extends StatelessWidget {
-  const _TabStrip();
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(10),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(22),
-      boxShadow: const [BoxShadow(color: Color(0x10000000), blurRadius: 22)],
-    ),
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.spaceAround,
-      children: [
-        const Icon(Icons.description_outlined, color: _body),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
-          decoration: BoxDecoration(
-            color: const Color(0xFF050E54),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: const Row(
-            children: [
-              Icon(Icons.link, color: Colors.white, size: 20),
-              SizedBox(width: 8),
-              Text(
-                'Dosage & Usage',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const Icon(Icons.comment_outlined, color: _body),
-        const Icon(Icons.sync, color: _body),
-      ],
-    ),
-  );
-}
-
-class _InfoBlock extends StatelessWidget {
-  const _InfoBlock({
-    required this.icon,
-    required this.color,
-    required this.title,
-    required this.lines,
-    this.prefix,
-  });
-  final IconData icon;
-  final Color color;
-  final String title;
-  final List<String> lines;
-  final String? prefix;
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.only(bottom: 22, top: 4),
-    margin: const EdgeInsets.only(bottom: 18),
-    decoration: const BoxDecoration(
-      border: Border(bottom: BorderSide(color: _border)),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            CircleAvatar(
-              radius: 14,
-              backgroundColor: color.withValues(alpha: .14),
-              child: Icon(icon, size: 17, color: color),
-            ),
-            const SizedBox(width: 10),
-            Text(
-              title,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-          ],
-        ),
-        if (prefix != null) ...[const SizedBox(height: 14), Text(prefix!)],
-        const SizedBox(height: 10),
-        ...lines.map(
-          (line) => Padding(
-            padding: const EdgeInsets.only(left: 7, bottom: 5),
-            child: Text(
-              '•  $line',
-              style: const TextStyle(color: _body, height: 1.45),
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
 class _RelatedProducts extends StatefulWidget {
-  const _RelatedProducts({super.key, required this.current});
+  const _RelatedProducts({
+    super.key,
+    required this.current,
+    required this.onCurrentLoaded,
+  });
   final ProductDetailsData current;
+  final ValueChanged<ShopProductEntity> onCurrentLoaded;
 
   @override
   State<_RelatedProducts> createState() => _RelatedProductsState();
@@ -1285,6 +1333,7 @@ class _RelatedProductsState extends State<_RelatedProducts> {
       if (current == null) {
         throw StateError('Unable to load related products.');
       }
+      widget.onCurrentLoaded(current);
       final categoryId = current.category?.id.trim() ?? '';
       final typeId = current.type?.id.trim() ?? '';
       final candidates = <ShopProductEntity>[];

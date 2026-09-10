@@ -20,4 +20,7 @@ abstract final class StorageKeys {
 
   /// Whether the user explicitly chose to browse without signing in.
   static const String guestMode = 'guest_mode';
+
+  /// Stable guest identity generated for this device/session profile.
+  static const String guestNumber = 'guest_number';
 }

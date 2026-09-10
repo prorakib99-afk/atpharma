@@ -4,6 +4,9 @@ abstract final class ApiConstants {
   /// Backend root host.
   static const String host = 'https://backend.altamampharma.com';
 
+  /// Public customer-facing storefront used for shareable product links.
+  static const String storefrontBaseUrl = 'https://altamampharma.com';
+
   /// Every REST endpoint is served under the `/api` global prefix.
   static const String apiPrefix = '/api';
 

@@ -31,4 +31,5 @@ abstract interface class AuthRepository {
     required String password,
   });
   Future<AppResult<void>> logout();
+  Future<AppResult<Map<String, dynamic>>> getMyProfile();
 }

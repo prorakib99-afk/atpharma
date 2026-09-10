@@ -7,756 +7,576 @@ import '../bloc/track_order_bloc.dart';
 import '../bloc/track_order_event.dart';
 import '../bloc/track_order_state.dart';
 
-const Color _kPrimary = Color(0xff1e2a5e);
-const Color _kMuted = Color(0xff6b7280);
-const Color _kBorder = Color(0xffe5e7eb);
-const Color _kBackground = Color(0xfff5f6fa);
-const Color _kSuccess = Color(0xff16a34a);
+const Color _blue = Color(0xff087cf0);
+const Color _navy = Color(0xff223b8f);
+const Color _ink = Color(0xff10142c);
+const Color _muted = Color(0xff7183a5);
+const Color _page = Color(0xfff5faff);
 
 class TrackOrderScreen extends StatelessWidget {
   const TrackOrderScreen({super.key, this.initialCode});
-
   final String? initialCode;
-
   @override
-  Widget build(BuildContext context) {
-    return BlocProvider<TrackOrderBloc>(
-      create: (_) => sl<TrackOrderBloc>(),
-      child: _TrackOrderView(initialCode: initialCode),
-    );
-  }
+  Widget build(BuildContext context) => BlocProvider<TrackOrderBloc>(
+    create: (_) => sl<TrackOrderBloc>(),
+    child: _TrackView(initialCode: initialCode),
+  );
 }
 
-class _TrackOrderView extends StatefulWidget {
-  const _TrackOrderView({this.initialCode});
-
+class _TrackView extends StatefulWidget {
+  const _TrackView({this.initialCode});
   final String? initialCode;
-
   @override
-  State<_TrackOrderView> createState() => _TrackOrderViewState();
+  State<_TrackView> createState() => _TrackViewState();
 }
 
-class _TrackOrderViewState extends State<_TrackOrderView> {
-  late final TextEditingController _controller = TextEditingController(
+class _TrackViewState extends State<_TrackView> {
+  late final TextEditingController controller = TextEditingController(
     text: widget.initialCode ?? '',
   );
-
   @override
   void initState() {
     super.initState();
-
-    final String? code = widget.initialCode?.trim();
-
-    if (code != null && code.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _submit());
+    if ((widget.initialCode ?? '').trim().isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => submit());
     }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    controller.dispose();
     super.dispose();
   }
 
-  void _submit() {
+  void submit() {
     FocusScope.of(context).unfocus();
     context.read<TrackOrderBloc>().add(
-      TrackOrderSubmitted(code: _controller.text),
+      TrackOrderSubmitted(code: controller.text),
     );
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _kBackground,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _TopBar(onBack: () => Navigator.of(context).maybePop()),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _SearchCard(controller: _controller, onSubmit: _submit),
-                    const SizedBox(height: 16),
-                    BlocBuilder<TrackOrderBloc, TrackOrderState>(
-                      builder: (context, state) {
-                        if (state.status == TrackOrderStatus.loading) {
-                          return const Padding(
-                            padding: EdgeInsets.only(top: 48),
-                            child: Center(child: CircularProgressIndicator()),
-                          );
-                        }
-
-                        if (state.status == TrackOrderStatus.failure) {
-                          return _ErrorCard(
-                            message:
-                                state.failure?.message ??
-                                'Unable to find that order.',
-                          );
-                        }
-
-                        if (state.hasOrder) {
-                          return _TrackOrderResult(order: state.order!);
-                        }
-
-                        return const SizedBox.shrink();
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TopBar extends StatelessWidget {
-  const _TopBar({required this.onBack});
-
-  final VoidCallback onBack;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 4, 16, 4),
-      child: Row(
-        children: [
-          IconButton(
-            onPressed: onBack,
-            icon: const Icon(Icons.arrow_back, color: _kPrimary),
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: _page,
+    body: BlocBuilder<TrackOrderBloc, TrackOrderState>(
+      builder: (context, state) => CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: <Widget>[
+          SliverToBoxAdapter(
+            child: _Header(onBack: () => Navigator.of(context).maybePop()),
           ),
-          const Text(
-            'Track Your Order',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: _kPrimary,
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 40),
+            sliver: SliverList.list(
+              children: <Widget>[
+                _SearchCard(
+                  controller: controller,
+                  onSubmit: submit,
+                  loading: state.status == TrackOrderStatus.loading,
+                ),
+                if (state.status == TrackOrderStatus.failure) ...<Widget>[
+                  const SizedBox(height: 16),
+                  _Message(
+                    message:
+                        state.failure?.message ?? 'Unable to find that order.',
+                  ),
+                ],
+                if (state.hasOrder) ...<Widget>[
+                  const SizedBox(height: 28),
+                  const _DividerTitle(),
+                  const SizedBox(height: 22),
+                  _Result(order: state.order!),
+                ],
+              ],
             ),
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
+
+class _Header extends StatelessWidget {
+  const _Header({required this.onBack});
+  final VoidCallback onBack;
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: 456,
+    child: Stack(
+      children: <Widget>[
+        Container(
+          height: 360,
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: <Color>[Color(0xff49aafa), Color(0xffc4edff)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.vertical(
+              bottom: Radius.elliptical(380, 96),
+            ),
+          ),
+        ),
+        Positioned(
+          left: -70,
+          right: -70,
+          top: 285,
+          child: Container(
+            height: 210,
+            decoration: BoxDecoration(
+              color: _page.withValues(alpha: .9),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.elliptical(390, 110),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          top: MediaQuery.paddingOf(context).top + 14,
+          left: 18,
+          child: Material(
+            color: Colors.white.withValues(alpha: .88),
+            shape: const CircleBorder(),
+            elevation: 2,
+            child: IconButton(
+              onPressed: onBack,
+              icon: const Icon(Icons.arrow_back_ios_new_rounded),
+              color: _blue,
+            ),
+          ),
+        ),
+        Positioned(
+          top: MediaQuery.paddingOf(context).top + 76,
+          left: 0,
+          right: 0,
+          child: Column(
+            children: <Widget>[
+              Container(
+                width: 92,
+                height: 92,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: const <BoxShadow>[
+                    BoxShadow(color: Color(0x220b4f8f), blurRadius: 25),
+                  ],
+                ),
+                child: Image.asset(
+                  'assets/images/at_pharma_icon.png',
+                  fit: BoxFit.contain,
+                ),
+              ),
+              const SizedBox(height: 28),
+              const Text(
+                'Track Your Order',
+                style: TextStyle(
+                  color: _ink,
+                  fontSize: 31,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 34),
+                child: Text(
+                  'Enter your order ID or the phone number on the order to see live delivery updates.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: _muted, fontSize: 17, height: 1.45),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _SearchCard extends StatelessWidget {
-  const _SearchCard({required this.controller, required this.onSubmit});
-
+  const _SearchCard({
+    required this.controller,
+    required this.onSubmit,
+    required this.loading,
+  });
   final TextEditingController controller;
   final VoidCallback onSubmit;
-
+  final bool loading;
   @override
-  Widget build(BuildContext context) {
-    return _Card(
+  Widget build(BuildContext context) => Transform.translate(
+    offset: Offset.zero,
+    child: Container(
+      padding: const EdgeInsets.all(20),
+      decoration: _card,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+        children: <Widget>[
           const Text(
             'Order ID or phone number',
             style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w600,
-              color: Color(0xff374151),
+              color: _ink,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           TextField(
             controller: controller,
             textInputAction: TextInputAction.search,
             onSubmitted: (_) => onSubmit(),
             decoration: InputDecoration(
-              hintText: 'e.g. AT1000023',
+              hintText: 'e.g. AT1000018 or 01712 345678',
+              hintStyle: const TextStyle(color: Color(0xffa1aec5)),
+              filled: true,
+              fillColor: Colors.white,
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 12,
+                horizontal: 16,
+                vertical: 17,
               ),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: _kBorder),
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: Color(0xffd7e0eb)),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: _kBorder),
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: Color(0xffd7e0eb)),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: _kPrimary),
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: _blue, width: 1.5),
               ),
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: onSubmit,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _kPrimary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 13),
+            height: 58,
+            child: FilledButton.icon(
+              onPressed: loading ? null : onSubmit,
+              style: FilledButton.styleFrom(
+                backgroundColor: _navy,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(17),
                 ),
               ),
-              icon: const Icon(Icons.search, size: 18),
-              label: const Text(
-                'Track Order',
-                style: TextStyle(fontWeight: FontWeight.w700),
+              icon: loading
+                  ? const SizedBox(
+                      width: 21,
+                      height: 21,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.search_rounded, size: 29),
+              label: Text(
+                loading ? 'Tracking...' : 'Track Order',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
 }
 
-class _ErrorCard extends StatelessWidget {
-  const _ErrorCard({required this.message});
-
-  final String message;
-
+class _DividerTitle extends StatelessWidget {
+  const _DividerTitle();
   @override
-  Widget build(BuildContext context) {
-    return _Card(
-      child: Row(
-        children: [
-          const Icon(Icons.error_outline, color: Colors.redAccent),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              message,
-              style: const TextStyle(color: Color(0xff374151)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TrackOrderResult extends StatelessWidget {
-  const _TrackOrderResult({required this.order});
-
-  final TrackOrderEntity order;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _StatusCard(order: order),
-        const SizedBox(height: 14),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final bool isWide = constraints.maxWidth >= 480;
-            final List<Widget> panels = <Widget>[
-              _AddressCard(order: order),
-              _RiderCard(order: order),
-            ];
-
-            if (!isWide) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  panels[0],
-                  const SizedBox(height: 14),
-                  panels[1],
-                ],
-              );
-            }
-
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Expanded(child: panels[0]),
-                const SizedBox(width: 14),
-                Expanded(child: panels[1]),
-              ],
-            );
-          },
+  Widget build(BuildContext context) => const Row(
+    children: <Widget>[
+      Expanded(child: Divider(color: Color(0xffccd8e7))),
+      Padding(
+        padding: EdgeInsets.symmetric(horizontal: 18),
+        child: Text(
+          'Tracking Result',
+          style: TextStyle(color: _muted, fontSize: 14),
         ),
-        const SizedBox(height: 14),
-        if (order.items.isNotEmpty) _ItemsCard(order: order),
-        if (order.items.isNotEmpty) const SizedBox(height: 14),
-        if (order.history.isNotEmpty) _HistoryCard(order: order),
-      ],
-    );
-  }
+      ),
+      Expanded(child: Divider(color: Color(0xffccd8e7))),
+    ],
+  );
 }
 
-class _StatusCard extends StatelessWidget {
-  const _StatusCard({required this.order});
-
+class _Result extends StatelessWidget {
+  const _Result({required this.order});
   final TrackOrderEntity order;
-
   @override
-  Widget build(BuildContext context) {
-    return _Card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.fromLTRB(18, 20, 18, 20),
+    decoration: _card,
+    child: Column(
+      children: <Widget>[
+        Row(
+          children: <Widget>[
+            const _IconBox(icon: Icons.inventory_2_outlined, purple: true),
+            const SizedBox(width: 13),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  const Text(
+                    'Order ID',
+                    style: TextStyle(color: _muted, fontSize: 13),
+                  ),
+                  Text(
+                    order.orderId.isEmpty
+                        ? order.consignmentCode
+                        : order.orderId,
+                    style: const TextStyle(
+                      color: _ink,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  if (order.history.isNotEmpty &&
+                      order.history.first.timestamp != null)
+                    Text(
+                      'Placed on ' + _date(order.history.first.timestamp!),
+                      style: const TextStyle(color: _muted, fontSize: 13),
+                    ),
+                ],
+              ),
+            ),
+            _Status(status: order.status),
+          ],
+        ),
+        if (order.steps.isNotEmpty) ...<Widget>[
+          const SizedBox(height: 28),
+          _Progress(steps: order.steps),
+        ],
+        const SizedBox(height: 26),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(15),
+          decoration: BoxDecoration(
+            color: const Color(0xfff1f7ff),
+            borderRadius: BorderRadius.circular(15),
+          ),
+          child: Row(
+            children: <Widget>[
+              const _IconBox(icon: Icons.calendar_month_outlined),
+              const SizedBox(width: 13),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'ORDER ${order.orderId}',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        letterSpacing: 0.4,
-                        fontWeight: FontWeight.w700,
-                        color: _kMuted,
-                      ),
+                  children: <Widget>[
+                    const Text(
+                      'Latest update',
+                      style: TextStyle(color: _muted, fontSize: 13),
                     ),
-                    const SizedBox(height: 2),
                     Text(
-                      'Consignment ${order.consignmentCode}',
+                      order.history.isEmpty
+                          ? order.status
+                          : order.history.last.title,
                       style: const TextStyle(
-                        fontSize: 15,
+                        color: _ink,
+                        fontSize: 17,
                         fontWeight: FontWeight.w800,
-                        color: _kPrimary,
                       ),
                     ),
                   ],
                 ),
               ),
-              if (order.status.isNotEmpty) _StatusBadge(status: order.status),
             ],
           ),
-          if (order.steps.isNotEmpty) ...<Widget>[
-            const SizedBox(height: 18),
-            _StepperRow(steps: order.steps),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.status});
-
-  final String status;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: const Color(0xffdcfce7),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        status,
-        style: const TextStyle(
-          fontSize: 11.5,
-          fontWeight: FontWeight.w700,
-          color: _kSuccess,
         ),
-      ),
-    );
-  }
-}
-
-class _StepperRow extends StatelessWidget {
-  const _StepperRow({required this.steps});
-
-  final List<TrackOrderStepEntity> steps;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: List<Widget>.generate(steps.length, (int index) {
-        final TrackOrderStepEntity step = steps[index];
-        final bool isLast = index == steps.length - 1;
-
-        return Expanded(
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      height: 2,
-                      color: index == 0
-                          ? Colors.transparent
-                          : (step.isCompleted ? _kPrimary : _kBorder),
-                    ),
-                  ),
-                  _StepDot(isCompleted: step.isCompleted),
-                  if (isLast)
-                    const Expanded(child: SizedBox.shrink())
-                  else
-                    Expanded(
-                      child: Container(
-                        height: 2,
-                        color: steps[index + 1].isCompleted
-                            ? _kPrimary
-                            : _kBorder,
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                step.label,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                style: TextStyle(
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w600,
-                  color: step.isCompleted ? _kPrimary : _kMuted,
-                ),
-              ),
-            ],
-          ),
-        );
-      }),
-    );
-  }
-}
-
-class _StepDot extends StatelessWidget {
-  const _StepDot({required this.isCompleted});
-
-  final bool isCompleted;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 22,
-      height: 22,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: isCompleted ? _kPrimary : Colors.white,
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: isCompleted ? _kPrimary : _kBorder,
-          width: 1.5,
-        ),
-      ),
-      child: isCompleted
-          ? const Icon(Icons.check, size: 13, color: Colors.white)
-          : null,
-    );
-  }
-}
-
-class _AddressCard extends StatelessWidget {
-  const _AddressCard({required this.order});
-
-  final TrackOrderEntity order;
-
-  @override
-  Widget build(BuildContext context) {
-    if (order.address.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return _Card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _CardHeading(
+        if (!order.address.isEmpty) ...<Widget>[
+          const SizedBox(height: 18),
+          _SmallDetail(
             icon: Icons.location_on_outlined,
             title: 'Delivery address',
+            value: order.address.address,
           ),
-          const SizedBox(height: 8),
-          if (order.address.name.isNotEmpty)
-            Text(
-              order.address.name,
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 12.5,
-              ),
-            ),
-          if (order.address.phone.isNotEmpty) ...<Widget>[
-            const SizedBox(height: 2),
-            Text(
-              order.address.phone,
-              style: const TextStyle(fontSize: 12, color: _kMuted),
-            ),
-          ],
-          if (order.address.address.isNotEmpty) ...<Widget>[
-            const SizedBox(height: 2),
-            Text(
-              order.address.address,
-              style: const TextStyle(fontSize: 12, color: _kMuted),
-            ),
-          ],
         ],
-      ),
-    );
-  }
-}
-
-class _RiderCard extends StatelessWidget {
-  const _RiderCard({required this.order});
-
-  final TrackOrderEntity order;
-
-  @override
-  Widget build(BuildContext context) {
-    return _Card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _CardHeading(
-            icon: Icons.person_outline,
+        if (!order.rider.isEmpty) ...<Widget>[
+          const SizedBox(height: 12),
+          _SmallDetail(
+            icon: Icons.delivery_dining_outlined,
             title: 'Delivery rider',
+            value:
+                order.rider.name +
+                (order.rider.phone.isEmpty ? '' : ' · ' + order.rider.phone),
           ),
-          const SizedBox(height: 8),
-          if (order.rider.name.isNotEmpty)
-            Text(
-              order.rider.name,
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 12.5,
-              ),
-            ),
-          if (order.rider.phone.isNotEmpty) ...<Widget>[
-            const SizedBox(height: 2),
-            Text(
-              order.rider.phone,
-              style: const TextStyle(fontSize: 12, color: _kMuted),
-            ),
-          ],
-          if (order.rider.isEmpty)
-            const Text(
-              "A rider hasn't been assigned yet.",
-              style: TextStyle(fontSize: 12, color: _kMuted),
-            ),
         ],
-      ),
-    );
-  }
+      ],
+    ),
+  );
 }
 
-class _ItemsCard extends StatelessWidget {
-  const _ItemsCard({required this.order});
-
-  final TrackOrderEntity order;
-
+class _Progress extends StatelessWidget {
+  const _Progress({required this.steps});
+  final List<TrackOrderStepEntity> steps;
   @override
-  Widget build(BuildContext context) {
-    return _Card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _CardHeading(
-            icon: Icons.inventory_2_outlined,
-            title: 'Items (${order.items.length})',
-          ),
-          const SizedBox(height: 10),
-          for (final TrackOrderItemEntity item in order.items) ...<Widget>[
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: List<Widget>.generate(steps.length, (int i) {
+      final TrackOrderStepEntity step = steps[i];
+      return Expanded(
+        child: Column(
+          children: <Widget>[
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+              children: <Widget>[
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.name,
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${_formatCurrency(item.unitPrice)} × ${item.quantity}',
-                        style: const TextStyle(fontSize: 11.5, color: _kMuted),
-                      ),
-                    ],
+                  child: Container(
+                    height: 3,
+                    color: i == 0
+                        ? Colors.transparent
+                        : (step.isCompleted ? _blue : const Color(0xffd4dfed)),
                   ),
                 ),
-                Text(
-                  _formatCurrency(item.total),
-                  style: const TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: step.isCompleted ? _blue : Colors.white,
+                    border: Border.all(
+                      color: step.isCompleted ? _blue : const Color(0xffcbd7e6),
+                      width: 2,
+                    ),
+                  ),
+                  child: step.isCompleted
+                      ? const Icon(Icons.check, color: Colors.white, size: 19)
+                      : const Icon(
+                          Icons.circle,
+                          color: Color(0xffdbe5f1),
+                          size: 13,
+                        ),
+                ),
+                Expanded(
+                  child: Container(
+                    height: 3,
+                    color: i == steps.length - 1
+                        ? Colors.transparent
+                        : (steps[i + 1].isCompleted
+                              ? _blue
+                              : const Color(0xffd4dfed)),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
+            Text(
+              step.label,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              style: const TextStyle(
+                color: _ink,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
-          const Divider(height: 1, color: _kBorder),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                order.deliveryFee <= 0 ? 'Delivery (free)' : 'Delivery',
-                style: const TextStyle(fontSize: 12, color: _kMuted),
-              ),
-              Text(
-                _formatCurrency(order.total),
-                style: const TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+        ),
+      );
+    }),
+  );
 }
 
-class _HistoryCard extends StatelessWidget {
-  const _HistoryCard({required this.order});
-
-  final TrackOrderEntity order;
-
+class _Status extends StatelessWidget {
+  const _Status({required this.status});
+  final String status;
   @override
-  Widget build(BuildContext context) {
-    return _Card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _CardHeading(
-            icon: Icons.local_shipping_outlined,
-            title: 'Tracking history',
-          ),
-          const SizedBox(height: 12),
-          for (int i = 0; i < order.history.length; i++)
-            _HistoryTile(
-              entry: order.history[i],
-              isLast: i == order.history.length - 1,
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HistoryTile extends StatelessWidget {
-  const _HistoryTile({required this.entry, required this.isLast});
-
-  final TrackOrderHistoryEntryEntity entry;
-  final bool isLast;
-
-  @override
-  Widget build(BuildContext context) {
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Column(
-            children: [
-              Container(
-                width: 20,
-                height: 20,
-                decoration: const BoxDecoration(
-                  color: _kPrimary,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.check, size: 12, color: Colors.white),
-              ),
-              if (!isLast)
-                Expanded(child: Container(width: 2, color: _kBorder)),
-            ],
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Padding(
-              padding: EdgeInsets.only(bottom: isLast ? 0 : 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    entry.title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12.5,
-                    ),
-                  ),
-                  if (entry.description.isNotEmpty) ...<Widget>[
-                    const SizedBox(height: 2),
-                    Text(
-                      entry.description,
-                      style: const TextStyle(fontSize: 11.5, color: _kMuted),
-                    ),
-                  ],
-                  if (entry.timestamp != null) ...<Widget>[
-                    const SizedBox(height: 2),
-                    Text(
-                      _formatTimestamp(entry.timestamp!),
-                      style: const TextStyle(fontSize: 10.5, color: _kMuted),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CardHeading extends StatelessWidget {
-  const _CardHeading({required this.icon, required this.title});
-
-  final IconData icon;
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: _kPrimary),
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    decoration: BoxDecoration(
+      color: const Color(0xffdcf8e9),
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        const Icon(
+          Icons.local_shipping_outlined,
+          color: Color(0xff08a668),
+          size: 18,
+        ),
         const SizedBox(width: 6),
         Text(
-          title,
+          status,
           style: const TextStyle(
-            fontSize: 13,
+            color: Color(0xff08a668),
+            fontSize: 12,
             fontWeight: FontWeight.w700,
-            color: _kPrimary,
           ),
         ),
       ],
-    );
-  }
+    ),
+  );
 }
 
-class _Card extends StatelessWidget {
-  const _Card({required this.child});
-
-  final Widget child;
-
+class _IconBox extends StatelessWidget {
+  const _IconBox({required this.icon, this.purple = false});
+  final IconData icon;
+  final bool purple;
   @override
   Widget build(BuildContext context) {
+    final Color color = purple ? const Color(0xff4e5cf5) : _blue;
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      width: 48,
+      height: 48,
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _kBorder),
+        color: color.withValues(alpha: .1),
+        borderRadius: BorderRadius.circular(13),
       ),
-      child: child,
+      child: Icon(icon, color: color, size: 26),
     );
   }
 }
 
-String _formatCurrency(double value) {
-  return '৳${value.toStringAsFixed(2)}';
+class _SmallDetail extends StatelessWidget {
+  const _SmallDetail({
+    required this.icon,
+    required this.title,
+    required this.value,
+  });
+  final IconData icon;
+  final String title;
+  final String value;
+  @override
+  Widget build(BuildContext context) => Row(
+    children: <Widget>[
+      Icon(icon, color: _blue, size: 21),
+      const SizedBox(width: 10),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(title, style: const TextStyle(color: _muted, fontSize: 12)),
+            Text(
+              value,
+              style: const TextStyle(color: _ink, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
 }
 
-String _formatTimestamp(DateTime timestamp) {
+class _Message extends StatelessWidget {
+  const _Message({required this.message});
+  final String message;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(16),
+    decoration: _card,
+    child: Row(
+      children: <Widget>[
+        const Icon(Icons.error_outline, color: Colors.redAccent),
+        const SizedBox(width: 10),
+        Expanded(child: Text(message)),
+      ],
+    ),
+  );
+}
+
+String _date(DateTime value) {
   const List<String> months = <String>[
     'Jan',
     'Feb',
@@ -771,12 +591,17 @@ String _formatTimestamp(DateTime timestamp) {
     'Nov',
     'Dec',
   ];
-
-  final int hour24 = timestamp.hour;
-  final int hour12 = hour24 % 12 == 0 ? 12 : hour24 % 12;
-  final String period = hour24 < 12 ? 'AM' : 'PM';
-  final String minute = timestamp.minute.toString().padLeft(2, '0');
-
-  return '${months[timestamp.month - 1]} ${timestamp.day}, ${timestamp.year} • '
-      '$hour12:$minute $period';
+  return value.day.toString() +
+      ' ' +
+      months[value.month - 1] +
+      ' ' +
+      value.year.toString();
 }
+
+final BoxDecoration _card = BoxDecoration(
+  color: Colors.white,
+  borderRadius: BorderRadius.circular(20),
+  boxShadow: const <BoxShadow>[
+    BoxShadow(color: Color(0x120d4d83), blurRadius: 28, offset: Offset(0, 10)),
+  ],
+);

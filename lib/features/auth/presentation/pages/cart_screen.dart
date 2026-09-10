@@ -314,6 +314,8 @@ class _CartItemView extends StatelessWidget {
     final width = MediaQuery.sizeOf(context).width;
     final isSmall = width <= 360;
     final imageSize = isSmall ? 112.0 : 132.0;
+    final bool canIncrease =
+        item.product.stock == null || item.quantity < item.product.stock!;
 
     return InkWell(
       onTap: () => _openProductDetails(context),
@@ -390,7 +392,9 @@ class _CartItemView extends StatelessWidget {
                             quantity: item.quantity,
                             onDecrease: () =>
                                 ProductCart.instance.decrease(item.id),
-                            onIncrease: () => _increaseQuantity(context),
+                            onIncrease: canIncrease
+                                ? () => _increaseQuantity(context)
+                                : null,
                           ),
                           const Spacer(),
                           _DeleteButton(
@@ -482,7 +486,7 @@ class _QuantityStepper extends StatelessWidget {
 
   final int quantity;
   final VoidCallback onDecrease;
-  final VoidCallback onIncrease;
+  final VoidCallback? onIncrease;
 
   @override
   Widget build(BuildContext context) {
@@ -499,8 +503,10 @@ class _QuantityStepper extends StatelessWidget {
           _StepperPart(label: '-', onTap: onDecrease),
           const _VerticalLine(),
           _StepperPart(label: '$quantity', onTap: () {}),
-          const _VerticalLine(),
-          _StepperPart(label: '+', onTap: onIncrease),
+          if (onIncrease != null) ...[
+            const _VerticalLine(),
+            _StepperPart(label: '+', onTap: onIncrease),
+          ],
         ],
       ),
     );
@@ -511,7 +517,7 @@ class _StepperPart extends StatelessWidget {
   const _StepperPart({required this.label, required this.onTap});
 
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -523,12 +529,12 @@ class _StepperPart extends StatelessWidget {
         child: Center(
           child: Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'Poppins',
               fontSize: 15,
               height: 1,
               fontWeight: FontWeight.w700,
-              color: _CartColors.title,
+              color: onTap == null ? _CartColors.muted : _CartColors.title,
             ),
           ),
         ),

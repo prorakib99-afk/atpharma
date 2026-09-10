@@ -484,7 +484,10 @@ class _DefaultState extends StatelessWidget {
                   .map(
                     (product) => Padding(
                       padding: const EdgeInsets.only(bottom: 10),
-                      child: _HorizontalCard(product),
+                      child: AnimatedBuilder(
+                        animation: ProductCart.instance,
+                        builder: (_, _) => _HorizontalCard(product),
+                      ),
                     ),
                   ),
           ],
@@ -761,7 +764,10 @@ class _Results extends StatelessWidget {
               mainAxisSpacing: 8,
               mainAxisExtent: 280,
             ),
-            itemBuilder: (_, index) => _GridCard(page.items[index]),
+            itemBuilder: (_, index) => AnimatedBuilder(
+              animation: ProductCart.instance,
+              builder: (_, _) => _GridCard(page.items[index]),
+            ),
           ),
         if (page.totalPages > 1) ...[
           const SizedBox(height: 24),
@@ -861,7 +867,10 @@ class _NoResults extends StatelessWidget {
                 .map(
                   (product) => Padding(
                     padding: const EdgeInsets.only(bottom: 10),
-                    child: _HorizontalCard(product),
+                    child: AnimatedBuilder(
+                      animation: ProductCart.instance,
+                      builder: (_, _) => _HorizontalCard(product),
+                    ),
                   ),
                 ),
           ],
@@ -889,6 +898,11 @@ class _Panel extends StatelessWidget {
 class _HorizontalCard extends StatelessWidget {
   const _HorizontalCard(this.product);
   final ShopProductEntity product;
+
+  bool get _addDisabled =>
+      product.isOutOfStock ||
+      ProductCart.instance.isAtStockLimit(product.id, product.stock);
+
   @override
   Widget build(BuildContext context) => InkWell(
     onTap: () => Navigator.push(
@@ -991,7 +1005,7 @@ class _HorizontalCard extends StatelessWidget {
                     Builder(
                       builder: (BuildContext buttonContext) {
                         return InkWell(
-                          onTap: product.isOutOfStock
+                          onTap: _addDisabled
                               ? null
                               : () => _addSearchProductToCart(
                                   buttonContext,
@@ -1000,7 +1014,7 @@ class _HorizontalCard extends StatelessWidget {
                           customBorder: const CircleBorder(),
                           child: CircleAvatar(
                             radius: 20,
-                            backgroundColor: product.isOutOfStock
+                            backgroundColor: _addDisabled
                                 ? _Colors.border
                                 : _Colors.blue,
                             child: const Icon(
@@ -1026,6 +1040,11 @@ class _HorizontalCard extends StatelessWidget {
 class _GridCard extends StatelessWidget {
   const _GridCard(this.product);
   final ShopProductEntity product;
+
+  bool get _addDisabled =>
+      product.isOutOfStock ||
+      ProductCart.instance.isAtStockLimit(product.id, product.stock);
+
   @override
   Widget build(BuildContext context) => InkWell(
     onTap: () => Navigator.push(
@@ -1039,6 +1058,8 @@ class _GridCard extends StatelessWidget {
             description: product.displayDescription,
             brand: product.displayCompanyName,
             price: product.sellingPrice.round(),
+            stock: product.stock,
+            isOutOfStock: product.isOutOfStock,
             prescriptionRequired: product.prescriptionRequired,
             currencyCode: product.currencyCode,
             countryCode: product.countryCode,
@@ -1077,7 +1098,7 @@ class _GridCard extends StatelessWidget {
                   child: Builder(
                     builder: (BuildContext buttonContext) {
                       return InkWell(
-                        onTap: product.isOutOfStock
+                        onTap: _addDisabled
                             ? null
                             : () => _addSearchProductToCart(
                                 buttonContext,
@@ -1086,7 +1107,7 @@ class _GridCard extends StatelessWidget {
                         customBorder: const CircleBorder(),
                         child: CircleAvatar(
                           radius: 20,
-                          backgroundColor: product.isOutOfStock
+                          backgroundColor: _addDisabled
                               ? _Colors.border
                               : _Colors.blue,
                           child: const Icon(

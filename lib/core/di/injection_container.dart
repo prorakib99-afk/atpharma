@@ -13,6 +13,7 @@ import '../../features/auth/domain/repositories/auth_repository.dart';
 import '../../features/auth/domain/usecases/login_use_case.dart';
 import '../../features/auth/domain/usecases/logout_use_case.dart';
 import '../../features/auth/presentation/bloc/login/login_bloc.dart';
+import '../../features/auth/presentation/bloc/profile/profile_bloc.dart';
 import '../../features/auth/presentation/bloc/checkout/checkout_bloc.dart';
 import '../../features/auth/presentation/bloc/review_order/review_order_bloc.dart';
 import '../../features/shop/data/services/checkout_location_service.dart';
@@ -24,6 +25,17 @@ import '../../features/shop/domain/usecases/cancel_shop_products_request_use_cas
 import '../../features/shop/domain/usecases/get_shop_product_details_use_case.dart';
 import '../../features/shop/domain/usecases/get_shop_products_use_case.dart';
 import '../../features/shop/presentation/bloc/home_products/home_products_bloc.dart';
+import '../../features/shop_reviews/data/datasources/shop_review_remote_data_source.dart';
+import '../../features/shop_reviews/data/repositories/shop_review_repository_impl.dart';
+import '../../features/shop_reviews/domain/repositories/shop_review_repository.dart';
+import '../../features/shop_reviews/domain/usecases/create_shop_review_use_case.dart';
+import '../../features/shop_reviews/domain/usecases/get_shop_reviews_use_case.dart';
+import '../../features/shop_reviews/presentation/bloc/shop_reviews_bloc.dart';
+import '../../features/shop_orders/data/datasources/shop_orders_remote_data_source.dart';
+import '../../features/shop_orders/data/repositories/shop_orders_repository_impl.dart';
+import '../../features/shop_orders/domain/repositories/shop_orders_repository.dart';
+import '../../features/shop_orders/domain/usecases/get_shop_orders_use_case.dart';
+import '../../features/shop_orders/presentation/bloc/shop_orders_bloc.dart';
 import '../../features/track_order/data/datasources/track_order_remote_data_source.dart';
 import '../../features/track_order/domain/repositories/track_order_repository.dart';
 import '../../features/track_order/domain/repositories/track_order_repository_impl.dart';
@@ -161,6 +173,12 @@ Future<void> configureDependencies() async {
     ..registerFactory<LoginBloc>(
       () => LoginBloc(loginUseCase: sl<LoginUseCase>()),
     )
+    ..registerFactory<ProfileBloc>(
+      () => ProfileBloc(
+        sessionManager: sl<SessionManager>(),
+        repository: sl<AuthRepository>(),
+      ),
+    )
     ..registerFactory<CheckoutBloc>(
       () => CheckoutBloc(sl<CheckoutLocationService>()),
     )
@@ -223,6 +241,41 @@ Future<void> configureDependencies() async {
       featuredPerPage: 4,
       cacheDuration: const Duration(minutes: 2),
     ),
+  );
+
+  sl.registerLazySingleton<ShopReviewRemoteDataSource>(
+    () => ShopReviewRemoteDataSourceImpl(dioClient: sl<DioClient>()),
+  );
+  sl.registerLazySingleton<ShopReviewRepository>(
+    () => ShopReviewRepositoryImpl(
+      remoteDataSource: sl<ShopReviewRemoteDataSource>(),
+    ),
+  );
+  sl.registerLazySingleton<GetShopReviewsUseCase>(
+    () => GetShopReviewsUseCase(repository: sl<ShopReviewRepository>()),
+  );
+  sl.registerLazySingleton<CreateShopReviewUseCase>(
+    () => CreateShopReviewUseCase(repository: sl<ShopReviewRepository>()),
+  );
+  sl.registerFactory<ShopReviewsBloc>(
+    () => ShopReviewsBloc(
+      getReviews: sl<GetShopReviewsUseCase>(),
+      createReview: sl<CreateShopReviewUseCase>(),
+    ),
+  );
+  sl.registerLazySingleton<ShopOrdersRemoteDataSource>(
+    () => ShopOrdersRemoteDataSourceImpl(dioClient: sl<DioClient>()),
+  );
+  sl.registerLazySingleton<ShopOrdersRepository>(
+    () => ShopOrdersRepositoryImpl(
+      remoteDataSource: sl<ShopOrdersRemoteDataSource>(),
+    ),
+  );
+  sl.registerLazySingleton<GetShopOrdersUseCase>(
+    () => GetShopOrdersUseCase(repository: sl<ShopOrdersRepository>()),
+  );
+  sl.registerFactory<ShopOrdersBloc>(
+    () => ShopOrdersBloc(getOrders: sl<GetShopOrdersUseCase>()),
   );
 
   /*

@@ -690,7 +690,10 @@ class _ProductGrid extends StatelessWidget {
         childAspectRatio: _Responsive.productAspectRatio(context),
       ),
       itemBuilder: (context, index) {
-        return _ProductCard(product: products[index]);
+        return AnimatedBuilder(
+          animation: ProductCart.instance,
+          builder: (_, _) => _ProductCard(product: products[index]),
+        );
       },
     );
   }
@@ -729,6 +732,9 @@ class _ProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isSmall = MediaQuery.sizeOf(context).width <= 360;
+    final bool addDisabled =
+        product.isOutOfStock ||
+        ProductCart.instance.isAtStockLimit(product.id, product.stock);
 
     return InkWell(
       onTap: () => Navigator.push(
@@ -798,7 +804,7 @@ class _ProductCard extends StatelessWidget {
                     bottom: -16,
                     child: Builder(
                       builder: (BuildContext buttonContext) => InkWell(
-                        onTap: product.isOutOfStock
+                        onTap: addDisabled
                             ? null
                             : () => _addToCart(buttonContext),
                         customBorder: const CircleBorder(),
@@ -806,7 +812,7 @@ class _ProductCard extends StatelessWidget {
                           width: isSmall ? 42 : 46,
                           height: isSmall ? 42 : 46,
                           decoration: BoxDecoration(
-                            color: product.isOutOfStock
+                            color: addDisabled
                                 ? _ExploreColors.placeholder
                                 : _ExploreColors.primary,
                             shape: BoxShape.circle,

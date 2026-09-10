@@ -109,6 +109,23 @@ final class SessionManager {
 
   Future<void> startGuestSession() async {
     await clearSession(preserveRememberedLogin: true);
+    final String guestNumber =
+        _localStorageService.readString(StorageKeys.guestNumber) ??
+        'GUEST-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
+    await _localStorageService.write<String>(
+      key: StorageKeys.guestNumber,
+      value: guestNumber,
+    );
+    await _localStorageService.writeMap(
+      key: StorageKeys.currentUser,
+      value: <String, dynamic>{
+        'name': guestNumber,
+        'guestNumber': guestNumber,
+        'accountType': 'Guest',
+        'role': 'Guest User',
+        'status': 'Active',
+      },
+    );
     await _localStorageService.write<bool>(
       key: StorageKeys.guestMode,
       value: true,

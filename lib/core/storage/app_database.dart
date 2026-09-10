@@ -6,7 +6,7 @@ final class AppDatabase {
   Future<Database> get instance async {
     return _database ??= await openDatabase(
       'atpharma_offline.db',
-      version: 3,
+      version: 4,
       onCreate: (Database db, int version) async {
         await db.execute(
           'CREATE TABLE storefront_config ('
@@ -52,6 +52,12 @@ final class AppDatabase {
         if (oldVersion < 3) {
           await _createFavoriteProductsTable(db);
         }
+        if (oldVersion < 4) {
+          await db.execute('ALTER TABLE cart_items ADD COLUMN stock INTEGER');
+          await db.execute(
+            'ALTER TABLE cart_items ADD COLUMN is_out_of_stock INTEGER NOT NULL DEFAULT 0',
+          );
+        }
       },
       onDowngrade: (Database db, int oldVersion, int newVersion) async {
         // Keeps existing user data when rolling back from the temporary
@@ -77,6 +83,8 @@ final class AppDatabase {
       'description TEXT NOT NULL, '
       'brand TEXT NOT NULL, '
       'price INTEGER NOT NULL, '
+      'stock INTEGER, '
+      'is_out_of_stock INTEGER NOT NULL DEFAULT 0, '
       'prescription_required INTEGER NOT NULL DEFAULT 0, '
       'currency_code TEXT NOT NULL DEFAULT \'\', '
       'country_code TEXT NOT NULL DEFAULT \'\', '
@@ -95,6 +103,8 @@ final class AppDatabase {
       'description TEXT NOT NULL, '
       'brand TEXT NOT NULL, '
       'price INTEGER NOT NULL, '
+      'stock INTEGER, '
+      'is_out_of_stock INTEGER NOT NULL DEFAULT 0, '
       'updated_at INTEGER NOT NULL'
       ')',
     );

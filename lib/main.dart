@@ -24,6 +24,7 @@ import 'features/auth/presentation/pages/login_screen.dart';
 import 'features/auth/presentation/pages/otp_screen.dart';
 import 'features/auth/presentation/pages/prescription_screen.dart';
 import 'features/track_order/presentation/pages/track_order_screen.dart';
+import 'features/shop_orders/presentation/pages/my_orders_screen.dart';
 import 'features/auth/presentation/pages/privacy_policy_screen.dart';
 import 'features/auth/presentation/pages/profile_screen.dart';
 import 'features/auth/presentation/pages/recovery_screen.dart';
@@ -43,6 +44,8 @@ import 'features/auth/presentation/bloc/checkout/checkout_bloc.dart';
 import 'features/auth/presentation/bloc/checkout/checkout_event.dart';
 import 'features/auth/presentation/bloc/login/login_event.dart';
 import 'features/auth/presentation/bloc/login/login_state.dart';
+import 'features/auth/presentation/bloc/profile/profile_bloc.dart';
+import 'features/auth/presentation/bloc/profile/profile_event.dart';
 import 'features/auth/presentation/bloc/review_order/review_order_bloc.dart';
 
 Future<void> main() async {
@@ -115,6 +118,8 @@ class AtPharmaApp extends StatelessWidget {
               Navigator.of(context).pushNamed(AppRoutes.login);
             },
             onGuestTap: () async {
+              await FavoriteStore.instance.clear();
+              await ProductCart.instance.clear();
               await sl<SessionManager>().startGuestSession();
               if (context.mounted) {
                 Navigator.of(context).pushReplacementNamed(AppRoutes.home);
@@ -142,7 +147,10 @@ class AtPharmaApp extends StatelessWidget {
         },
 
         AppRoutes.profile: (BuildContext context) {
-          return const ProfileScreen();
+          return BlocProvider<ProfileBloc>(
+            create: (_) => sl<ProfileBloc>()..add(const ProfileRequested()),
+            child: const ProfileScreen(),
+          );
         },
 
         AppRoutes.explore: (BuildContext context) {
@@ -236,8 +244,13 @@ class AtPharmaApp extends StatelessWidget {
         AppRoutes.contactSupport: (BuildContext context) {
           return const ContactSupportScreen();
         },
+        AppRoutes.myOrders: (BuildContext context) {
+          return const MyOrdersScreen();
+        },
+
         AppRoutes.trackOrder: (BuildContext context) {
-          return const TrackOrderScreen();
+          final value = ModalRoute.settingsOf(context)?.arguments;
+          return TrackOrderScreen(initialCode: value is String ? value : null);
         },
 
         AppRoutes.productDetails: (BuildContext context) {

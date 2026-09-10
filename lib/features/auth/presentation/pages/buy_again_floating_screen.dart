@@ -170,7 +170,10 @@ class _FloatingBuyAgainScreenState extends State<FloatingBuyAgainScreen> {
                   BuildContext context,
                   int index,
                 ) {
-                  return _ProductCard(_page.items[index]);
+                  return AnimatedBuilder(
+                    animation: ProductCart.instance,
+                    builder: (_, _) => _ProductCard(_page.items[index]),
+                  );
                 }, childCount: _page.items.length),
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: MediaQuery.sizeOf(context).width >= 650
@@ -340,6 +343,10 @@ class _ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool addDisabled =
+        product.isOutOfStock ||
+        ProductCart.instance.isAtStockLimit(product.id, product.stock);
+
     return InkWell(
       onTap: () => _openDetails(context),
       borderRadius: BorderRadius.circular(16),
@@ -378,14 +385,14 @@ class _ProductCard extends StatelessWidget {
                     bottom: -18,
                     child: Builder(
                       builder: (BuildContext buttonContext) => Material(
-                        color: product.isOutOfStock
+                        color: addDisabled
                             ? const Color(0xFF98A1B3)
                             : _Colors.blue,
                         elevation: 7,
                         shadowColor: const Color(0x300B83D9),
                         shape: const CircleBorder(),
                         child: InkWell(
-                          onTap: product.isOutOfStock
+                          onTap: addDisabled
                               ? null
                               : () => _addToCart(buttonContext),
                           customBorder: const CircleBorder(),
