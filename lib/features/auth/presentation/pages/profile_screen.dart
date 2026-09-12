@@ -7,48 +7,180 @@ import '../bloc/profile/profile_bloc.dart';
 import '../bloc/profile/profile_event.dart';
 import '../bloc/profile/profile_state.dart';
 
-class SessionInfo {
-  const SessionInfo({
-    required this.device,
-    required this.ip,
-    required this.dateTime,
-    this.isThisDevice = false,
-  });
-  final String device;
-  final String ip;
-  final String dateTime;
-  final bool isThisDevice;
+Future<void> _showEditProfileSheet(
+  BuildContext context,
+  ProfileBloc bloc,
+  ProfileData profile,
+) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (BuildContext sheetContext) {
+      return BlocProvider.value(
+        value: bloc,
+        child: _EditProfileSheet(profile: profile),
+      );
+    },
+  );
+}
+
+class _EditProfileSheet extends StatefulWidget {
+  const _EditProfileSheet({required this.profile});
+  final ProfileData profile;
+
+  @override
+  State<_EditProfileSheet> createState() => _EditProfileSheetState();
+}
+
+class _EditProfileSheetState extends State<_EditProfileSheet> {
+  late final TextEditingController _nameController = TextEditingController(
+    text: widget.profile.name,
+  );
+  late final TextEditingController _phoneController = TextEditingController(
+    text: widget.profile.phone == 'Not available' ? '' : widget.profile.phone,
+  );
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocListener<ProfileBloc, ProfileState>(
+      listenWhen: (ProfileState previous, ProfileState current) =>
+          previous.updateStatus != current.updateStatus,
+      listener: (BuildContext context, ProfileState state) {
+        if (state.updateStatus == ProfileUpdateStatus.success) {
+          Navigator.of(context).pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Profile updated successfully.')),
+          );
+        } else if (state.updateStatus == ProfileUpdateStatus.failure) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.updateError ?? 'Failed to update profile.'),
+            ),
+          );
+        }
+      },
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+          ),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Center(
+                  child: Container(
+                    width: 42,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xffe5edf5),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+                const Text(
+                  'Edit Contact Information',
+                  style: TextStyle(
+                    color: ProfileScreen.ink,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _nameController,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: const InputDecoration(
+                    labelText: 'Full Name',
+                    prefixIcon: Icon(Icons.person_outline),
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (String? value) =>
+                      (value == null || value.trim().isEmpty)
+                      ? 'Name is required'
+                      : null,
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(
+                    labelText: 'Phone',
+                    prefixIcon: Icon(Icons.phone_outlined),
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (String? value) =>
+                      (value == null || value.trim().isEmpty)
+                      ? 'Phone is required'
+                      : null,
+                ),
+                const SizedBox(height: 20),
+                BlocBuilder<ProfileBloc, ProfileState>(
+                  buildWhen: (ProfileState previous, ProfileState current) =>
+                      previous.updateStatus != current.updateStatus,
+                  builder: (BuildContext context, ProfileState state) {
+                    final bool submitting =
+                        state.updateStatus == ProfileUpdateStatus.submitting;
+                    return FilledButton(
+                      onPressed: submitting
+                          ? null
+                          : () {
+                              if (!_formKey.currentState!.validate()) return;
+                              context.read<ProfileBloc>().add(
+                                ProfileUpdateRequested(
+                                  name: _nameController.text.trim(),
+                                  phone: _phoneController.text.trim(),
+                                ),
+                              );
+                            },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: ProfileScreen.blue,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: submitting
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.4,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text('Update Profile'),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({
-    super.key,
-    this.sessions = const <SessionInfo>[
-      SessionInfo(
-        device: 'Windows 10',
-        ip: '150.228.135.197',
-        dateTime: '27 July 2026 at 16:05',
-        isThisDevice: true,
-      ),
-      SessionInfo(
-        device: 'Unknown Device',
-        ip: '103.163.171.206',
-        dateTime: '25 July 2026 at 01:48',
-      ),
-      SessionInfo(
-        device: 'Unknown Device',
-        ip: '150.228.135.191',
-        dateTime: '21 July 2026 at 18:21',
-      ),
-      SessionInfo(
-        device: 'Windows 10',
-        ip: '150.228.135.191',
-        dateTime: '21 July 2026 at 17:56',
-      ),
-    ],
-  });
-
-  final List<SessionInfo> sessions;
+  const ProfileScreen({super.key});
   static const Color blue = Color(0xff087cf0);
   static const Color page = Color(0xfff4f8fc);
   static const Color ink = Color(0xff10142c);
@@ -79,7 +211,6 @@ class ProfileScreen extends StatelessWidget {
             ),
           );
         }
-        final SessionInfo? current = sessions.isEmpty ? null : sessions.first;
         return NavigationPageScaffold(
           currentPage: null,
           backgroundColor: page,
@@ -94,12 +225,7 @@ class ProfileScreen extends StatelessWidget {
             child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: <Widget>[
-                SliverToBoxAdapter(
-                  child: _ProfileHero(
-                    profile: profile,
-                    sessionCount: sessions.length,
-                  ),
-                ),
+                SliverToBoxAdapter(child: _ProfileHero(profile: profile)),
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
                   sliver: SliverList.list(
@@ -108,59 +234,21 @@ class ProfileScreen extends StatelessWidget {
                         title: 'Contact Information',
                         titleIcon: Icons.people_alt_outlined,
                         showEdit: !profile.isGuest,
+                        onEdit: () => _showEditProfileSheet(
+                          context,
+                          context.read<ProfileBloc>(),
+                          profile,
+                        ),
                         rows: <_Info>[
                           _Info(
                             Icons.person_outline,
                             'Full Name',
                             profile.name,
                           ),
-                          _Info(
-                            Icons.phone_outlined,
-                            'Business Phone',
-                            profile.phone,
-                          ),
-                          _Info(
-                            Icons.mail_outline,
-                            'Work Email',
-                            profile.email,
-                          ),
-                          _Info(
-                            Icons.verified_user_outlined,
-                            'Account Status',
-                            profile.status,
-                            green: true,
-                          ),
+                          _Info(Icons.phone_outlined, 'Phone', profile.phone),
+                          _Info(Icons.mail_outline, 'Email', profile.email),
                         ],
                       ),
-                      const SizedBox(height: 14),
-                      _InfoCard(
-                        title: 'Account Activity',
-                        titleIcon: Icons.schedule,
-                        rows: <_Info>[
-                          _Info(
-                            Icons.schedule,
-                            'Last Login',
-                            current?.dateTime ?? 'Not available',
-                          ),
-                          _Info(
-                            Icons.location_on_outlined,
-                            'Login Location',
-                            current?.ip ?? 'Not available',
-                          ),
-                          _Info(
-                            Icons.desktop_windows_outlined,
-                            'Login Device',
-                            current?.device ?? 'Not available',
-                          ),
-                          _Info(
-                            Icons.people_outline,
-                            'Active Sessions',
-                            sessions.length.toString(),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      _SessionsCard(items: sessions),
                     ],
                   ),
                 ),
@@ -174,14 +262,13 @@ class ProfileScreen extends StatelessWidget {
 }
 
 class _ProfileHero extends StatelessWidget {
-  const _ProfileHero({required this.profile, required this.sessionCount});
+  const _ProfileHero({required this.profile});
   final ProfileData profile;
-  final int sessionCount;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 330,
+      height: 250,
       child: Stack(
         clipBehavior: Clip.none,
         children: <Widget>[
@@ -225,11 +312,6 @@ class _ProfileHero extends StatelessWidget {
                 }
               },
             ),
-          ),
-          Positioned(
-            top: MediaQuery.paddingOf(context).top + 12,
-            right: 18,
-            child: _RoundButton(icon: Icons.more_horiz_rounded, onTap: () {}),
           ),
           Positioned(
             left: 0,
@@ -323,31 +405,6 @@ class _ProfileHero extends StatelessWidget {
               ],
             ),
           ),
-          Positioned(
-            left: 16,
-            right: 16,
-            bottom: 0,
-            child: Row(
-              children: <Widget>[
-                Expanded(
-                  child: _Summary(
-                    icon: Icons.person_outline,
-                    label: 'Account Type',
-                    value: profile.accountType,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _Summary(
-                    icon: Icons.layers_outlined,
-                    label: 'Active Sessions',
-                    value: sessionCount.toString(),
-                    purple: true,
-                  ),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
@@ -371,57 +428,6 @@ class _RoundButton extends StatelessWidget {
   );
 }
 
-class _Summary extends StatelessWidget {
-  const _Summary({
-    required this.icon,
-    required this.label,
-    required this.value,
-    this.purple = false,
-  });
-  final IconData icon;
-  final String label;
-  final String value;
-  final bool purple;
-  @override
-  Widget build(BuildContext context) => Container(
-    height: 76,
-    padding: const EdgeInsets.symmetric(horizontal: 12),
-    decoration: _cardDecoration,
-    child: Row(
-      children: <Widget>[
-        _IconBox(icon, purple: purple),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                label,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: ProfileScreen.muted,
-                  fontSize: 13,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                value,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: ProfileScreen.ink,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
 class _Info {
   const _Info(this.icon, this.label, this.value, {this.green = false});
   final IconData icon;
@@ -436,209 +442,116 @@ class _InfoCard extends StatelessWidget {
     required this.titleIcon,
     required this.rows,
     this.showEdit = false,
+    this.onEdit,
   });
   final String title;
   final IconData titleIcon;
   final List<_Info> rows;
   final bool showEdit;
+  final VoidCallback? onEdit;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.fromLTRB(14, 15, 14, 8),
-    decoration: _cardDecoration,
-    child: Column(
+  Widget build(BuildContext context) => ClipRRect(
+    borderRadius: BorderRadius.circular(18),
+    child: Stack(
       children: <Widget>[
-        Row(
-          children: <Widget>[
-            _IconBox(titleIcon),
-            const SizedBox(width: 11),
-            Expanded(
-              child: Text(
-                title,
-                style: const TextStyle(
-                  color: ProfileScreen.ink,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-            if (showEdit)
-              TextButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.edit_outlined, size: 18),
-                label: const Text('Edit'),
-              ),
-          ],
-        ),
-        for (int i = 0; i < rows.length; i++)
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            decoration: BoxDecoration(
-              border: i < rows.length - 1
-                  ? const Border(bottom: BorderSide(color: Color(0xffe5edf5)))
-                  : null,
-            ),
-            child: Row(
-              children: <Widget>[
-                _IconBox(rows[i].icon, small: true, green: rows[i].green),
-                const SizedBox(width: 12),
-                SizedBox(
-                  width: 116,
-                  child: Text(
-                    rows[i].label,
-                    style: const TextStyle(
-                      color: ProfileScreen.muted,
-                      fontSize: 12.5,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Text(
-                    rows[i].value,
-                    style: TextStyle(
-                      color: rows[i].green
-                          ? const Color(0xff0ba66a)
-                          : ProfileScreen.ink,
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
+        Positioned.fill(
+          child: Transform.scale(
+            scale: 1.18,
+            child: Image.asset(
+              'assets/images/box_grid_view.png',
+              fit: BoxFit.fill,
             ),
           ),
-      ],
-    ),
-  );
-}
-
-class _SessionsCard extends StatelessWidget {
-  const _SessionsCard({required this.items});
-  final List<SessionInfo> items;
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.fromLTRB(14, 15, 14, 8),
-    decoration: _cardDecoration,
-    child: Column(
-      children: <Widget>[
-        Row(
-          children: <Widget>[
-            const _IconBox(Icons.desktop_windows_outlined, purple: true),
-            const SizedBox(width: 11),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 26, 14, 30),
+          child: Column(
+            children: <Widget>[
+              Row(
                 children: <Widget>[
-                  Text(
-                    'Recent Sessions',
-                    style: TextStyle(
-                      color: ProfileScreen.ink,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
+                  _IconBox(titleIcon),
+                  const SizedBox(width: 11),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        color: ProfileScreen.ink,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                   ),
-                  Text(
-                    'Devices currently signed in to this account.',
-                    style: TextStyle(color: ProfileScreen.muted, fontSize: 12),
-                  ),
+                  if (showEdit)
+                    TextButton.icon(
+                      onPressed: onEdit,
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      label: const Text('Edit'),
+                    ),
                 ],
               ),
-            ),
-            TextButton(onPressed: () {}, child: const Text('View All')),
-            const Icon(Icons.chevron_right_rounded, color: ProfileScreen.muted),
-          ],
-        ),
-        for (int i = 0; i < items.length; i++)
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            decoration: BoxDecoration(
-              border: i < items.length - 1
-                  ? const Border(bottom: BorderSide(color: Color(0xffe5edf5)))
-                  : null,
-            ),
-            child: Row(
-              children: <Widget>[
-                const _IconBox(Icons.desktop_windows_outlined, small: true),
-                const SizedBox(width: 11),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              for (int i = 0; i < rows.length; i++)
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    border: i < rows.length - 1
+                        ? const Border(
+                            bottom: BorderSide(color: Color(0xffe5edf5)),
+                          )
+                        : null,
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: <Widget>[
-                      Wrap(
-                        spacing: 10,
-                        children: <Widget>[
-                          Text(
-                            items[i].device,
-                            style: const TextStyle(
-                              color: ProfileScreen.ink,
-                              fontWeight: FontWeight.w700,
+                      _IconBox(rows[i].icon, small: true, green: rows[i].green),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            Text(
+                              rows[i].label,
+                              style: const TextStyle(
+                                color: ProfileScreen.muted,
+                                fontSize: 12,
+                              ),
                             ),
-                          ),
-                          Text(
-                            items[i].ip,
-                            style: const TextStyle(
-                              color: ProfileScreen.muted,
-                              fontSize: 12,
+                            const SizedBox(height: 2),
+                            Text(
+                              rows[i].value,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: rows[i].green
+                                    ? const Color(0xff0ba66a)
+                                    : ProfileScreen.ink,
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                      Text(
-                        items[i].dateTime,
-                        style: const TextStyle(
-                          color: ProfileScreen.blue,
-                          fontSize: 12,
+                          ],
                         ),
                       ),
                     ],
                   ),
                 ),
-                if (items[i].isThisDevice)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 11,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xffdcf8e9),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Text(
-                      'This device',
-                      style: TextStyle(color: Color(0xff0ba66a), fontSize: 11),
-                    ),
-                  )
-                else
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    color: ProfileScreen.muted,
-                  ),
-              ],
-            ),
+            ],
           ),
+        ),
       ],
     ),
   );
 }
 
 class _IconBox extends StatelessWidget {
-  const _IconBox(
-    this.icon, {
-    this.small = false,
-    this.purple = false,
-    this.green = false,
-  });
+  const _IconBox(this.icon, {this.small = false, this.green = false});
   final IconData icon;
   final bool small;
-  final bool purple;
   final bool green;
   @override
   Widget build(BuildContext context) {
-    final Color color = green
-        ? const Color(0xff0ba66a)
-        : purple
-        ? const Color(0xff4e5cf5)
-        : ProfileScreen.blue;
+    final Color color = green ? const Color(0xff0ba66a) : ProfileScreen.blue;
     return Container(
       width: small ? 36 : 46,
       height: small ? 36 : 46,
@@ -650,11 +563,3 @@ class _IconBox extends StatelessWidget {
     );
   }
 }
-
-final BoxDecoration _cardDecoration = BoxDecoration(
-  color: Colors.white,
-  borderRadius: BorderRadius.circular(18),
-  boxShadow: const <BoxShadow>[
-    BoxShadow(color: Color(0x100d4d83), blurRadius: 24, offset: Offset(0, 8)),
-  ],
-);

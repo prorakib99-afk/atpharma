@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/routes/app_routes.dart';
+import '../../../../core/session/session_manager.dart';
 import '../../../../shared/widgets/navigation_page_scaffold.dart';
 import '../../../shop/data/services/offline_order_service.dart';
 
@@ -66,6 +67,17 @@ class _CompletedOrderScreenState extends State<CompletedOrderScreen> {
   void dispose() {
     _timer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _continueShopping() async {
+    final SessionManager sessionManager = sl<SessionManager>();
+    if (!sessionManager.canAccessStore) {
+      await sessionManager.startGuestSession();
+    }
+    if (!mounted) return;
+    Navigator.of(
+      context,
+    ).pushNamedAndRemoveUntil(AppRoutes.home, (Route<dynamic> route) => false);
   }
 
   Future<void> _cancelOrder() async {
@@ -198,13 +210,7 @@ class _CompletedOrderScreenState extends State<CompletedOrderScreen> {
                       cancelled: _cancelled,
                     ),
                     const SizedBox(height: 16),
-                    _ContinueShoppingButton(
-                      onTap: () =>
-                          Navigator.of(context).pushNamedAndRemoveUntil(
-                            AppRoutes.home,
-                            (Route<dynamic> route) => false,
-                          ),
-                    ),
+                    _ContinueShoppingButton(onTap: _continueShopping),
                   ]),
                 ),
               ),

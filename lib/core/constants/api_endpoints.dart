@@ -18,7 +18,7 @@ abstract final class AuthEndpoints {
   static const String register = '/shop/auth/register'; // POST
   static const String verifyEmail = '/shop/auth/verify-email'; // POST
   static const String requestCode = '/shop/auth/request-code'; // POST
-  static const String me = '/auth/me'; // GET
+  static const String me = '/shop/auth/me'; // GET
   static const String logout = '/auth/logout'; // POST
 }
 

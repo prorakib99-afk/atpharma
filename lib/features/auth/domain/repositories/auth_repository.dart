@@ -32,4 +32,8 @@ abstract interface class AuthRepository {
   });
   Future<AppResult<void>> logout();
   Future<AppResult<Map<String, dynamic>>> getMyProfile();
+  Future<AppResult<Map<String, dynamic>>> updateMyProfile({
+    required String name,
+    required String phone,
+  });
 }

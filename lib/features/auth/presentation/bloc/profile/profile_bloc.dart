@@ -9,6 +9,7 @@ final class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
   ProfileBloc({required this._sessionManager, required this._repository})
     : super(const ProfileState()) {
     on<ProfileRequested>(_onRequested);
+    on<ProfileUpdateRequested>(_onUpdateRequested);
   }
 
   final SessionManager _sessionManager;
@@ -39,6 +40,38 @@ final class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
           _sessionManager.currentUser,
           isGuest: _sessionManager.isGuestMode,
         ),
+      ),
+    );
+  }
+
+  Future<void> _onUpdateRequested(
+    ProfileUpdateRequested event,
+    Emitter<ProfileState> emit,
+  ) async {
+    emit(
+      state.copyWith(
+        updateStatus: ProfileUpdateStatus.submitting,
+        updateError: null,
+      ),
+    );
+    final result = await _repository.updateMyProfile(
+      name: event.name,
+      phone: event.phone,
+    );
+    final user = result.dataOrNull;
+    if (user != null) {
+      emit(
+        state.copyWith(
+          updateStatus: ProfileUpdateStatus.success,
+          profile: ProfileData.fromSession(user, isGuest: false),
+        ),
+      );
+      return;
+    }
+    emit(
+      state.copyWith(
+        updateStatus: ProfileUpdateStatus.failure,
+        updateError: result.failureOrNull?.message ?? 'Failed to update profile.',
       ),
     );
   }

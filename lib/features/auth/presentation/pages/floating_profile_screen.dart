@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/session/session_manager.dart';
+import '../../domain/repositories/auth_repository.dart';
 import '../../domain/usecases/logout_use_case.dart';
 import '../bloc/profile/profile_state.dart';
 import 'favorite_store.dart';
@@ -82,12 +83,21 @@ class FloatingProfileScreen extends StatelessWidget {
     VoidCallback? onTrackOrderTap,
     VoidCallback? onMyOrdersTap,
     VoidCallback? onSignOutTap,
-  }) {
-    final ProfileData profile = ProfileData.fromSession(
-      sl<SessionManager>().currentUser,
-      isGuest: sl<SessionManager>().isGuestMode,
+  }) async {
+    final SessionManager sessionManager = sl<SessionManager>();
+    ProfileData profile = ProfileData.fromSession(
+      sessionManager.currentUser,
+      isGuest: sessionManager.isGuestMode,
     );
-    return Navigator.of(context).push(
+    if (!profile.isGuest && sessionManager.hasAccessToken) {
+      final result = await sl<AuthRepository>().getMyProfile();
+      final user = result.dataOrNull;
+      if (user != null) {
+        profile = ProfileData.fromSession(user, isGuest: false);
+      }
+    }
+    if (!context.mounted) return;
+    await Navigator.of(context).push<void>(
       PageRouteBuilder(
         opaque: false,
         barrierDismissible: true,

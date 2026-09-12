@@ -1,3 +1,4 @@
+import '../../../../core/constants/api_constants.dart';
 import '../../../../core/constants/api_endpoints.dart';
 import '../../../../core/network/api_request_options.dart';
 import '../../../../core/network/dio_client.dart';
@@ -10,6 +11,11 @@ abstract interface class AuthRemoteDataSource {
   });
 
   Future<Map<String, dynamic>> getMyProfile();
+
+  Future<Map<String, dynamic>> updateMyProfile({
+    required String name,
+    required String phone,
+  });
 
   Future<Map<String, dynamic>> register({
     required String name,
@@ -159,8 +165,37 @@ final class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<Map<String, dynamic>> getMyProfile() async {
     final response = await _dioClient.get<dynamic>(
-      UserEndpoints.me,
-      options: ApiRequestOptions.authenticated(),
+      AuthEndpoints.me,
+      options: ApiRequestOptions.authenticated(
+        headers: const <String, dynamic>{
+          'X-Pharmacy-Slug': ApiConstants.pharmacySlug,
+        },
+      ),
+    );
+    if (response.data is! Map)
+      throw const FormatException('Invalid profile response.');
+    final root = Map<String, dynamic>.from(response.data as Map);
+    final dynamic data = root['data'];
+    final dynamic value = data is Map
+        ? (data['user'] ?? data['customer'] ?? data)
+        : (root['user'] ?? root['customer'] ?? root);
+    if (value is! Map) throw const FormatException('Profile was not returned.');
+    return Map<String, dynamic>.from(value);
+  }
+
+  @override
+  Future<Map<String, dynamic>> updateMyProfile({
+    required String name,
+    required String phone,
+  }) async {
+    final response = await _dioClient.patch<dynamic>(
+      UserEndpoints.updateMyProfile,
+      data: <String, dynamic>{'name': name, 'phone': phone},
+      options: ApiRequestOptions.authenticated(
+        headers: const <String, dynamic>{
+          'X-Pharmacy-Slug': ApiConstants.pharmacySlug,
+        },
+      ),
     );
     if (response.data is! Map)
       throw const FormatException('Invalid profile response.');

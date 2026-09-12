@@ -209,4 +209,21 @@ final class AuthRepositoryImpl implements AuthRepository {
       return AppError<Map<String, dynamic>>(FailureMapper.fromException(error));
     }
   }
+
+  @override
+  Future<AppResult<Map<String, dynamic>>> updateMyProfile({
+    required String name,
+    required String phone,
+  }) async {
+    try {
+      final user = await _remoteDataSource.updateMyProfile(
+        name: name,
+        phone: phone,
+      );
+      await _sessionManager.updateCurrentUser(user);
+      return AppSuccess<Map<String, dynamic>>(user);
+    } catch (error) {
+      return AppError<Map<String, dynamic>>(FailureMapper.fromException(error));
+    }
+  }
 }

@@ -144,19 +144,40 @@ final class ProfileData extends Equatable {
 
 enum ProfileStatus { initial, loading, success }
 
+enum ProfileUpdateStatus { idle, submitting, success, failure }
+
 final class ProfileState extends Equatable {
-  const ProfileState({this.status = ProfileStatus.initial, this.profile});
+  const ProfileState({
+    this.status = ProfileStatus.initial,
+    this.profile,
+    this.updateStatus = ProfileUpdateStatus.idle,
+    this.updateError,
+  });
 
   final ProfileStatus status;
   final ProfileData? profile;
+  final ProfileUpdateStatus updateStatus;
+  final String? updateError;
 
-  ProfileState copyWith({ProfileStatus? status, ProfileData? profile}) {
+  ProfileState copyWith({
+    ProfileStatus? status,
+    ProfileData? profile,
+    ProfileUpdateStatus? updateStatus,
+    String? updateError,
+  }) {
     return ProfileState(
       status: status ?? this.status,
       profile: profile ?? this.profile,
+      updateStatus: updateStatus ?? this.updateStatus,
+      updateError: updateError,
     );
   }
 
   @override
-  List<Object?> get props => <Object?>[status, profile];
+  List<Object?> get props => <Object?>[
+    status,
+    profile,
+    updateStatus,
+    updateError,
+  ];
 }

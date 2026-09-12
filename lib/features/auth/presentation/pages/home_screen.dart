@@ -186,10 +186,23 @@ class _HomeBodyState extends State<_HomeBody> with WidgetsBindingObserver {
                 '${position.longitude.toStringAsFixed(4)}';
 
       _updateAddress(resolvedAddress);
+      final LocalStorageService storage = sl<LocalStorageService>();
       unawaited(
-        sl<LocalStorageService>().write<String>(
+        storage.write<String>(
           key: StorageKeys.lastKnownAddress,
           value: resolvedAddress,
+        ),
+      );
+      unawaited(
+        storage.write<double>(
+          key: StorageKeys.lastKnownLatitude,
+          value: position.latitude,
+        ),
+      );
+      unawaited(
+        storage.write<double>(
+          key: StorageKeys.lastKnownLongitude,
+          value: position.longitude,
         ),
       );
     } catch (_) {
