@@ -5,7 +5,14 @@ abstract final class ApiConstants {
   static const String host = 'https://backend.altamampharma.com';
 
   /// Public customer-facing storefront used for shareable product links.
-  static const String storefrontBaseUrl = 'https://altamampharma.com';
+  static const String storefrontBaseUrl =
+      'https://altamampharma.com/tajaltamam';
+
+  /// Tenant selected by the public Taj AL Tamam storefront.
+  ///
+  /// Public shop APIs use this value in the `X-Pharmacy-Slug` header to
+  /// select the correct catalog, categories, and checkout configuration.
+  static const String pharmacySlug = 'tajaltamam';
 
   /// Every REST endpoint is served under the `/api` global prefix.
   static const String apiPrefix = '/api';

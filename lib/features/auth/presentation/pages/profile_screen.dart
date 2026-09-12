@@ -188,10 +188,10 @@ class _ProfileHero extends StatelessWidget {
           Container(
             height: 215,
             decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: <Color>[Color(0xff48aafa), Color(0xffb9e8ff)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+              image: DecorationImage(
+                image: AssetImage('assets/images/sky.png'),
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
               ),
               borderRadius: BorderRadius.vertical(
                 bottom: Radius.elliptical(330, 82),

@@ -124,8 +124,10 @@ class _Header extends StatelessWidget {
         Container(
           height: 290,
           decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xff45adfa), Color(0xffaddbff)],
+            image: DecorationImage(
+              image: AssetImage('assets/images/sky.png'),
+              fit: BoxFit.cover,
+              alignment: Alignment.topCenter,
             ),
             borderRadius: BorderRadius.vertical(
               bottom: Radius.elliptical(300, 70),
@@ -154,14 +156,27 @@ class _Header extends StatelessWidget {
           child: Column(
             children: [
               Container(
-                width: 58,
-                height: 58,
+                width: 72,
+                height: 72,
                 padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
-                  color: const Color(0xff174b94),
-                  borderRadius: BorderRadius.circular(14),
+                  color: Colors.white.withValues(alpha: .92),
+                  borderRadius: BorderRadius.circular(22),
+                  boxShadow: const <BoxShadow>[
+                    BoxShadow(
+                      color: Color(0x240c4f8e),
+                      blurRadius: 18,
+                      offset: Offset(0, 7),
+                    ),
+                  ],
                 ),
-                child: Image.asset('assets/images/at_pharma_icon.png'),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.asset(
+                    'assets/images/at_pharma_icon.png',
+                    fit: BoxFit.contain,
+                  ),
+                ),
               ),
               const SizedBox(height: 18),
               const Text(

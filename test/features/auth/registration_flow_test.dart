@@ -148,6 +148,7 @@ void main() {
       });
       expect(ApiRequestOptions.requiresAuthentication(requests.single), false);
       expect(ApiRequestOptions.allowsRetry(requests.single), false);
+      expect(requests.single.headers['X-Pharmacy-Slug'], 'tajaltamam');
       expect(session.hasAccessToken, false);
     },
   );

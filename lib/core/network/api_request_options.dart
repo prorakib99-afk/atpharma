@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 
+import '../constants/api_constants.dart';
+
 abstract final class ApiRequestOptions {
   ApiRequestOptions._();
 
@@ -52,7 +54,12 @@ abstract final class ApiRequestOptions {
     bool allowRetry = true,
   }) {
     return Options(
-      headers: headers,
+      // Shop endpoints are tenant-aware. Without this header the backend
+      // accepts the request but resolves no storefront catalog.
+      headers: <String, dynamic>{
+        'X-Pharmacy-Slug': ApiConstants.pharmacySlug,
+        ...?headers,
+      },
       extra: <String, dynamic>{
         ...?extra,
         requiresAuthenticationKey: false,

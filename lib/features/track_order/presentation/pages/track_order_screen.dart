@@ -107,10 +107,10 @@ class _Header extends StatelessWidget {
         Container(
           height: 360,
           decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: <Color>[Color(0xff49aafa), Color(0xffc4edff)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+            image: DecorationImage(
+              image: AssetImage('assets/images/sky.png'),
+              fit: BoxFit.cover,
+              alignment: Alignment.topCenter,
             ),
             borderRadius: BorderRadius.vertical(
               bottom: Radius.elliptical(380, 96),
