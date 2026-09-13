@@ -327,7 +327,7 @@ class _OrderCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      'Placed on ' + _date(order.createdAt),
+                      'Placed on ${_date(order.createdAt)}',
                       style: const TextStyle(
                         color: Color(0xff7283a1),
                         fontSize: 12,
@@ -361,9 +361,7 @@ class _OrderCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  order.itemCount.toString() +
-                      ' items   •   SAR ' +
-                      order.total.toStringAsFixed(2),
+                  '${order.itemCount} items   •   SAR ${order.total.toStringAsFixed(2)}',
                   style: const TextStyle(
                     color: Color(0xff667a9b),
                     fontSize: 12,
@@ -443,7 +441,7 @@ String _date(DateTime? d) {
     'Nov',
     'Dec',
   ];
-  return d.day.toString() + ' ' + m[d.month - 1] + ' ' + d.year.toString();
+  return '${d.day} ${m[d.month - 1]} ${d.year}';
 }
 
 final _dec = BoxDecoration(

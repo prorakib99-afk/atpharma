@@ -10,8 +10,7 @@ abstract interface class ShopOrdersRemoteDataSource {
 
 final class ShopOrdersRemoteDataSourceImpl
     implements ShopOrdersRemoteDataSource {
-  const ShopOrdersRemoteDataSourceImpl({required DioClient dioClient})
-    : _dioClient = dioClient;
+  const ShopOrdersRemoteDataSourceImpl({required this._dioClient});
   final DioClient _dioClient;
   @override
   Future<ShopOrdersPage> getOrders({
@@ -23,8 +22,9 @@ final class ShopOrdersRemoteDataSourceImpl
       queryParameters: <String, dynamic>{'page': page, 'limit': limit},
       options: ApiRequestOptions.authenticated(),
     );
-    if (response.data is! Map)
+    if (response.data is! Map) {
       throw const FormatException('Invalid orders response.');
+    }
     final root = Map<String, dynamic>.from(response.data as Map);
     final dynamic payload = root['data'] ?? root;
     final Map<String, dynamic> data = payload is Map

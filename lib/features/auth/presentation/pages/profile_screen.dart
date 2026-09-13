@@ -429,7 +429,7 @@ class _RoundButton extends StatelessWidget {
 }
 
 class _Info {
-  const _Info(this.icon, this.label, this.value, {this.green = false});
+  const _Info(this.icon, this.label, this.value) : green = false;
   final IconData icon;
   final String label;
   final String value;

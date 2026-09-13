@@ -4,9 +4,8 @@ import 'shop_orders_event.dart';
 import 'shop_orders_state.dart';
 
 final class ShopOrdersBloc extends Bloc<ShopOrdersEvent, ShopOrdersState> {
-  ShopOrdersBloc({required GetShopOrdersUseCase getOrders})
-    : _getOrders = getOrders,
-      super(const ShopOrdersState()) {
+  ShopOrdersBloc({required this._getOrders})
+    : super(const ShopOrdersState()) {
     on<ShopOrdersRequested>(_requested);
   }
   final GetShopOrdersUseCase _getOrders;

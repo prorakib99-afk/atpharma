@@ -172,8 +172,9 @@ final class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         },
       ),
     );
-    if (response.data is! Map)
+    if (response.data is! Map) {
       throw const FormatException('Invalid profile response.');
+    }
     final root = Map<String, dynamic>.from(response.data as Map);
     final dynamic data = root['data'];
     final dynamic value = data is Map
@@ -197,8 +198,9 @@ final class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         },
       ),
     );
-    if (response.data is! Map)
+    if (response.data is! Map) {
       throw const FormatException('Invalid profile response.');
+    }
     final root = Map<String, dynamic>.from(response.data as Map);
     final dynamic data = root['data'];
     final dynamic value = data is Map

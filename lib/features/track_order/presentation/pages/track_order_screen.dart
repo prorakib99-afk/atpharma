@@ -336,7 +336,7 @@ class _Result extends StatelessWidget {
                   if (order.history.isNotEmpty &&
                       order.history.first.timestamp != null)
                     Text(
-                      'Placed on ' + _date(order.history.first.timestamp!),
+                      'Placed on ${_date(order.history.first.timestamp!)}',
                       style: const TextStyle(color: _muted, fontSize: 13),
                     ),
                 ],
@@ -400,7 +400,7 @@ class _Result extends StatelessWidget {
             title: 'Delivery rider',
             value:
                 order.rider.name +
-                (order.rider.phone.isEmpty ? '' : ' · ' + order.rider.phone),
+                (order.rider.phone.isEmpty ? '' : ' · ${order.rider.phone}'),
           ),
         ],
       ],
@@ -591,11 +591,7 @@ String _date(DateTime value) {
     'Nov',
     'Dec',
   ];
-  return value.day.toString() +
-      ' ' +
-      months[value.month - 1] +
-      ' ' +
-      value.year.toString();
+  return '${value.day} ${months[value.month - 1]} ${value.year}';
 }
 
 final BoxDecoration _card = BoxDecoration(
