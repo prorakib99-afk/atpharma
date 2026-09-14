@@ -97,6 +97,12 @@ class FloatingProfileScreen extends StatelessWidget {
       }
     }
     if (!context.mounted) return;
+
+    VoidCallback? deferred;
+    void runAfterClose(VoidCallback? action) {
+      deferred = action;
+    }
+
     await Navigator.of(context).push<void>(
       PageRouteBuilder(
         opaque: false,
@@ -129,20 +135,20 @@ class FloatingProfileScreen extends StatelessWidget {
                           name: profile.name,
                           role: profile.roleLine,
                           onProfileTap: () {
+                            runAfterClose(onProfileTap);
                             Navigator.of(context).pop();
-                            onProfileTap?.call();
                           },
                           onMyOrdersTap: () {
+                            runAfterClose(onMyOrdersTap);
                             Navigator.of(context).pop();
-                            onMyOrdersTap?.call();
                           },
                           onTrackOrderTap: () {
+                            runAfterClose(onTrackOrderTap);
                             Navigator.of(context).pop();
-                            onTrackOrderTap?.call();
                           },
                           onSignOutTap: () {
+                            runAfterClose(onSignOutTap);
                             Navigator.of(context).pop();
-                            onSignOutTap?.call();
                           },
                         ),
                       ),
@@ -155,6 +161,8 @@ class FloatingProfileScreen extends StatelessWidget {
         },
       ),
     );
+
+    deferred?.call();
   }
 
   @override

@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../../../../core/constants/api_endpoints.dart';
+import '../../../../core/constants/api_constants.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/network/api_request_options.dart';
 import '../../../../core/network/dio_client.dart';
@@ -197,7 +198,15 @@ final class OfflineOrderService extends ChangeNotifier {
     final Response<dynamic> response = await _dioClient.post<dynamic>(
       ShopOrderEndpoints.createOrder,
       data: draft.toJson(),
-      options: ApiRequestOptions.publicRequest(allowRetry: false),
+      // Forward a signed-in customer's token so the backend associates the
+      // order with the account shown by My Orders. Guest checkout still works
+      // because the interceptor adds no token when none is available.
+      options: ApiRequestOptions.authenticated(
+        headers: const <String, dynamic>{
+          'X-Pharmacy-Slug': ApiConstants.pharmacySlug,
+        },
+        allowRetry: false,
+      ),
     );
     final Map<String, dynamic>? root = JsonValueParser.map(response.data);
     final Map<String, dynamic>? data =
@@ -402,8 +411,9 @@ final class OfflineOrderService extends ChangeNotifier {
       final Response<dynamic> response = await _dioClient.post<dynamic>(
         ShopOrderEndpoints.createOrder,
         data: payload,
-        options: ApiRequestOptions.publicRequest(
+        options: ApiRequestOptions.authenticated(
           headers: <String, dynamic>{
+            'X-Pharmacy-Slug': ApiConstants.pharmacySlug,
             'X-Idempotency-Key': row['idempotency_key'],
           },
           allowRetry: false,

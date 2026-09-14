@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import '../../../../core/constants/api_constants.dart';
 import '../../../../core/network/api_request_options.dart';
 import '../../../../core/network/dio_client.dart';
 import '../models/shop_order_model.dart';
@@ -20,7 +21,11 @@ final class ShopOrdersRemoteDataSourceImpl
     final Response<dynamic> response = await _dioClient.get<dynamic>(
       '/shop/account/orders',
       queryParameters: <String, dynamic>{'page': page, 'limit': limit},
-      options: ApiRequestOptions.authenticated(),
+      options: ApiRequestOptions.authenticated(
+        headers: const <String, dynamic>{
+          'X-Pharmacy-Slug': ApiConstants.pharmacySlug,
+        },
+      ),
     );
     if (response.data is! Map) {
       throw const FormatException('Invalid orders response.');
@@ -30,10 +35,22 @@ final class ShopOrdersRemoteDataSourceImpl
     final Map<String, dynamic> data = payload is Map
         ? Map<String, dynamic>.from(payload)
         : root;
-    final dynamic raw =
-        data['orders'] ?? data['items'] ?? data['results'] ?? root['orders'];
+    final dynamic ordersPayload = payload is List
+        ? payload
+        : data['orders'] ?? data['items'] ?? data['results'] ?? root['orders'];
+    final dynamic raw = ordersPayload is Map
+        ? ordersPayload['data'] ??
+              ordersPayload['orders'] ??
+              ordersPayload['items'] ??
+              ordersPayload['results']
+        : ordersPayload;
     final List<dynamic> list = raw is List ? raw : <dynamic>[];
-    final dynamic meta = data['pagination'] ?? data['meta'];
+    final dynamic meta =
+        data['pagination'] ??
+        data['meta'] ??
+        root['pagination'] ??
+        root['meta'] ??
+        (ordersPayload is Map ? ordersPayload['pagination'] : null);
     final Map<String, dynamic> pagination = meta is Map
         ? Map<String, dynamic>.from(meta)
         : data;
