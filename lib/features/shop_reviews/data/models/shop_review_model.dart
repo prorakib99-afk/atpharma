@@ -1,4 +1,5 @@
 import '../../../../core/utils/json_value_parser.dart';
+import '../../domain/entities/my_review_entity.dart';
 import '../../domain/entities/shop_review_entity.dart';
 
 final class ShopReviewModel {
@@ -29,7 +30,7 @@ final class ShopReviewModel {
         fallback: 'Customer',
       ),
       title: JsonValueParser.string(json['title']),
-      comment: JsonValueParser.string(json['comment'] ?? json['review']),
+      comment: JsonValueParser.string(json['comment']),
       createdAt: JsonValueParser.dateTime(json['createdAt']),
     );
   }
@@ -60,6 +61,14 @@ ShopReviewPage parseShopReviewPage(Map<String, dynamic> json) {
       .map(ShopReviewModel.fromJson)
       .map((model) => model.toEntity())
       .toList(growable: false);
+
+  final Map<String, dynamic>? myReviewJson = JsonValueParser.map(
+    json['myReview'] ??
+        json['my_review'] ??
+        json['userReview'] ??
+        json['currentUserReview'],
+  );
+
   return ShopReviewPage(
     items: items,
     summary: ShopReviewSummary(
@@ -69,5 +78,35 @@ ShopReviewPage parseShopReviewPage(Map<String, dynamic> json) {
     ),
     page: JsonValueParser.integer(json['page'], fallback: 1),
     totalPages: JsonValueParser.integer(json['totalPages']),
+    myReview: myReviewJson == null
+        ? null
+        : _parseMyReview(myReviewJson, productId: json['productId']),
+    canReview: JsonValueParser.boolean(
+      json['canReview'] ?? json['isEligibleToReview'] ?? json['hasPurchased'],
+      fallback: true,
+    ),
+  );
+}
+
+MyReviewEntity _parseMyReview(Map<String, dynamic> json, {dynamic productId}) {
+  final String status = JsonValueParser.string(
+    json['status'] ?? json['approvalStatus'] ?? json['moderationStatus'],
+  ).toLowerCase();
+  final bool published =
+      status.contains('publish') ||
+      status.contains('approved') ||
+      status.contains('active') ||
+      JsonValueParser.boolean(json['isApproved'] ?? json['approved']);
+
+  return MyReviewEntity(
+    id: JsonValueParser.string(json['id']),
+    productId: JsonValueParser.string(json['productId'] ?? productId),
+    productName: JsonValueParser.string(json['productName']),
+    productImageUrl: JsonValueParser.string(json['productImage']),
+    rating: JsonValueParser.integer(json['rating']).clamp(1, 5),
+    title: JsonValueParser.string(json['title']),
+    comment: JsonValueParser.string(json['comment'] ?? json['review']),
+    published: published,
+    createdAt: JsonValueParser.dateTime(json['createdAt']),
   );
 }

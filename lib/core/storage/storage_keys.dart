@@ -7,6 +7,9 @@ abstract final class StorageKeys {
   /// Serialized authenticated user profile.
   static const String currentUser = 'current_user';
 
+  /// Tenant slug resolved from the backend, when available.
+  static const String pharmacySlug = 'pharmacy_slug';
+
   /// Whether the user selected "Remember me".
   static const String rememberMe = 'remember_me';
 

@@ -202,7 +202,7 @@ final class OfflineOrderService extends ChangeNotifier {
       // order with the account shown by My Orders. Guest checkout still works
       // because the interceptor adds no token when none is available.
       options: ApiRequestOptions.authenticated(
-        headers: const <String, dynamic>{
+        headers: <String, dynamic>{
           'X-Pharmacy-Slug': ApiConstants.pharmacySlug,
         },
         allowRetry: false,

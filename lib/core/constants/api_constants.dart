@@ -12,7 +12,10 @@ abstract final class ApiConstants {
   ///
   /// Public shop APIs use this value in the `X-Pharmacy-Slug` header to
   /// select the correct catalog, categories, and checkout configuration.
-  static const String pharmacySlug = 'tajaltamam';
+  static String pharmacySlug = String.fromEnvironment(
+    'PHARMACY_SLUG',
+    defaultValue: 'tajaltamam',
+  );
 
   /// Every REST endpoint is served under the `/api` global prefix.
   static const String apiPrefix = '/api';

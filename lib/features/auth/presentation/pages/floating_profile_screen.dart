@@ -21,6 +21,52 @@ Future<void> signOutFromProfile(BuildContext context) async {
 }
 
 /// ---------------------------------------------------------------------
+/// PROFILE TRIGGER AVATAR — the small round avatar button (e.g. in an
+/// AppBar) that opens [FloatingProfileScreen]. Shows the signed-in user's
+/// photo, falling back to `assets/images/dummy_avatar.png` when the
+/// backend has no image.
+/// ---------------------------------------------------------------------
+class ProfileTriggerAvatar extends StatelessWidget {
+  const ProfileTriggerAvatar({super.key, this.size = 40});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final SessionManager sessionManager = sl<SessionManager>();
+    final ProfileData profile = ProfileData.fromSession(
+      sessionManager.currentUser,
+      isGuest: sessionManager.isGuestMode,
+    );
+    final String? avatarUrl = profile.avatarUrl;
+
+    return ClipOval(
+      child: avatarUrl != null && avatarUrl.trim().isNotEmpty
+          ? Image.network(
+              avatarUrl,
+              width: size,
+              height: size,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => Image.asset(
+                'assets/images/dummy_avatar.png',
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                cacheWidth: 80,
+              ),
+            )
+          : Image.asset(
+              'assets/images/dummy_avatar.png',
+              width: size,
+              height: size,
+              fit: BoxFit.cover,
+              cacheWidth: 80,
+            ),
+    );
+  }
+}
+
+/// ---------------------------------------------------------------------
 /// DATA MODEL
 /// ---------------------------------------------------------------------
 class ProfileMenuAction {
@@ -54,6 +100,7 @@ class FloatingProfileScreen extends StatelessWidget {
     this.onProfileTap,
     this.onTrackOrderTap,
     this.onMyOrdersTap,
+    this.onMyReviewsTap,
     this.onSignOutTap,
     this.showAccentTab = true,
   });
@@ -66,11 +113,13 @@ class FloatingProfileScreen extends StatelessWidget {
   final VoidCallback? onProfileTap;
   final VoidCallback? onTrackOrderTap;
   final VoidCallback? onMyOrdersTap;
+  final VoidCallback? onMyReviewsTap;
   final VoidCallback? onSignOutTap;
   final bool showAccentTab;
 
   static const _accent = Color(0xff7c3aed);
   static const _textMuted = Color(0xff6b7280);
+  static bool _isShowing = false;
 
   /// Convenience helper — opens this menu as a floating overlay anchored
   /// just below-right of [anchorKey]'s widget (e.g. an avatar IconButton).
@@ -82,87 +131,100 @@ class FloatingProfileScreen extends StatelessWidget {
     VoidCallback? onProfileTap,
     VoidCallback? onTrackOrderTap,
     VoidCallback? onMyOrdersTap,
+    VoidCallback? onMyReviewsTap,
     VoidCallback? onSignOutTap,
   }) async {
-    final SessionManager sessionManager = sl<SessionManager>();
-    ProfileData profile = ProfileData.fromSession(
-      sessionManager.currentUser,
-      isGuest: sessionManager.isGuestMode,
-    );
-    if (!profile.isGuest && sessionManager.hasAccessToken) {
-      final result = await sl<AuthRepository>().getMyProfile();
-      final user = result.dataOrNull;
-      if (user != null) {
-        profile = ProfileData.fromSession(user, isGuest: false);
+    if (_isShowing) return;
+    _isShowing = true;
+    try {
+      final SessionManager sessionManager = sl<SessionManager>();
+      ProfileData profile = ProfileData.fromSession(
+        sessionManager.currentUser,
+        isGuest: sessionManager.isGuestMode,
+      );
+      if (!profile.isGuest && sessionManager.hasAccessToken) {
+        final result = await sl<AuthRepository>().getMyProfile();
+        final user = result.dataOrNull;
+        if (user != null) {
+          profile = ProfileData.fromSession(user, isGuest: false);
+        }
       }
-    }
-    if (!context.mounted) return;
+      if (!context.mounted) return;
 
-    VoidCallback? deferred;
-    void runAfterClose(VoidCallback? action) {
-      deferred = action;
-    }
+      VoidCallback? deferred;
+      void runAfterClose(VoidCallback? action) {
+        deferred = action;
+      }
 
-    await Navigator.of(context).push<void>(
-      PageRouteBuilder(
-        opaque: false,
-        barrierDismissible: true,
-        barrierColor: Colors.black.withValues(alpha: 0.05),
-        transitionDuration: const Duration(milliseconds: 150),
-        pageBuilder: (context, anim, secondaryAnim) {
-          return FadeTransition(
-            opacity: anim,
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onTap: () => Navigator.of(context).pop(),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final isWide = constraints.maxWidth >= 600;
-                  return Align(
-                    alignment: Alignment.topRight,
-                    child: Padding(
-                      padding: EdgeInsets.only(
-                        top: isWide ? 84 : 88,
-                        right: isWide ? 20 : 24,
-                      ),
-                      child: GestureDetector(
-                        onTap: () {},
-                        child: FloatingProfileScreen(
-                          avatarAssetPath: profile.isGuest
-                              ? null
-                              : avatarAssetPath,
-                          avatarUrl: profile.isGuest ? null : profile.avatarUrl,
-                          name: profile.name,
-                          role: profile.roleLine,
-                          onProfileTap: () {
-                            runAfterClose(onProfileTap);
-                            Navigator.of(context).pop();
-                          },
-                          onMyOrdersTap: () {
-                            runAfterClose(onMyOrdersTap);
-                            Navigator.of(context).pop();
-                          },
-                          onTrackOrderTap: () {
-                            runAfterClose(onTrackOrderTap);
-                            Navigator.of(context).pop();
-                          },
-                          onSignOutTap: () {
-                            runAfterClose(onSignOutTap);
-                            Navigator.of(context).pop();
-                          },
+      await Navigator.of(context).push<void>(
+        PageRouteBuilder(
+          opaque: false,
+          barrierDismissible: true,
+          barrierColor: Colors.black.withValues(alpha: 0.05),
+          transitionDuration: const Duration(milliseconds: 150),
+          pageBuilder: (context, anim, secondaryAnim) {
+            return FadeTransition(
+              opacity: anim,
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: () => Navigator.of(context).pop(),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isWide = constraints.maxWidth >= 600;
+                    return Align(
+                      alignment: Alignment.topRight,
+                      child: Padding(
+                        padding: EdgeInsets.only(
+                          top: isWide ? 84 : 88,
+                          right: isWide ? 20 : 24,
+                        ),
+                        child: GestureDetector(
+                          onTap: () {},
+                          child: FloatingProfileScreen(
+                            avatarAssetPath: profile.isGuest
+                                ? null
+                                : avatarAssetPath,
+                            avatarUrl: profile.isGuest
+                                ? null
+                                : profile.avatarUrl,
+                            name: profile.name,
+                            role: profile.roleLine,
+                            onProfileTap: () {
+                              runAfterClose(onProfileTap);
+                              Navigator.of(context).pop();
+                            },
+                            onMyOrdersTap: () {
+                              runAfterClose(onMyOrdersTap);
+                              Navigator.of(context).pop();
+                            },
+                            onMyReviewsTap: () {
+                              runAfterClose(onMyReviewsTap);
+                              Navigator.of(context).pop();
+                            },
+                            onTrackOrderTap: () {
+                              runAfterClose(onTrackOrderTap);
+                              Navigator.of(context).pop();
+                            },
+                            onSignOutTap: () {
+                              runAfterClose(onSignOutTap);
+                              Navigator.of(context).pop();
+                            },
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
-            ),
-          );
-        },
-      ),
-    );
+            );
+          },
+        ),
+      );
 
-    deferred?.call();
+      deferred?.call();
+    } finally {
+      _isShowing = false;
+    }
   }
 
   @override
@@ -198,19 +260,10 @@ class FloatingProfileScreen extends StatelessWidget {
                       radius: 18,
                       backgroundColor: const Color(0xffe5e7eb),
                       backgroundImage: avatarUrl?.trim().isNotEmpty == true
-                          ? NetworkImage(avatarUrl!)
-                          : avatarAssetPath != null
-                          ? AssetImage(avatarAssetPath!)
-                          : null,
-                      child:
-                          avatarUrl?.trim().isNotEmpty != true &&
-                              avatarAssetPath == null
-                          ? const Icon(
-                              Icons.person,
-                              color: Colors.white,
-                              size: 18,
-                            )
-                          : null,
+                          ? NetworkImage(avatarUrl!) as ImageProvider
+                          : const AssetImage(
+                              'assets/images/dummy_avatar.png',
+                            ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -256,6 +309,12 @@ class FloatingProfileScreen extends StatelessWidget {
                       title: 'My Orders',
                       subtitle: 'View your order history',
                       onTap: onMyOrdersTap,
+                    ),
+                    _MenuRow(
+                      icon: Icons.star_outline_rounded,
+                      title: 'My Reviews',
+                      subtitle: 'Manage your product reviews',
+                      onTap: onMyReviewsTap,
                     ),
                     _MenuRow(
                       icon: Icons.local_shipping_outlined,

@@ -257,17 +257,16 @@ class _ProfileAvatar extends StatelessWidget {
         context,
         avatarAssetPath: 'assets/images/at_pharma_icon.png',
         onProfileTap: () => Navigator.of(context).pushNamed(AppRoutes.profile),
+        onMyOrdersTap: () =>
+            Navigator.of(context).pushNamed(AppRoutes.myOrders),
+        onMyReviewsTap: () =>
+            Navigator.of(context).pushNamed(AppRoutes.myReviews),
+        onTrackOrderTap: () =>
+            Navigator.of(context).pushNamed(AppRoutes.trackOrder),
         onSignOutTap: () => signOutFromProfile(context),
       ),
       customBorder: const CircleBorder(),
-      child: ClipOval(
-        child: Image.asset(
-          'assets/images/at_pharma_icon.png',
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-        ),
-      ),
+      child: const ProfileTriggerAvatar(size: size),
     );
   }
 }

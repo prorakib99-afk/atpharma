@@ -2,7 +2,7 @@ abstract final class JsonValueParser {
   JsonValueParser._();
 
   static String string(dynamic value, {String fallback = ''}) {
-    if (value == null) {
+    if (value == null || value is Map || value is List) {
       return fallback;
     }
 

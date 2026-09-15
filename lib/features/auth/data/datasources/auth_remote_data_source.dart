@@ -158,7 +158,12 @@ final class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<void> logout() async {
     await _dioClient.post<dynamic>(
       AuthEndpoints.logout,
-      options: ApiRequestOptions.authenticated(allowRetry: false),
+      options: ApiRequestOptions.authenticated(
+        headers: <String, dynamic>{
+          'X-Pharmacy-Slug': ApiConstants.pharmacySlug,
+        },
+        allowRetry: false,
+      ),
     );
   }
 
@@ -167,7 +172,7 @@ final class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     final response = await _dioClient.get<dynamic>(
       AuthEndpoints.me,
       options: ApiRequestOptions.authenticated(
-        headers: const <String, dynamic>{
+        headers: <String, dynamic>{
           'X-Pharmacy-Slug': ApiConstants.pharmacySlug,
         },
       ),
@@ -193,7 +198,7 @@ final class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       UserEndpoints.updateMyProfile,
       data: <String, dynamic>{'name': name, 'phone': phone},
       options: ApiRequestOptions.authenticated(
-        headers: const <String, dynamic>{
+        headers: <String, dynamic>{
           'X-Pharmacy-Slug': ApiConstants.pharmacySlug,
         },
       ),

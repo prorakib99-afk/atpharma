@@ -24,6 +24,7 @@ import 'features/auth/presentation/pages/login_screen.dart';
 import 'features/auth/presentation/pages/otp_screen.dart';
 import 'features/auth/presentation/pages/prescription_screen.dart';
 import 'features/track_order/presentation/pages/track_order_screen.dart';
+import 'features/auth/presentation/pages/screen_my_reviews.dart';
 import 'features/shop_orders/presentation/pages/my_orders_screen.dart';
 import 'features/auth/presentation/pages/privacy_policy_screen.dart';
 import 'features/auth/presentation/pages/profile_screen.dart';
@@ -246,6 +247,9 @@ class AtPharmaApp extends StatelessWidget {
         },
         AppRoutes.myOrders: (BuildContext context) {
           return const MyOrdersScreen();
+        },
+        AppRoutes.myReviews: (BuildContext context) {
+          return const MyReviewsScreen();
         },
 
         AppRoutes.trackOrder: (BuildContext context) {

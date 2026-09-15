@@ -25,4 +25,5 @@ abstract final class AppRoutes {
   static const String contactSupport = '/contact-support';
   static const String trackOrder = '/track-order';
   static const String myOrders = '/my-orders';
+  static const String myReviews = '/my-reviews';
 }

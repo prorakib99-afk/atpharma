@@ -14,6 +14,18 @@ final class AuthRepositoryImpl implements AuthRepository {
   final AuthRemoteDataSource _remoteDataSource;
   final SessionManager _sessionManager;
 
+  String? _pharmacySlugFrom(Map<String, dynamic> json) {
+    final dynamic data = json['data'] is Map ? json['data'] : json;
+    final Map<String, dynamic> payload = data is Map
+        ? Map<String, dynamic>.from(data)
+        : json;
+    final dynamic pharmacy = payload['pharmacy'];
+    return (payload['pharmacySlug'] ??
+            payload['pharmacy_slug'] ??
+            (pharmacy is Map ? pharmacy['slug'] : null))
+        ?.toString();
+  }
+
   @override
   Future<AppResult<AuthSession>> login({
     required String identifier,
@@ -25,18 +37,35 @@ final class AuthRepositoryImpl implements AuthRepository {
         identifier: identifier,
         password: password,
       );
-      final bool requiresTwoFactor = json['requiresTwoFactor'] == true;
-      final Object? profile = json['user'] ?? json['customer'];
+      final Map<String, dynamic> payload = json['data'] is Map
+          ? Map<String, dynamic>.from(json['data'] as Map)
+          : json;
+      final bool requiresTwoFactor =
+          payload['requiresTwoFactor'] == true ||
+          json['requiresTwoFactor'] == true;
+      final Object? profile =
+          payload['user'] ??
+          payload['customer'] ??
+          json['user'] ??
+          json['customer'];
       final Map<String, dynamic> user = profile is Map
           ? Map<String, dynamic>.from(profile)
           : <String, dynamic>{};
-      final String? token = json['accessToken']?.toString().trim();
+      final String? token =
+          (payload['accessToken'] ??
+                  payload['access_token'] ??
+                  payload['token'] ??
+                  json['accessToken'] ??
+                  json['access_token'] ??
+                  json['token'])
+              ?.toString()
+              .trim();
 
       final AuthSession session = AuthSession(
         requiresTwoFactor: requiresTwoFactor,
         accessToken: token,
         user: user,
-        message: json['message']?.toString(),
+        message: (payload['message'] ?? json['message'])?.toString(),
       );
 
       if (!requiresTwoFactor) {
@@ -49,6 +78,7 @@ final class AuthRepositoryImpl implements AuthRepository {
           rememberMe: rememberMe,
           identifier: identifier,
         );
+        await _sessionManager.savePharmacySlug(_pharmacySlugFrom(json));
       }
 
       return AppSuccess<AuthSession>(session);
@@ -112,6 +142,7 @@ final class AuthRepositoryImpl implements AuthRepository {
         rememberMe: rememberMe,
         identifier: identifier,
       );
+      await _sessionManager.savePharmacySlug(_pharmacySlugFrom(response));
       return AppSuccess<AuthSession>(
         AuthSession(
           requiresTwoFactor: false,
@@ -204,6 +235,7 @@ final class AuthRepositoryImpl implements AuthRepository {
     try {
       final user = await _remoteDataSource.getMyProfile();
       await _sessionManager.updateCurrentUser(user);
+      await _sessionManager.savePharmacySlug(_pharmacySlugFrom(user));
       return AppSuccess<Map<String, dynamic>>(user);
     } catch (error) {
       return AppError<Map<String, dynamic>>(FailureMapper.fromException(error));
@@ -221,6 +253,7 @@ final class AuthRepositoryImpl implements AuthRepository {
         phone: phone,
       );
       await _sessionManager.updateCurrentUser(user);
+      await _sessionManager.savePharmacySlug(_pharmacySlugFrom(user));
       return AppSuccess<Map<String, dynamic>>(user);
     } catch (error) {
       return AppError<Map<String, dynamic>>(FailureMapper.fromException(error));

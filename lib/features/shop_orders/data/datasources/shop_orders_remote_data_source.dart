@@ -22,7 +22,7 @@ final class ShopOrdersRemoteDataSourceImpl
       '/shop/account/orders',
       queryParameters: <String, dynamic>{'page': page, 'limit': limit},
       options: ApiRequestOptions.authenticated(
-        headers: const <String, dynamic>{
+        headers: <String, dynamic>{
           'X-Pharmacy-Slug': ApiConstants.pharmacySlug,
         },
       ),

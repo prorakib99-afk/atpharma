@@ -31,6 +31,13 @@ import '../../features/shop_reviews/domain/repositories/shop_review_repository.d
 import '../../features/shop_reviews/domain/usecases/create_shop_review_use_case.dart';
 import '../../features/shop_reviews/domain/usecases/get_shop_reviews_use_case.dart';
 import '../../features/shop_reviews/presentation/bloc/shop_reviews_bloc.dart';
+import '../../features/shop_reviews/data/datasources/my_reviews_remote_data_source.dart';
+import '../../features/shop_reviews/data/repositories/my_reviews_repository_impl.dart';
+import '../../features/shop_reviews/domain/repositories/my_reviews_repository.dart';
+import '../../features/shop_reviews/domain/usecases/delete_my_review_use_case.dart';
+import '../../features/shop_reviews/domain/usecases/get_my_reviews_use_case.dart';
+import '../../features/shop_reviews/domain/usecases/update_my_review_use_case.dart';
+import '../../features/shop_reviews/presentation/bloc/my_reviews_bloc.dart';
 import '../../features/shop_orders/data/datasources/shop_orders_remote_data_source.dart';
 import '../../features/shop_orders/data/repositories/shop_orders_repository_impl.dart';
 import '../../features/shop_orders/domain/repositories/shop_orders_repository.dart';
@@ -244,7 +251,10 @@ Future<void> configureDependencies() async {
   );
 
   sl.registerLazySingleton<ShopReviewRemoteDataSource>(
-    () => ShopReviewRemoteDataSourceImpl(dioClient: sl<DioClient>()),
+    () => ShopReviewRemoteDataSourceImpl(
+      dioClient: sl<DioClient>(),
+      sessionManager: sl<SessionManager>(),
+    ),
   );
   sl.registerLazySingleton<ShopReviewRepository>(
     () => ShopReviewRepositoryImpl(
@@ -261,6 +271,29 @@ Future<void> configureDependencies() async {
     () => ShopReviewsBloc(
       getReviews: sl<GetShopReviewsUseCase>(),
       createReview: sl<CreateShopReviewUseCase>(),
+    ),
+  );
+  sl.registerLazySingleton<MyReviewsRemoteDataSource>(
+    () => MyReviewsRemoteDataSourceImpl(dioClient: sl<DioClient>()),
+  );
+  sl.registerLazySingleton<MyReviewsRepository>(
+    () => MyReviewsRepositoryImpl(
+      remoteDataSource: sl<MyReviewsRemoteDataSource>(),
+    ),
+  );
+  sl.registerLazySingleton<GetMyReviewsUseCase>(
+    () => GetMyReviewsUseCase(repository: sl<MyReviewsRepository>()),
+  );
+  sl.registerLazySingleton<DeleteMyReviewUseCase>(
+    () => DeleteMyReviewUseCase(repository: sl<MyReviewsRepository>()),
+  );
+  sl.registerLazySingleton<UpdateMyReviewUseCase>(
+    () => UpdateMyReviewUseCase(repository: sl<MyReviewsRepository>()),
+  );
+  sl.registerFactory<MyReviewsBloc>(
+    () => MyReviewsBloc(
+      getMyReviews: sl<GetMyReviewsUseCase>(),
+      deleteMyReview: sl<DeleteMyReviewUseCase>(),
     ),
   );
   sl.registerLazySingleton<ShopOrdersRemoteDataSource>(

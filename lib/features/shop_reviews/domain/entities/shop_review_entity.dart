@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+import 'my_review_entity.dart';
+
 final class ShopReviewEntity extends Equatable {
   const ShopReviewEntity({
     required this.id,
@@ -45,11 +47,25 @@ final class ShopReviewPage extends Equatable {
     required this.summary,
     required this.page,
     required this.totalPages,
+    this.myReview,
+    this.canReview = true,
   });
   final List<ShopReviewEntity> items;
   final ShopReviewSummary summary;
   final int page;
   final int totalPages;
+  final MyReviewEntity? myReview;
+
+  /// Whether the current user is eligible to write a review for this
+  /// product — true only after they have ordered it.
+  final bool canReview;
   @override
-  List<Object?> get props => [items, summary, page, totalPages];
+  List<Object?> get props => [
+    items,
+    summary,
+    page,
+    totalPages,
+    myReview,
+    canReview,
+  ];
 }

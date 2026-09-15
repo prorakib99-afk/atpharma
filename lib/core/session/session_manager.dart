@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../constants/api_constants.dart';
 import '../storage/local_storage_service.dart';
 import '../storage/storage_keys.dart';
 import '../storage/token_storage.dart';
@@ -8,7 +9,14 @@ final class SessionManager {
   SessionManager({
     required this._tokenStorage,
     required this._localStorageService,
-  });
+  }) {
+    final String? storedSlug = _localStorageService.readString(
+      StorageKeys.pharmacySlug,
+    );
+    if (storedSlug != null) {
+      ApiConstants.pharmacySlug = storedSlug;
+    }
+  }
 
   final TokenStorage _tokenStorage;
   final LocalStorageService _localStorageService;
@@ -62,6 +70,19 @@ final class SessionManager {
 
   bool get isGuestMode {
     return _localStorageService.readBool(StorageKeys.guestMode) ?? false;
+  }
+
+  String get pharmacySlug => ApiConstants.pharmacySlug;
+
+  Future<void> savePharmacySlug(String? slug) async {
+    final String normalizedSlug = (slug ?? '').trim();
+    if (normalizedSlug.isEmpty) return;
+
+    ApiConstants.pharmacySlug = normalizedSlug;
+    await _localStorageService.write<String>(
+      key: StorageKeys.pharmacySlug,
+      value: normalizedSlug,
+    );
   }
 
   bool get canAccessStore {

@@ -51,14 +51,24 @@ final class ShopReviewsBloc extends Bloc<ShopReviewsEvent, ShopReviewsState> {
         title: event.title,
         comment: event.comment,
       );
-      final page = await _getReviews(productId: event.productId);
       emit(
         state.copyWith(
           status: ShopReviewsStatus.submitted,
-          page: page,
           message: 'Review submitted for approval.',
         ),
       );
+      try {
+        final page = await _getReviews(productId: event.productId);
+        emit(
+          state.copyWith(
+            status: ShopReviewsStatus.success,
+            page: page,
+            clearMessage: true,
+          ),
+        );
+      } catch (_) {
+        // Submission succeeded; a refresh failure must not leave the UI busy.
+      }
     } catch (error) {
       emit(
         state.copyWith(

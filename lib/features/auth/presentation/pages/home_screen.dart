@@ -497,6 +497,8 @@ class _Header extends StatelessWidget {
                   Navigator.of(context).pushNamed(AppRoutes.profile),
               onMyOrdersTap: () =>
                   Navigator.of(context).pushNamed(AppRoutes.myOrders),
+              onMyReviewsTap: () =>
+                  Navigator.of(context).pushNamed(AppRoutes.myReviews),
               onTrackOrderTap: () =>
                   Navigator.of(context).pushNamed(AppRoutes.trackOrder),
               onSignOutTap: () => signOutFromProfile(context),
@@ -521,15 +523,7 @@ class _ProfileAvatarButton extends StatelessWidget {
       customBorder: const CircleBorder(),
       child: SizedBox.square(
         dimension: size,
-        child: ClipOval(
-          child: Image.asset(
-            'assets/images/at_pharma_icon.png',
-            width: size,
-            height: size,
-            fit: BoxFit.cover,
-            cacheWidth: 80,
-          ),
-        ),
+        child: ProfileTriggerAvatar(size: size),
       ),
     );
   }

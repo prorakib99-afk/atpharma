@@ -3,9 +3,7 @@ import '../../domain/repositories/shop_review_repository.dart';
 import '../datasources/shop_review_remote_data_source.dart';
 
 final class ShopReviewRepositoryImpl implements ShopReviewRepository {
-  ShopReviewRepositoryImpl({
-    required this._remoteDataSource,
-  });
+  ShopReviewRepositoryImpl({required this._remoteDataSource});
   final ShopReviewRemoteDataSource _remoteDataSource;
   @override
   Future<ShopReviewPage> getReviews({
