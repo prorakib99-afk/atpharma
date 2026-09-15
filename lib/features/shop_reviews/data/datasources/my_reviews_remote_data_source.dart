@@ -1,4 +1,3 @@
-import '../../../../core/constants/api_constants.dart';
 import '../../../../core/network/api_request_options.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/utils/json_value_parser.dart';
@@ -25,11 +24,7 @@ final class MyReviewsRemoteDataSourceImpl implements MyReviewsRemoteDataSource {
     final response = await _dioClient.get<dynamic>(
       '/shop/my-reviews',
       queryParameters: {'page': page},
-      options: ApiRequestOptions.authenticated(
-        headers: <String, dynamic>{
-          'X-Pharmacy-Slug': ApiConstants.pharmacySlug,
-        },
-      ),
+      options: ApiRequestOptions.authenticatedShop(),
     );
     final json = JsonValueParser.map(response.data);
     if (json == null) {
@@ -40,13 +35,13 @@ final class MyReviewsRemoteDataSourceImpl implements MyReviewsRemoteDataSource {
 
   @override
   Future<void> deleteReview({required String reviewId}) async {
+    final String normalizedReviewId = reviewId.trim();
+    if (normalizedReviewId.isEmpty) {
+      throw ArgumentError.value(reviewId, 'reviewId', 'Review ID is required.');
+    }
     await _dioClient.delete<dynamic>(
-      '/shop/reviews/${Uri.encodeComponent(reviewId)}',
-      options: ApiRequestOptions.authenticated(
-        headers: <String, dynamic>{
-          'X-Pharmacy-Slug': ApiConstants.pharmacySlug,
-        },
-      ),
+      '/shop/reviews/${Uri.encodeComponent(normalizedReviewId)}',
+      options: ApiRequestOptions.authenticatedShop(),
     );
   }
 
@@ -57,18 +52,22 @@ final class MyReviewsRemoteDataSourceImpl implements MyReviewsRemoteDataSource {
     String? title,
     String? comment,
   }) async {
+    final String normalizedReviewId = reviewId.trim();
+    if (normalizedReviewId.isEmpty) {
+      throw ArgumentError.value(reviewId, 'reviewId', 'Review ID is required.');
+    }
+    if (rating < 1 || rating > 5) {
+      throw RangeError.range(rating, 1, 5, 'rating');
+    }
+
     await _dioClient.patch<dynamic>(
-      '/shop/reviews/${Uri.encodeComponent(reviewId)}',
+      '/shop/reviews/${Uri.encodeComponent(normalizedReviewId)}',
       data: <String, dynamic>{
         'rating': rating,
-        if (title?.trim().isNotEmpty == true) 'title': title!.trim(),
-        if (comment?.trim().isNotEmpty == true) 'comment': comment!.trim(),
+        if (title != null) 'title': title.trim(),
+        if (comment != null) 'comment': comment.trim(),
       },
-      options: ApiRequestOptions.authenticated(
-        headers: <String, dynamic>{
-          'X-Pharmacy-Slug': ApiConstants.pharmacySlug,
-        },
-      ),
+      options: ApiRequestOptions.authenticatedShop(),
     );
   }
 }

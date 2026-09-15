@@ -42,6 +42,34 @@ abstract final class ApiRequestOptions {
     );
   }
 
+  /// Options for authenticated customer storefront calls.
+  ///
+  /// Shop endpoints are tenant-scoped even after authentication, so the
+  /// bearer token alone is not enough. Keeping the tenant and JSON content
+  /// type here prevents individual PATCH/POST calls from silently drifting
+  /// from the storefront selected by the current session.
+  static Options authenticatedShop({
+    String? pharmacySlug,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ResponseType? responseType,
+    bool allowRetry = true,
+  }) {
+    final String resolvedSlug = (pharmacySlug ?? ApiConstants.pharmacySlug)
+        .trim();
+
+    return authenticated(
+      headers: <String, dynamic>{
+        if (resolvedSlug.isNotEmpty) 'X-Pharmacy-Slug': resolvedSlug,
+        ...?headers,
+      },
+      extra: extra,
+      responseType: responseType,
+      contentType: Headers.jsonContentType,
+      allowRetry: allowRetry,
+    );
+  }
+
   static Options publicRequest({
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,

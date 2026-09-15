@@ -48,7 +48,9 @@ final class MyReviewModel {
     );
 
     return MyReviewModel(
-      id: JsonValueParser.string(json['id']),
+      id: JsonValueParser.string(
+        json['id'] ?? json['reviewId'] ?? json['review_id'],
+      ),
       productId: JsonValueParser.string(
         product?['id'] ?? json['productId'] ?? json['product_id'],
       ),

@@ -487,7 +487,9 @@ class _MyReviewCardState extends State<_MyReviewCard> {
         _updating = false;
         _editing = false;
       });
-    } catch (error) {
+    } catch (error, stackTrace) {
+      debugPrint('Review update failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
       if (!mounted) return;
       setState(() => _updating = false);
       ScaffoldMessenger.of(context)
@@ -498,7 +500,10 @@ class _MyReviewCardState extends State<_MyReviewCard> {
 
   String _errorMessage(Object error) {
     if (error is ApiException) return error.message;
-    return 'Unable to complete the request.';
+    final String message = error.toString().trim();
+    return message.isEmpty
+        ? 'Unable to complete the request.'
+        : message.replaceFirst(RegExp(r'^(Exception|StateError):\s*'), '');
   }
 
   Future<void> _confirmDelete() async {

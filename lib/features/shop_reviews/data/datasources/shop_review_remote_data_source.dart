@@ -1,4 +1,3 @@
-import '../../../../core/constants/api_constants.dart';
 import '../../../../core/network/api_request_options.dart';
 import '../../../../core/session/session_manager.dart';
 import '../../../../core/network/dio_client.dart';
@@ -47,17 +46,11 @@ final class ShopReviewRemoteDataSourceImpl
     try {
       final mineResponse = await _dioClient.get<dynamic>(
         '/shop/products/${Uri.encodeComponent(productId)}/reviews/mine',
-        options: ApiRequestOptions.authenticated(
-          headers: <String, dynamic>{
-            'X-Pharmacy-Slug': ApiConstants.pharmacySlug,
-          },
-        ),
+        options: ApiRequestOptions.authenticatedShop(),
       );
-      final Map<String, dynamic>? mineRoot = JsonValueParser.map(
-        mineResponse.data,
+      final Map<String, dynamic>? mine = _extractReviewJson(
+        JsonValueParser.map(mineResponse.data),
       );
-      final Map<String, dynamic>? mine =
-          JsonValueParser.map(mineRoot?['data']) ?? mineRoot;
       return ShopReviewPage(
         items: parsedPage.items,
         summary: parsedPage.summary,
@@ -68,6 +61,34 @@ final class ShopReviewRemoteDataSourceImpl
     } catch (_) {
       return parsedPage;
     }
+  }
+
+  /// The review endpoint has been returned both directly and inside
+  /// `data.review`/`data.myReview` by different backend versions. Only return
+  /// an actual review object here; treating a wrapper as the review produces
+  /// an empty id and makes PATCH impossible.
+  Map<String, dynamic>? _extractReviewJson(Map<String, dynamic>? json) {
+    if (json == null || json.isEmpty) return null;
+
+    const List<String> wrapperKeys = <String>[
+      'data',
+      'review',
+      'myReview',
+      'my_review',
+      'userReview',
+      'currentUserReview',
+    ];
+    for (final String key in wrapperKeys) {
+      final Map<String, dynamic>? nested = JsonValueParser.map(json[key]);
+      final Map<String, dynamic>? review = _extractReviewJson(nested);
+      if (review != null) return review;
+    }
+
+    final String id = JsonValueParser.string(
+      json['id'] ?? json['reviewId'] ?? json['review_id'],
+    );
+    if (id.isEmpty) return null;
+    return json;
   }
 
   @override
@@ -84,11 +105,7 @@ final class ShopReviewRemoteDataSourceImpl
         if (title?.trim().isNotEmpty == true) 'title': title!.trim(),
         if (comment?.trim().isNotEmpty == true) 'comment': comment!.trim(),
       },
-      options: ApiRequestOptions.authenticated(
-        headers: <String, dynamic>{
-          'X-Pharmacy-Slug': ApiConstants.pharmacySlug,
-        },
-      ),
+      options: ApiRequestOptions.authenticatedShop(),
     );
   }
 }
