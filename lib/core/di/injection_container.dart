@@ -1,23 +1,25 @@
 import 'dart:async';
-import '../../features/auth/domain/usecases/forgot_password_use_case.dart';
-import '../../features/auth/presentation/bloc/recovery/recovery_bloc.dart';
-import '../../features/auth/domain/usecases/registration_use_cases.dart';
-import '../../features/auth/presentation/bloc/registration/registration_bloc.dart';
 
 import 'package:atpharma/features/shop/domain/repositories/shop_product_repository_impl.dart';
 import 'package:dio/dio.dart';
 import 'package:get_it/get_it.dart';
+
 import '../../features/auth/data/datasources/auth_remote_data_source.dart';
 import '../../features/auth/data/repositories/auth_repository_impl.dart';
 import '../../features/auth/domain/repositories/auth_repository.dart';
+import '../../features/auth/domain/usecases/forgot_password_use_case.dart';
 import '../../features/auth/domain/usecases/login_use_case.dart';
 import '../../features/auth/domain/usecases/logout_use_case.dart';
+import '../../features/auth/domain/usecases/registration_use_cases.dart';
+import '../../features/auth/presentation/bloc/checkout/checkout_bloc.dart';
 import '../../features/auth/presentation/bloc/login/login_bloc.dart';
 import '../../features/auth/presentation/bloc/profile/profile_bloc.dart';
-import '../../features/auth/presentation/bloc/checkout/checkout_bloc.dart';
+import '../../features/auth/presentation/bloc/recovery/recovery_bloc.dart';
+import '../../features/auth/presentation/bloc/registration/registration_bloc.dart';
 import '../../features/auth/presentation/bloc/review_order/review_order_bloc.dart';
-import '../../features/shop/data/services/checkout_location_service.dart';
+
 import '../../features/shop/data/datasources/shop_product_remote_data_source.dart';
+import '../../features/shop/data/services/checkout_location_service.dart';
 import '../../features/shop/data/services/offline_order_service.dart';
 import '../../features/shop/domain/repositories/shop_product_repository.dart';
 import '../../features/shop/domain/usecases/cancel_shop_product_details_request_use_case.dart';
@@ -25,36 +27,42 @@ import '../../features/shop/domain/usecases/cancel_shop_products_request_use_cas
 import '../../features/shop/domain/usecases/get_shop_product_details_use_case.dart';
 import '../../features/shop/domain/usecases/get_shop_products_use_case.dart';
 import '../../features/shop/presentation/bloc/home_products/home_products_bloc.dart';
-import '../../features/shop_reviews/data/datasources/shop_review_remote_data_source.dart';
-import '../../features/shop_reviews/data/repositories/shop_review_repository_impl.dart';
-import '../../features/shop_reviews/domain/repositories/shop_review_repository.dart';
-import '../../features/shop_reviews/domain/usecases/create_shop_review_use_case.dart';
-import '../../features/shop_reviews/domain/usecases/get_shop_reviews_use_case.dart';
-import '../../features/shop_reviews/presentation/bloc/shop_reviews_bloc.dart';
-import '../../features/shop_reviews/data/datasources/my_reviews_remote_data_source.dart';
-import '../../features/shop_reviews/data/repositories/my_reviews_repository_impl.dart';
-import '../../features/shop_reviews/domain/repositories/my_reviews_repository.dart';
-import '../../features/shop_reviews/domain/usecases/delete_my_review_use_case.dart';
-import '../../features/shop_reviews/domain/usecases/get_my_reviews_use_case.dart';
-import '../../features/shop_reviews/domain/usecases/update_my_review_use_case.dart';
-import '../../features/shop_reviews/presentation/bloc/my_reviews_bloc.dart';
+
 import '../../features/shop_orders/data/datasources/shop_orders_remote_data_source.dart';
 import '../../features/shop_orders/data/repositories/shop_orders_repository_impl.dart';
 import '../../features/shop_orders/domain/repositories/shop_orders_repository.dart';
 import '../../features/shop_orders/domain/usecases/get_shop_orders_use_case.dart';
+import '../../features/shop_orders/domain/usecases/order_cancellation_use_cases.dart';
+import '../../features/shop_orders/presentation/bloc/order_cancellation/order_cancellation_bloc.dart';
 import '../../features/shop_orders/presentation/bloc/shop_orders_bloc.dart';
+
+import '../../features/shop_reviews/data/datasources/my_reviews_remote_data_source.dart';
+import '../../features/shop_reviews/data/datasources/shop_review_remote_data_source.dart';
+import '../../features/shop_reviews/data/repositories/my_reviews_repository_impl.dart';
+import '../../features/shop_reviews/data/repositories/shop_review_repository_impl.dart';
+import '../../features/shop_reviews/domain/repositories/my_reviews_repository.dart';
+import '../../features/shop_reviews/domain/repositories/shop_review_repository.dart';
+import '../../features/shop_reviews/domain/usecases/create_shop_review_use_case.dart';
+import '../../features/shop_reviews/domain/usecases/delete_my_review_use_case.dart';
+import '../../features/shop_reviews/domain/usecases/get_my_reviews_use_case.dart';
+import '../../features/shop_reviews/domain/usecases/get_shop_reviews_use_case.dart';
+import '../../features/shop_reviews/domain/usecases/update_my_review_use_case.dart';
+import '../../features/shop_reviews/presentation/bloc/my_reviews_bloc.dart';
+import '../../features/shop_reviews/presentation/bloc/shop_reviews_bloc.dart';
+
 import '../../features/track_order/data/datasources/track_order_remote_data_source.dart';
 import '../../features/track_order/domain/repositories/track_order_repository.dart';
 import '../../features/track_order/domain/repositories/track_order_repository_impl.dart';
 import '../../features/track_order/domain/usecases/track_order_use_case.dart';
 import '../../features/track_order/presentation/bloc/track_order_bloc.dart';
+
 import '../network/dio_client.dart';
 import '../network/interceptors/auth_interceptor.dart';
 import '../network/interceptors/retry_interceptor.dart';
 import '../session/session_expiry_notifier.dart';
 import '../session/session_manager.dart';
-import '../storage/local_storage_service.dart';
 import '../storage/app_database.dart';
+import '../storage/local_storage_service.dart';
 import '../storage/token_storage.dart';
 
 final GetIt sl = GetIt.instance;
@@ -70,9 +78,6 @@ Future<void> configureDependencies() async {
 
   await LocalStorageService.initialize();
 
-  /*
-   * Core storage and session dependencies
-   */
   final LocalStorageService localStorageService = LocalStorageService();
 
   final TokenStorage tokenStorage = GetStorageTokenStorage(
@@ -86,10 +91,6 @@ Future<void> configureDependencies() async {
 
   final SessionExpiryNotifier sessionExpiryNotifier = SessionExpiryNotifier();
 
-  /*
-   * A single Dio instance must be used throughout
-   * the entire application.
-   */
   final Dio dio = DioClient.createDio();
 
   final AuthInterceptor authInterceptor = AuthInterceptor(
@@ -106,23 +107,20 @@ Future<void> configureDependencies() async {
     maximumDelay: const Duration(seconds: 4),
   );
 
-  /*
-   * AuthInterceptor must remain before RetryInterceptor.
-   */
   dio.interceptors.addAll(<Interceptor>[authInterceptor, retryInterceptor]);
 
   final DioClient dioClient = DioClient(dio: dio);
+
   final AppDatabase appDatabase = AppDatabase();
+
   final OfflineOrderService offlineOrderService = OfflineOrderService(
     database: appDatabase,
     dioClient: dioClient,
   );
+
   final CheckoutLocationService checkoutLocationService =
       CheckoutLocationService();
 
-  /*
-   * Core singleton registrations
-   */
   sl
     ..registerSingleton<LocalStorageService>(localStorageService)
     ..registerSingleton<TokenStorage>(tokenStorage)
@@ -193,28 +191,16 @@ Future<void> configureDependencies() async {
       () => ReviewOrderBloc(sl<OfflineOrderService>()),
     );
 
-  /*
-   * Shop Product DataSource
-   *
-   * Lazy singleton is suitable because every screen
-   * should use the same request cancellation manager.
-   */
   sl.registerLazySingleton<ShopProductRemoteDataSource>(
     () => ShopProductRemoteDataSourceImpl(dioClient: sl<DioClient>()),
   );
 
-  /*
-   * Shop Product Repository
-   */
   sl.registerLazySingleton<ShopProductRepository>(
     () => ShopProductRepositoryImpl(
       remoteDataSource: sl<ShopProductRemoteDataSource>(),
     ),
   );
 
-  /*
-   * Shop Product UseCases
-   */
   sl.registerLazySingleton<GetShopProductsUseCase>(
     () => GetShopProductsUseCase(repository: sl<ShopProductRepository>()),
   );
@@ -235,11 +221,6 @@ Future<void> configureDependencies() async {
     ),
   );
 
-  /*
-   * BLoCs must always be factory registrations.
-   *
-   * Every HomeScreen instance receives a new Bloc.
-   */
   sl.registerFactory<HomeProductsBloc>(
     () => HomeProductsBloc(
       getShopProductsUseCase: sl<GetShopProductsUseCase>(),
@@ -256,64 +237,95 @@ Future<void> configureDependencies() async {
       sessionManager: sl<SessionManager>(),
     ),
   );
+
   sl.registerLazySingleton<ShopReviewRepository>(
     () => ShopReviewRepositoryImpl(
       remoteDataSource: sl<ShopReviewRemoteDataSource>(),
     ),
   );
+
   sl.registerLazySingleton<GetShopReviewsUseCase>(
     () => GetShopReviewsUseCase(repository: sl<ShopReviewRepository>()),
   );
+
   sl.registerLazySingleton<CreateShopReviewUseCase>(
     () => CreateShopReviewUseCase(repository: sl<ShopReviewRepository>()),
   );
+
   sl.registerFactory<ShopReviewsBloc>(
     () => ShopReviewsBloc(
       getReviews: sl<GetShopReviewsUseCase>(),
       createReview: sl<CreateShopReviewUseCase>(),
     ),
   );
+
   sl.registerLazySingleton<MyReviewsRemoteDataSource>(
     () => MyReviewsRemoteDataSourceImpl(dioClient: sl<DioClient>()),
   );
+
   sl.registerLazySingleton<MyReviewsRepository>(
     () => MyReviewsRepositoryImpl(
       remoteDataSource: sl<MyReviewsRemoteDataSource>(),
     ),
   );
+
   sl.registerLazySingleton<GetMyReviewsUseCase>(
     () => GetMyReviewsUseCase(repository: sl<MyReviewsRepository>()),
   );
+
   sl.registerLazySingleton<DeleteMyReviewUseCase>(
     () => DeleteMyReviewUseCase(repository: sl<MyReviewsRepository>()),
   );
+
   sl.registerLazySingleton<UpdateMyReviewUseCase>(
     () => UpdateMyReviewUseCase(repository: sl<MyReviewsRepository>()),
   );
+
   sl.registerFactory<MyReviewsBloc>(
     () => MyReviewsBloc(
       getMyReviews: sl<GetMyReviewsUseCase>(),
       deleteMyReview: sl<DeleteMyReviewUseCase>(),
     ),
   );
+
   sl.registerLazySingleton<ShopOrdersRemoteDataSource>(
-    () => ShopOrdersRemoteDataSourceImpl(dioClient: sl<DioClient>()),
+    () => ShopOrdersRemoteDataSourceImpl(
+      dioClient: sl<DioClient>(),
+      sessionManager: sl<SessionManager>(),
+    ),
   );
+
   sl.registerLazySingleton<ShopOrdersRepository>(
     () => ShopOrdersRepositoryImpl(
       remoteDataSource: sl<ShopOrdersRemoteDataSource>(),
     ),
   );
+
   sl.registerLazySingleton<GetShopOrdersUseCase>(
     () => GetShopOrdersUseCase(repository: sl<ShopOrdersRepository>()),
   );
+
+  sl.registerLazySingleton<GetOrderCancellationConfigUseCase>(
+    () => GetOrderCancellationConfigUseCase(
+      repository: sl<ShopOrdersRepository>(),
+    ),
+  );
+
+  sl.registerLazySingleton<CancelShopOrderUseCase>(
+    () => CancelShopOrderUseCase(repository: sl<ShopOrdersRepository>()),
+  );
+
   sl.registerFactory<ShopOrdersBloc>(
     () => ShopOrdersBloc(getOrders: sl<GetShopOrdersUseCase>()),
   );
 
-  /*
-   * Track Order (public delivery tracking) dependencies.
-   */
+  sl.registerFactory<OrderCancellationBloc>(
+    () => OrderCancellationBloc(
+      getCancellationConfig: sl<GetOrderCancellationConfigUseCase>(),
+      cancelOrder: sl<CancelShopOrderUseCase>(),
+    ),
+  );
+
   sl.registerLazySingleton<TrackOrderRemoteDataSource>(
     () => TrackOrderRemoteDataSourceImpl(dioClient: sl<DioClient>()),
   );
@@ -337,9 +349,11 @@ Future<void> resetDependencies() async {
   if (sl.isRegistered<OfflineOrderService>()) {
     sl<OfflineOrderService>().dispose();
   }
+
   if (sl.isRegistered<AppDatabase>()) {
     await sl<AppDatabase>().close();
   }
+
   if (sl.isRegistered<SessionExpiryNotifier>()) {
     sl<SessionExpiryNotifier>().dispose();
   }

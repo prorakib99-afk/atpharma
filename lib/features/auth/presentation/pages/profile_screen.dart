@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:image_cropper/image_cropper.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/routes/app_routes.dart';
 import '../../../../shared/widgets/navigation_page_scaffold.dart';
@@ -7,6 +9,86 @@ import '../bloc/profile/profile_bloc.dart';
 import '../bloc/profile/profile_event.dart';
 import '../bloc/profile/profile_state.dart';
 
+Future<void> _pickCropAndUploadProfileImage(
+  BuildContext context,
+  ProfileBloc bloc,
+) async {
+  final ImagePicker picker = ImagePicker();
+  final XFile? picked = await picker.pickImage(
+    source: ImageSource.gallery,
+    maxWidth: 1600,
+    imageQuality: 88,
+  );
+  if (picked == null) return;
+
+  final CroppedFile? cropped = await ImageCropper().cropImage(
+    sourcePath: picked.path,
+    compressQuality: 88,
+    uiSettings: <PlatformUiSettings>[
+      AndroidUiSettings(
+        toolbarTitle: 'Crop Profile Photo',
+        toolbarColor: ProfileScreen.blue,
+        toolbarWidgetColor: Colors.white,
+        lockAspectRatio: true,
+        aspectRatioPresets: <CropAspectRatioPreset>[
+          CropAspectRatioPreset.square,
+        ],
+      ),
+      IOSUiSettings(
+        title: 'Crop Profile Photo',
+        aspectRatioLockEnabled: true,
+        aspectRatioPresets: <CropAspectRatioPreset>[
+          CropAspectRatioPreset.square,
+        ],
+      ),
+    ],
+    aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+  );
+  if (cropped == null) return;
+  bloc.add(ProfileImageUpdateRequested(imagePath: cropped.path));
+}
+
+Future<void> _showProfileImageActions(
+  BuildContext context,
+  ProfileBloc bloc,
+  ProfileData profile,
+) async {
+  final bool hasImage = profile.avatarUrl != null;
+  final String? action = await showModalBottomSheet<String>(
+    context: context,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (BuildContext sheetContext) {
+      return SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose photo'),
+              onTap: () => Navigator.pop(sheetContext, 'choose'),
+            ),
+            if (hasImage)
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                title: const Text('Remove photo'),
+                textColor: Colors.red,
+                onTap: () => Navigator.pop(sheetContext, 'remove'),
+              ),
+          ],
+        ),
+      );
+    },
+  );
+  if (!context.mounted) return;
+  if (action == 'choose') {
+    await _pickCropAndUploadProfileImage(context, bloc);
+  } else if (action == 'remove') {
+    bloc.add(const ProfileImageRemoveRequested());
+  }
+}
 Future<void> _showEditProfileSheet(
   BuildContext context,
   ProfileBloc bloc,
@@ -225,7 +307,16 @@ class ProfileScreen extends StatelessWidget {
             child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: <Widget>[
-                SliverToBoxAdapter(child: _ProfileHero(profile: profile)),
+                SliverToBoxAdapter(
+                  child: _ProfileHero(
+                    profile: profile,
+                    onAvatarTap: () => _showProfileImageActions(
+                      context,
+                      context.read<ProfileBloc>(),
+                      profile,
+                    ),
+                  ),
+                ),
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
                   sliver: SliverList.list(
@@ -262,8 +353,9 @@ class ProfileScreen extends StatelessWidget {
 }
 
 class _ProfileHero extends StatelessWidget {
-  const _ProfileHero({required this.profile});
+  const _ProfileHero({required this.profile, required this.onAvatarTap});
   final ProfileData profile;
+  final VoidCallback onAvatarTap;
 
   @override
   Widget build(BuildContext context) {
@@ -322,44 +414,57 @@ class _ProfileHero extends StatelessWidget {
                 Stack(
                   clipBehavior: Clip.none,
                   children: <Widget>[
-                    Container(
-                      width: 86,
-                      height: 86,
-                      padding: const EdgeInsets.all(7),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: <BoxShadow>[
-                          BoxShadow(
-                            color: ProfileScreen.blue.withValues(alpha: .16),
-                            spreadRadius: 9,
-                          ),
-                        ],
-                      ),
-                      child: CircleAvatar(
-                        backgroundColor: const Color(0xffdfe4ea),
-                        backgroundImage: profile.avatarUrl == null
-                            ? null
-                            : NetworkImage(profile.avatarUrl!),
-                        child: profile.avatarUrl == null
-                            ? const Icon(
-                                Icons.person,
-                                color: Colors.white,
-                                size: 38,
-                              )
-                            : null,
-                      ),
-                    ),
-                    Positioned(
-                      right: 2,
-                      bottom: 5,
+                    GestureDetector(
+                      onTap: profile.isGuest ? null : onAvatarTap,
                       child: Container(
-                        width: 25,
-                        height: 25,
+                        width: 86,
+                        height: 86,
+                        padding: const EdgeInsets.all(7),
                         decoration: BoxDecoration(
-                          color: const Color(0xff18bd7b),
+                          color: Colors.white,
                           shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 5),
+                          boxShadow: <BoxShadow>[
+                            BoxShadow(
+                              color: ProfileScreen.blue.withValues(alpha: .16),
+                              spreadRadius: 9,
+                            ),
+                          ],
+                        ),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: <Widget>[
+                            CircleAvatar(
+                              backgroundColor: const Color(0xffdfe4ea),
+                              backgroundImage: profile.avatarUrl == null
+                                  ? null
+                                  : NetworkImage(profile.avatarUrl!),
+                              child: profile.avatarUrl == null
+                                  ? const Icon(
+                                      Icons.person,
+                                      color: Colors.white,
+                                      size: 38,
+                                    )
+                                  : null,
+                            ),
+                            if (!profile.isGuest)
+                              Align(
+                                alignment: Alignment.bottomRight,
+                                child: Container(
+                                  width: 26,
+                                  height: 26,
+                                  decoration: BoxDecoration(
+                                    color: ProfileScreen.blue,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white, width: 3),
+                                  ),
+                                  child: const Icon(
+                                    Icons.add,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     ),

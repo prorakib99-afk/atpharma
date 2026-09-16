@@ -6,4 +6,12 @@ abstract interface class ShopOrdersRepository {
     required int page,
     required int limit,
   });
+
+  Future<AppResult<ShopOrderCancellationConfig>> getCancellationConfig();
+
+  Future<AppResult<CancelShopOrderResult>> cancelOrder({
+    required String orderNumber,
+    required String reason,
+    String? note,
+  });
 }

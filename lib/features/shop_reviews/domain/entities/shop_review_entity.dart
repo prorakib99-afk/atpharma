@@ -11,14 +11,16 @@ final class ShopReviewEntity extends Equatable {
     required this.comment,
     this.createdAt,
   });
+
   final String id;
   final int rating;
   final String customerName;
   final String title;
   final String comment;
   final DateTime? createdAt;
+
   @override
-  List<Object?> get props => [
+  List<Object?> get props => <Object?>[
     id,
     rating,
     customerName,
@@ -34,11 +36,13 @@ final class ShopReviewSummary extends Equatable {
     required this.count,
     required this.breakdown,
   });
+
   final double average;
   final int count;
   final Map<int, int> breakdown;
+
   @override
-  List<Object?> get props => [average, count, breakdown];
+  List<Object?> get props => <Object?>[average, count, breakdown];
 }
 
 final class ShopReviewPage extends Equatable {
@@ -48,19 +52,28 @@ final class ShopReviewPage extends Equatable {
     required this.page,
     required this.totalPages,
     this.myReview,
-    this.canReview = true,
+    this.canReview = false,
   });
+
   final List<ShopReviewEntity> items;
   final ShopReviewSummary summary;
   final int page;
   final int totalPages;
   final MyReviewEntity? myReview;
 
-  /// Whether the current user is eligible to write a review for this
-  /// product — true only after they have ordered it.
+  /// True only when backend confirms:
+  ///
+  /// hasPurchased == true
+  /// AND
+  /// canReview == true
   final bool canReview;
+
+  bool get canSubmitNewReview {
+    return canReview && myReview == null;
+  }
+
   @override
-  List<Object?> get props => [
+  List<Object?> get props => <Object?>[
     items,
     summary,
     page,

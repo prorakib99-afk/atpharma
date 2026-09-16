@@ -14,16 +14,50 @@ final class AuthRepositoryImpl implements AuthRepository {
   final AuthRemoteDataSource _remoteDataSource;
   final SessionManager _sessionManager;
 
-  String? _pharmacySlugFrom(Map<String, dynamic> json) {
-    final dynamic data = json['data'] is Map ? json['data'] : json;
-    final Map<String, dynamic> payload = data is Map
-        ? Map<String, dynamic>.from(data)
+  String? _tokenFrom(Map<String, dynamic> json) {
+    final Map<String, dynamic> payload = json['data'] is Map
+        ? Map<String, dynamic>.from(json['data'] as Map)
         : json;
+    return (payload['accessToken'] ??
+            payload['access_token'] ??
+            payload['token'] ??
+            json['accessToken'] ??
+            json['access_token'] ??
+            json['token'])
+        ?.toString()
+        .trim();
+  }
+
+  Map<String, dynamic> _payloadFrom(Map<String, dynamic> json) {
+    return json['data'] is Map
+        ? Map<String, dynamic>.from(json['data'] as Map)
+        : json;
+  }
+
+  Map<String, dynamic> _guestFrom(Map<String, dynamic> json) {
+    final Map<String, dynamic> payload = _payloadFrom(json);
+    final Object? guest = payload['guest'] ?? payload['customer'] ?? payload['user'];
+    if (guest is Map) return Map<String, dynamic>.from(guest);
+    return <String, dynamic>{};
+  }
+
+  String? _pharmacySlugFrom(Map<String, dynamic> json) {
+    final Map<String, dynamic> payload = _payloadFrom(json);
     final dynamic pharmacy = payload['pharmacy'];
     return (payload['pharmacySlug'] ??
             payload['pharmacy_slug'] ??
             (pharmacy is Map ? pharmacy['slug'] : null))
         ?.toString();
+  }
+
+  Future<void> _claimPreviousGuestOrders(String? guestToken) async {
+    final String token = guestToken?.trim() ?? '';
+    if (token.isEmpty) return;
+    try {
+      await _remoteDataSource.claimGuestOrders(guestToken: token);
+    } catch (_) {
+      // Claiming is best effort; successful login should not be rolled back.
+    }
   }
 
   @override
@@ -33,33 +67,22 @@ final class AuthRepositoryImpl implements AuthRepository {
     required bool rememberMe,
   }) async {
     try {
+      final String? previousGuestToken = _sessionManager.isGuestMode
+          ? _sessionManager.accessToken
+          : null;
       final Map<String, dynamic> json = await _remoteDataSource.login(
         identifier: identifier,
         password: password,
       );
-      final Map<String, dynamic> payload = json['data'] is Map
-          ? Map<String, dynamic>.from(json['data'] as Map)
-          : json;
+      final Map<String, dynamic> payload = _payloadFrom(json);
       final bool requiresTwoFactor =
-          payload['requiresTwoFactor'] == true ||
-          json['requiresTwoFactor'] == true;
+          payload['requiresTwoFactor'] == true || json['requiresTwoFactor'] == true;
       final Object? profile =
-          payload['user'] ??
-          payload['customer'] ??
-          json['user'] ??
-          json['customer'];
+          payload['user'] ?? payload['customer'] ?? json['user'] ?? json['customer'];
       final Map<String, dynamic> user = profile is Map
           ? Map<String, dynamic>.from(profile)
           : <String, dynamic>{};
-      final String? token =
-          (payload['accessToken'] ??
-                  payload['access_token'] ??
-                  payload['token'] ??
-                  json['accessToken'] ??
-                  json['access_token'] ??
-                  json['token'])
-              ?.toString()
-              .trim();
+      final String? token = _tokenFrom(json);
 
       final AuthSession session = AuthSession(
         requiresTwoFactor: requiresTwoFactor,
@@ -79,11 +102,31 @@ final class AuthRepositoryImpl implements AuthRepository {
           identifier: identifier,
         );
         await _sessionManager.savePharmacySlug(_pharmacySlugFrom(json));
+        await _claimPreviousGuestOrders(previousGuestToken);
       }
 
       return AppSuccess<AuthSession>(session);
     } catch (error) {
       return AppError<AuthSession>(FailureMapper.fromException(error));
+    }
+  }
+
+  @override
+  Future<AppResult<void>> continueAsGuest() async {
+    try {
+      final Map<String, dynamic> json = await _remoteDataSource.startGuestSession();
+      final String? token = _tokenFrom(json);
+      if (token == null || token.isEmpty) {
+        throw const FormatException('Guest token was not returned.');
+      }
+      await _sessionManager.savePharmacySlug(_pharmacySlugFrom(json));
+      await _sessionManager.saveGuestSession(
+        accessToken: token,
+        guest: _guestFrom(json),
+      );
+      return const AppSuccess<void>(null);
+    } catch (error) {
+      return AppError<void>(FailureMapper.fromException(error));
     }
   }
 
@@ -115,16 +158,16 @@ final class AuthRepositoryImpl implements AuthRepository {
     required bool rememberMe,
   }) async {
     try {
+      final String? previousGuestToken = _sessionManager.isGuestMode
+          ? _sessionManager.accessToken
+          : null;
       final response = await _remoteDataSource.verifyCode(
         identifier: identifier,
         code: code,
         registration: registration,
       );
-      final json = response['data'] is Map
-          ? Map<String, dynamic>.from(response['data'] as Map)
-          : response;
-      final token =
-          json['accessToken'] ?? json['access_token'] ?? json['token'];
+      final json = _payloadFrom(response);
+      final token = json['accessToken'] ?? json['access_token'] ?? json['token'];
       final profile = json['user'] ?? json['customer'];
       if (token is! String ||
           token.trim().isEmpty ||
@@ -143,6 +186,7 @@ final class AuthRepositoryImpl implements AuthRepository {
         identifier: identifier,
       );
       await _sessionManager.savePharmacySlug(_pharmacySlugFrom(response));
+      await _claimPreviousGuestOrders(previousGuestToken);
       return AppSuccess<AuthSession>(
         AuthSession(
           requiresTwoFactor: false,
@@ -157,9 +201,7 @@ final class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<AppResult<void>> resendRegistrationCode({
-    required String email,
-  }) async {
+  Future<AppResult<void>> resendRegistrationCode({required String email}) async {
     try {
       await _remoteDataSource.resendRegistrationCode(email: email);
       return const AppSuccess<void>(null);
@@ -259,4 +301,31 @@ final class AuthRepositoryImpl implements AuthRepository {
       return AppError<Map<String, dynamic>>(FailureMapper.fromException(error));
     }
   }
-}
+
+  @override
+  Future<AppResult<Map<String, dynamic>>> updateMyProfileImage({
+    required String imagePath,
+  }) async {
+    try {
+      final user = await _remoteDataSource.updateMyProfileImage(
+        imagePath: imagePath,
+      );
+      await _sessionManager.updateCurrentUser(user);
+      await _sessionManager.savePharmacySlug(_pharmacySlugFrom(user));
+      return AppSuccess<Map<String, dynamic>>(user);
+    } catch (error) {
+      return AppError<Map<String, dynamic>>(FailureMapper.fromException(error));
+    }
+  }
+
+  @override
+  Future<AppResult<Map<String, dynamic>>> removeMyProfileImage() async {
+    try {
+      final user = await _remoteDataSource.removeMyProfileImage();
+      await _sessionManager.updateCurrentUser(user);
+      await _sessionManager.savePharmacySlug(_pharmacySlugFrom(user));
+      return AppSuccess<Map<String, dynamic>>(user);
+    } catch (error) {
+      return AppError<Map<String, dynamic>>(FailureMapper.fromException(error));
+    }
+  }}

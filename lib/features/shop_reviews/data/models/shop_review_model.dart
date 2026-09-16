@@ -11,6 +11,7 @@ final class ShopReviewModel {
     required this.comment,
     this.createdAt,
   });
+
   final String id;
   final int rating;
   final String customerName;
@@ -19,9 +20,10 @@ final class ShopReviewModel {
   final DateTime? createdAt;
 
   factory ShopReviewModel.fromJson(Map<String, dynamic> json) {
-    final customer =
+    final Map<String, dynamic>? customer =
         JsonValueParser.map(json['customer']) ??
         JsonValueParser.map(json['user']);
+
     return ShopReviewModel(
       id: JsonValueParser.string(json['id']),
       rating: JsonValueParser.integer(json['rating']).clamp(1, 5),
@@ -35,38 +37,49 @@ final class ShopReviewModel {
     );
   }
 
-  ShopReviewEntity toEntity() => ShopReviewEntity(
-    id: id,
-    rating: rating,
-    customerName: customerName,
-    title: title,
-    comment: comment,
-    createdAt: createdAt,
-  );
+  ShopReviewEntity toEntity() {
+    return ShopReviewEntity(
+      id: id,
+      rating: rating,
+      customerName: customerName,
+      title: title,
+      comment: comment,
+      createdAt: createdAt,
+    );
+  }
 }
 
 ShopReviewPage parseShopReviewPage(Map<String, dynamic> json) {
-  final summaryJson =
-      JsonValueParser.map(json['summary']) ?? const <String, dynamic>{};
-  final breakdownJson =
+  final Map<String, dynamic> payload =
+      JsonValueParser.map(json['data']) ?? json;
+
+  final Map<String, dynamic> summaryJson =
+      JsonValueParser.map(payload['summary']) ?? const <String, dynamic>{};
+
+  final Map<String, dynamic> breakdownJson =
       JsonValueParser.map(summaryJson['breakdown']) ??
       const <String, dynamic>{};
-  final breakdown = <int, int>{
-    for (var rating = 1; rating <= 5; rating++)
+
+  final Map<int, int> breakdown = <int, int>{
+    for (int rating = 1; rating <= 5; rating++)
       rating: JsonValueParser.integer(breakdownJson['$rating']),
   };
-  final items = JsonValueParser.list(json['data'] ?? json['items'])
-      .map((item) => JsonValueParser.map(item))
+
+  final dynamic rawReviews =
+      payload['reviews'] ?? payload['items'] ?? payload['data'];
+
+  final List<ShopReviewEntity> items = JsonValueParser.list(rawReviews)
+      .map((dynamic item) => JsonValueParser.map(item))
       .whereType<Map<String, dynamic>>()
       .map(ShopReviewModel.fromJson)
-      .map((model) => model.toEntity())
+      .map((ShopReviewModel model) => model.toEntity())
       .toList(growable: false);
 
   final Map<String, dynamic>? myReviewJson = JsonValueParser.map(
-    json['myReview'] ??
-        json['my_review'] ??
-        json['userReview'] ??
-        json['currentUserReview'],
+    payload['myReview'] ??
+        payload['my_review'] ??
+        payload['userReview'] ??
+        payload['currentUserReview'],
   );
 
   return ShopReviewPage(
@@ -76,15 +89,18 @@ ShopReviewPage parseShopReviewPage(Map<String, dynamic> json) {
       count: JsonValueParser.integer(summaryJson['count']),
       breakdown: breakdown,
     ),
-    page: JsonValueParser.integer(json['page'], fallback: 1),
-    totalPages: JsonValueParser.integer(json['totalPages']),
+    page: JsonValueParser.integer(payload['page'], fallback: 1),
+    totalPages: JsonValueParser.integer(
+      payload['totalPages'] ?? payload['total_pages'],
+      fallback: 1,
+    ),
     myReview: myReviewJson == null
         ? null
-        : _parseMyReview(myReviewJson, productId: json['productId']),
-    canReview: JsonValueParser.boolean(
-      json['canReview'] ?? json['isEligibleToReview'] ?? json['hasPurchased'],
-      fallback: true,
-    ),
+        : _parseMyReview(myReviewJson, productId: payload['productId']),
+
+    // Public reviews endpoint is NOT authoritative
+    // for purchase eligibility.
+    canReview: false,
   );
 }
 
@@ -92,6 +108,7 @@ MyReviewEntity _parseMyReview(Map<String, dynamic> json, {dynamic productId}) {
   final String status = JsonValueParser.string(
     json['status'] ?? json['approvalStatus'] ?? json['moderationStatus'],
   ).toLowerCase();
+
   final bool published =
       status.contains('publish') ||
       status.contains('approved') ||
@@ -99,14 +116,24 @@ MyReviewEntity _parseMyReview(Map<String, dynamic> json, {dynamic productId}) {
       JsonValueParser.boolean(json['isApproved'] ?? json['approved']);
 
   return MyReviewEntity(
-    id: JsonValueParser.string(json['id']),
-    productId: JsonValueParser.string(json['productId'] ?? productId),
-    productName: JsonValueParser.string(json['productName']),
-    productImageUrl: JsonValueParser.string(json['productImage']),
+    id: JsonValueParser.string(
+      json['id'] ?? json['reviewId'] ?? json['review_id'],
+    ),
+    productId: JsonValueParser.string(
+      json['productId'] ?? json['product_id'] ?? productId,
+    ),
+    productName: JsonValueParser.string(
+      json['productName'] ?? json['product_name'],
+    ),
+    productImageUrl: JsonValueParser.string(
+      json['productImage'] ?? json['productImageUrl'] ?? json['product_image'],
+    ),
     rating: JsonValueParser.integer(json['rating']).clamp(1, 5),
     title: JsonValueParser.string(json['title']),
     comment: JsonValueParser.string(json['comment'] ?? json['review']),
     published: published,
-    createdAt: JsonValueParser.dateTime(json['createdAt']),
+    createdAt: JsonValueParser.dateTime(
+      json['createdAt'] ?? json['created_at'],
+    ),
   );
 }

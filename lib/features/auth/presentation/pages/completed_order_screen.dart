@@ -1,12 +1,18 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/session/session_manager.dart';
 import '../../../../shared/widgets/navigation_page_scaffold.dart';
 import '../../../shop/data/services/offline_order_service.dart';
+import '../../../shop_orders/domain/entities/shop_order_entity.dart';
+import '../../../shop_orders/presentation/bloc/order_cancellation/order_cancellation_bloc.dart';
+import '../../../shop_orders/presentation/bloc/order_cancellation/order_cancellation_event.dart';
+import '../../../shop_orders/presentation/bloc/order_cancellation/order_cancellation_state.dart';
+import '../../domain/repositories/auth_repository.dart';
 
 class CompletedOrderArguments {
   const CompletedOrderArguments({
@@ -18,32 +24,52 @@ class CompletedOrderArguments {
   final String paymentMethod;
 }
 
-class CompletedOrderScreen extends StatefulWidget {
+class CompletedOrderScreen extends StatelessWidget {
   const CompletedOrderScreen({super.key, required this.arguments});
 
   static const String routeName = '/completed-order';
+
   final CompletedOrderArguments arguments;
 
   @override
-  State<CompletedOrderScreen> createState() => _CompletedOrderScreenState();
+  Widget build(BuildContext context) {
+    return BlocProvider<OrderCancellationBloc>(
+      create: (_) => sl<OrderCancellationBloc>(),
+      child: _CompletedOrderView(arguments: arguments),
+    );
+  }
 }
 
-class _CompletedOrderScreenState extends State<CompletedOrderScreen> {
+class _CompletedOrderView extends StatefulWidget {
+  const _CompletedOrderView({required this.arguments});
+
+  final CompletedOrderArguments arguments;
+
+  @override
+  State<_CompletedOrderView> createState() => _CompletedOrderViewState();
+}
+
+class _CompletedOrderViewState extends State<_CompletedOrderView> {
   static const Duration _cancelWindow = Duration(minutes: 15);
+
   Timer? _timer;
+
   late Duration _remaining;
-  bool _cancelling = false;
+
   bool _cancelled = false;
 
   CreatedOrderReceipt get _receipt => widget.arguments.receipt;
+
   DateTime get _deadline => _receipt.createdAt.toLocal().add(_cancelWindow);
-  bool get _canCancel =>
-      !_cancelled && !_cancelling && _remaining > Duration.zero;
+
+  bool get _canCancel => !_cancelled && _remaining > Duration.zero;
 
   @override
   void initState() {
     super.initState();
+
     _updateRemaining();
+
     _timer = Timer.periodic(
       const Duration(seconds: 1),
       (_) => _updateRemaining(),
@@ -51,13 +77,19 @@ class _CompletedOrderScreenState extends State<CompletedOrderScreen> {
   }
 
   void _updateRemaining() {
-    final Duration value = _deadline.difference(DateTime.now());
-    final Duration next = value.isNegative ? Duration.zero : value;
+    final Duration difference = _deadline.difference(DateTime.now());
+
+    final Duration next = difference.isNegative ? Duration.zero : difference;
+
     if (!mounted) {
       _remaining = next;
       return;
     }
-    setState(() => _remaining = next);
+
+    setState(() {
+      _remaining = next;
+    });
+
     if (next == Duration.zero) {
       _timer?.cancel();
     }
@@ -71,62 +103,73 @@ class _CompletedOrderScreenState extends State<CompletedOrderScreen> {
 
   Future<void> _continueShopping() async {
     final SessionManager sessionManager = sl<SessionManager>();
+
     if (!sessionManager.canAccessStore) {
-      await sessionManager.startGuestSession();
+      final result = await sl<AuthRepository>().continueAsGuest();
+
+      if (result.failureOrNull != null && mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(result.failureOrNull!.message)));
+      }
     }
-    if (!mounted) return;
+
+    if (!mounted) {
+      return;
+    }
+
     Navigator.of(
       context,
     ).pushNamedAndRemoveUntil(AppRoutes.home, (Route<dynamic> route) => false);
   }
 
-  Future<void> _cancelOrder() async {
-    if (!_canCancel) return;
-    final bool? confirmed = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext dialogContext) => AlertDialog(
-        title: const Text('Cancel this order?'),
-        content: const Text(
-          'The order will be cancelled and its stock restored.',
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Keep Order'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: _CompletedColors.danger,
-            ),
-            child: const Text('Cancel Order'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-
-    setState(() => _cancelling = true);
-    try {
-      await sl<OfflineOrderService>().cancelOrder(_receipt.id);
-      if (!mounted) return;
-      _timer?.cancel();
-      setState(() {
-        _cancelling = false;
-        _cancelled = true;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Order cancelled successfully.')),
-      );
-    } catch (error) {
-      if (!mounted) return;
-      setState(() => _cancelling = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error.toString().replaceFirst('Exception: ', '')),
-        ),
-      );
+  Future<void> _openCancellationSheet() async {
+    if (!_canCancel) {
+      return;
     }
+
+    final OrderCancellationBloc bloc = context.read<OrderCancellationBloc>();
+
+    bloc.add(const OrderCancellationReset());
+
+    bloc.add(const OrderCancellationReasonsRequested());
+
+    final CancelShopOrderResult? result =
+        await showModalBottomSheet<CancelShopOrderResult>(
+          context: context,
+          isScrollControlled: true,
+          useSafeArea: true,
+          backgroundColor: Colors.transparent,
+          builder: (BuildContext bottomSheetContext) {
+            return BlocProvider<OrderCancellationBloc>.value(
+              value: bloc,
+              child: _CancelOrderSheet(orderNumber: _receipt.orderNumber),
+            );
+          },
+        );
+
+    if (result == null || !mounted) {
+      return;
+    }
+
+    _timer?.cancel();
+
+    setState(() {
+      _cancelled = true;
+    });
+
+    final String message = result.refundRequired
+        ? '${result.message} The pharmacy will process your refund.'
+        : result.message;
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: _CompletedColors.success,
+        ),
+      );
   }
 
   String _formatDate(DateTime value) {
@@ -144,23 +187,34 @@ class _CompletedOrderScreenState extends State<CompletedOrderScreen> {
       'Nov',
       'Dec',
     ];
+
     final DateTime local = value.toLocal();
+
     final int hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
+
     final String minute = local.minute.toString().padLeft(2, '0');
+
     final String period = local.hour < 12 ? 'A.M' : 'P.M';
-    return '${months[local.month - 1]} ${local.day.toString().padLeft(2, '0')}, '
-        '${local.year}  •  $hour.$minute $period';
+
+    return '${months[local.month - 1]} '
+        '${local.day.toString().padLeft(2, '0')}, '
+        '${local.year}  •  '
+        '$hour.$minute $period';
   }
 
   String get _remainingLabel {
     final int minutes = _remaining.inMinutes;
+
     final int seconds = _remaining.inSeconds.remainder(60);
-    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+
+    return '${minutes.toString().padLeft(2, '0')}:'
+        '${seconds.toString().padLeft(2, '0')}';
   }
 
   @override
   Widget build(BuildContext context) {
     final double bottomSafe = MediaQuery.paddingOf(context).bottom;
+
     final String payment = widget.arguments.paymentMethod.toUpperCase() == 'COD'
         ? 'Cash On Delivery'
         : widget.arguments.paymentMethod;
@@ -187,33 +241,434 @@ class _CompletedOrderScreenState extends State<CompletedOrderScreen> {
                 sliver: SliverList(
                   delegate: SliverChildListDelegate(<Widget>[
                     const _AtPharmaLogo(),
-                    const SizedBox(height: 58),
+                    const SizedBox(height: 42),
                     const _SuccessIllustration(),
-                    const SizedBox(height: 28),
+                    const SizedBox(height: 20),
                     const _SuccessTitle(),
-                    const SizedBox(height: 34),
+                    const SizedBox(height: 28),
                     _OrderInfoCard(
                       orderNumber: _receipt.orderNumber,
                       orderDate: _formatDate(_receipt.createdAt),
                       paymentMethod: payment,
                     ),
-                    const SizedBox(height: 26),
+                    const SizedBox(height: 24),
                     _CancelNotice(
                       cancelled: _cancelled,
                       canCancel: _remaining > Duration.zero,
                       remaining: _remainingLabel,
                     ),
-                    const SizedBox(height: 34),
+                    const SizedBox(height: 24),
                     _CancelOrderButton(
-                      onTap: _canCancel ? _cancelOrder : null,
-                      loading: _cancelling,
+                      onTap: _canCancel ? _openCancellationSheet : null,
                       cancelled: _cancelled,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                     _ContinueShoppingButton(onTap: _continueShopping),
                   ]),
                 ),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CancelOrderSheet extends StatefulWidget {
+  const _CancelOrderSheet({required this.orderNumber});
+
+  final String orderNumber;
+
+  @override
+  State<_CancelOrderSheet> createState() => _CancelOrderSheetState();
+}
+
+class _CancelOrderSheetState extends State<_CancelOrderSheet> {
+  String? _selectedReason;
+
+  final TextEditingController _noteController = TextEditingController();
+
+  @override
+  void dispose() {
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  ShopOrderCancellationReason? _selectedReasonEntity(
+    ShopOrderCancellationConfig config,
+  ) {
+    for (final reason in config.reasons) {
+      if (reason.code == _selectedReason) {
+        return reason;
+      }
+    }
+
+    return null;
+  }
+
+  bool _canSubmit(OrderCancellationState state) {
+    if (state.isCancelling || _selectedReason == null) {
+      return false;
+    }
+
+    final config = state.config;
+
+    if (config == null) {
+      return false;
+    }
+
+    final reason = _selectedReasonEntity(config);
+
+    if (reason == null) {
+      return false;
+    }
+
+    if ((reason.requiresNote || reason.isOther) &&
+        _noteController.text.trim().isEmpty) {
+      return false;
+    }
+
+    return true;
+  }
+
+  void _submit(OrderCancellationState state) {
+    if (!_canSubmit(state)) {
+      return;
+    }
+
+    context.read<OrderCancellationBloc>().add(
+      OrderCancellationSubmitted(
+        orderNumber: widget.orderNumber,
+        reason: _selectedReason!,
+        note: _noteController.text,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final double keyboard = MediaQuery.viewInsetsOf(context).bottom;
+
+    return BlocConsumer<OrderCancellationBloc, OrderCancellationState>(
+      listenWhen: (previous, current) {
+        return previous.status != current.status &&
+            current.status == OrderCancellationStatus.success;
+      },
+      listener: (BuildContext context, OrderCancellationState state) {
+        final result = state.result;
+
+        if (result != null) {
+          Navigator.of(context).pop(result);
+        }
+      },
+      builder: (BuildContext context, OrderCancellationState state) {
+        return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.88,
+          ),
+          padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + keyboard),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: _sheetContent(context, state),
+        );
+      },
+    );
+  }
+
+  Widget _sheetContent(BuildContext context, OrderCancellationState state) {
+    if (state.isLoadingReasons && state.config == null) {
+      return const SizedBox(
+        height: 260,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (state.status == OrderCancellationStatus.failure &&
+        state.config == null) {
+      return _CancellationLoadError(
+        message:
+            state.failure?.message ?? 'Unable to load cancellation reasons.',
+        onRetry: () {
+          context.read<OrderCancellationBloc>().add(
+            const OrderCancellationReasonsRequested(),
+          );
+        },
+      );
+    }
+
+    final ShopOrderCancellationConfig? config = state.config;
+
+    if (config == null || config.reasons.isEmpty) {
+      return const SizedBox(
+        height: 260,
+        child: Center(child: Text('No cancellation reasons are available.')),
+      );
+    }
+
+    final selected = _selectedReasonEntity(config);
+
+    final bool showNote =
+        selected != null && (selected.requiresNote || selected.isOther);
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 44,
+          height: 5,
+          decoration: BoxDecoration(
+            color: const Color(0xffd8dde6),
+            borderRadius: BorderRadius.circular(99),
+          ),
+        ),
+        const SizedBox(height: 18),
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Cancel order',
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 21,
+                  fontWeight: FontWeight.w700,
+                  color: _CompletedColors.title,
+                ),
+              ),
+            ),
+            IconButton(
+              onPressed: state.isCancelling
+                  ? null
+                  : () => Navigator.pop(context),
+              icon: const Icon(Icons.close_rounded),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        const Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Please tell us why you want to cancel this order.',
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 14,
+              height: 1.5,
+              color: _CompletedColors.body,
+            ),
+          ),
+        ),
+        const SizedBox(height: 18),
+        Flexible(
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                for (final reason in config.reasons)
+                  _CancellationReasonTile(
+                    reason: reason,
+                    selected: _selectedReason == reason.code,
+                    enabled: !state.isCancelling,
+                    onTap: () {
+                      setState(() {
+                        _selectedReason = reason.code;
+
+                        if (!(reason.requiresNote || reason.isOther)) {
+                          _noteController.clear();
+                        }
+                      });
+                    },
+                  ),
+                if (showNote) ...[
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: _noteController,
+                    enabled: !state.isCancelling,
+                    maxLength: 500,
+                    maxLines: 4,
+                    onChanged: (_) {
+                      setState(() {});
+                    },
+                    decoration: InputDecoration(
+                      labelText: 'Tell us why',
+                      hintText: 'Write your reason...',
+                      alignLabelWithHint: true,
+                      filled: true,
+                      fillColor: const Color(0xfff8fafc),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: Color(0xffdfe5ec)),
+                      ),
+                    ),
+                  ),
+                ],
+                if (state.status == OrderCancellationStatus.failure &&
+                    state.failure != null) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xfffff1f0),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xffffccc7)),
+                    ),
+                    child: Text(
+                      state.failure!.message,
+                      style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 13,
+                        color: _CompletedColors.danger,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 18),
+        SizedBox(
+          width: double.infinity,
+          height: 54,
+          child: FilledButton(
+            onPressed: _canSubmit(state) ? () => _submit(state) : null,
+            style: FilledButton.styleFrom(
+              backgroundColor: _CompletedColors.danger,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            child: state.isCancelling
+                ? const SizedBox.square(
+                    dimension: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Text(
+                    'Confirm Cancellation',
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CancellationReasonTile extends StatelessWidget {
+  const _CancellationReasonTile({
+    required this.reason,
+    required this.selected,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final ShopOrderCancellationReason reason;
+  final bool selected;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: selected ? const Color(0xfffff5f3) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: enabled ? onTap : null,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: selected
+                    ? _CompletedColors.danger
+                    : const Color(0xffe4e8ee),
+              ),
+            ),
+            child: Row(
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: selected
+                          ? _CompletedColors.danger
+                          : const Color(0xffa8b0bd),
+                      width: 2,
+                    ),
+                  ),
+                  child: selected
+                      ? Center(
+                          child: Container(
+                            width: 10,
+                            height: 10,
+                            decoration: const BoxDecoration(
+                              color: _CompletedColors.danger,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    reason.label,
+                    style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: _CompletedColors.title,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CancellationLoadError extends StatelessWidget {
+  const _CancellationLoadError({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 280,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.error_outline_rounded,
+                size: 46,
+                color: _CompletedColors.danger,
+              ),
+              const SizedBox(height: 14),
+              Text(message, textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              FilledButton(onPressed: onRetry, child: const Text('Try Again')),
             ],
           ),
         ),
@@ -227,44 +682,13 @@ class _AtPharmaLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Image.asset(
-          'assets/images/at_pharma_icon.png',
-          width: 32,
-          height: 32,
-          fit: BoxFit.contain,
-        ),
-        const SizedBox(height: 8),
-        Image.asset(
-          'assets/images/atpharma_font.png',
-          height: 20,
-          fit: BoxFit.contain,
-          errorBuilder: (_, _, _) {
-            return const Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(
-                    text: 'AT ',
-                    style: TextStyle(color: _CompletedColors.brandBlue),
-                  ),
-                  TextSpan(
-                    text: 'PHARMA',
-                    style: TextStyle(color: _CompletedColors.brandGreen),
-                  ),
-                ],
-              ),
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 20,
-                height: 24 / 20,
-                fontWeight: FontWeight.w700,
-              ),
-            );
-          },
-        ),
-      ],
+    return Center(
+      child: Image.asset(
+        'assets/images/at_pharma_icon.png',
+        width: 42,
+        height: 42,
+        fit: BoxFit.contain,
+      ),
     );
   }
 }
@@ -275,143 +699,26 @@ class _SuccessIllustration extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: SizedBox(
-        width: 220,
-        height: 160,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            const Positioned(
-              left: 28,
-              top: 32,
-              child: _ConfettiDot(color: _CompletedColors.success, size: 8),
-            ),
-            const Positioned(
-              left: 46,
-              top: 72,
-              child: _ConfettiDot(color: _CompletedColors.success, size: 6),
-            ),
-            const Positioned(
-              left: 36,
-              bottom: 48,
-              child: _ConfettiDot(color: Color(0xff9ee5ba), size: 5),
-            ),
-            const Positioned(
-              left: 18,
-              bottom: 28,
-              child: _ConfettiDiamond(color: Color(0xfffb776d), size: 11),
-            ),
-            const Positioned(
-              right: 38,
-              top: 54,
-              child: _ConfettiDiamond(
-                color: _CompletedColors.success,
-                size: 10,
-              ),
-            ),
-            const Positioned(
-              right: 54,
-              top: 22,
-              child: _ConfettiDot(color: Color(0xff9ee5ba), size: 6),
-            ),
-            const Positioned(
-              right: 30,
-              bottom: 44,
-              child: _ConfettiDot(color: Color(0xff9ee5ba), size: 5),
-            ),
-            const Positioned(
-              right: 20,
-              bottom: 58,
-              child: _ConfettiDiamond(
-                color: _CompletedColors.primary,
-                size: 10,
-              ),
-            ),
-            const Positioned(
-              right: 18,
-              top: 82,
-              child: _ConfettiDiamond(color: Color(0xffffc439), size: 11),
-            ),
-
-            Container(
-              width: 132,
-              height: 132,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _CompletedColors.success.withValues(alpha: 0.08),
-              ),
-            ),
-            Container(
-              width: 108,
-              height: 108,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _CompletedColors.success.withValues(alpha: 0.12),
-              ),
-            ),
-            Container(
-              width: 82,
-              height: 82,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xff41df63), Color(0xff05a83d)],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Color(0x3305972c),
-                    blurRadius: 24,
-                    offset: Offset(0, 12),
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.check_rounded,
-                size: 54,
-                color: _CompletedColors.white,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ConfettiDot extends StatelessWidget {
-  const _ConfettiDot({required this.color, required this.size});
-
-  final Color color;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-    );
-  }
-}
-
-class _ConfettiDiamond extends StatelessWidget {
-  const _ConfettiDiamond({required this.color, required this.size});
-
-  final Color color;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return Transform.rotate(
-      angle: 0.78,
       child: Container(
-        width: size,
-        height: size,
+        width: 104,
+        height: 104,
         decoration: BoxDecoration(
-          border: Border.all(color: color, width: 2),
-          borderRadius: BorderRadius.circular(2),
+          shape: BoxShape.circle,
+          color: _CompletedColors.success.withValues(alpha: 0.12),
+        ),
+        alignment: Alignment.center,
+        child: Container(
+          width: 76,
+          height: 76,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xff41df63), Color(0xff05a83d)],
+            ),
+          ),
+          child: const Icon(Icons.check_rounded, size: 50, color: Colors.white),
         ),
       ),
     );
@@ -425,35 +732,24 @@ class _SuccessTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Column(
       children: [
-        Text.rich(
-          TextSpan(
-            children: [
-              TextSpan(
-                text: 'Order C',
-                style: TextStyle(color: _CompletedColors.title),
-              ),
-              TextSpan(
-                text: 'onfirmed!',
-                style: TextStyle(color: _CompletedColors.success),
-              ),
-            ],
-          ),
+        Text(
+          'Order Confirmed!',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontFamily: 'Poppins',
-            fontSize: 26,
-            height: 32 / 26,
+            fontSize: 25,
             fontWeight: FontWeight.w700,
+            color: _CompletedColors.success,
           ),
         ),
-        SizedBox(height: 10),
+        SizedBox(height: 8),
         Text(
           'Your order has been received\nand is being prepared.',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontFamily: 'Poppins',
-            fontSize: 17,
-            height: 28 / 17,
+            fontSize: 16,
+            height: 1.6,
             fontWeight: FontWeight.w500,
             color: _CompletedColors.body,
           ),
@@ -478,11 +774,10 @@ class _OrderInfoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 26),
+      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
       decoration: BoxDecoration(
-        color: _CompletedColors.white,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _CompletedColors.white, width: 2),
         boxShadow: const <BoxShadow>[
           BoxShadow(
             color: Color(0x0A000000),
@@ -492,28 +787,28 @@ class _OrderInfoCard extends StatelessWidget {
         ],
       ),
       child: Column(
-        children: <Widget>[
+        children: [
           _InfoRow(
             icon: Icons.inventory_2_outlined,
             iconColor: _CompletedColors.primary,
-            iconBackground: _CompletedColors.primaryLight,
+            background: _CompletedColors.primaryLight,
             label: 'Order Number',
             value: orderNumber.startsWith('#') ? orderNumber : '#$orderNumber',
             valueColor: _CompletedColors.primary,
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
           _InfoRow(
             icon: Icons.calendar_month_outlined,
             iconColor: _CompletedColors.success,
-            iconBackground: const Color(0xffe7fbf0),
+            background: const Color(0xffe7fbf0),
             label: 'Order Date',
             value: orderDate,
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
           _InfoRow(
             icon: Icons.credit_card_rounded,
             iconColor: _CompletedColors.orange,
-            iconBackground: _CompletedColors.orangeLight,
+            background: _CompletedColors.orangeLight,
             label: 'Payment Method',
             value: paymentMethod,
           ),
@@ -527,7 +822,7 @@ class _InfoRow extends StatelessWidget {
   const _InfoRow({
     required this.icon,
     required this.iconColor,
-    required this.iconBackground,
+    required this.background,
     required this.label,
     required this.value,
     this.valueColor = _CompletedColors.title,
@@ -535,7 +830,7 @@ class _InfoRow extends StatelessWidget {
 
   final IconData icon;
   final Color iconColor;
-  final Color iconBackground;
+  final Color background;
   final String label;
   final String value;
   final Color valueColor;
@@ -545,41 +840,31 @@ class _InfoRow extends StatelessWidget {
     return Row(
       children: [
         Container(
-          width: 48,
-          height: 48,
+          width: 46,
+          height: 46,
           alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: iconBackground,
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, size: 25, color: iconColor),
+          decoration: BoxDecoration(shape: BoxShape.circle, color: background),
+          child: Icon(icon, size: 24, color: iconColor),
         ),
-        const SizedBox(width: 16),
+        const SizedBox(width: 14),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontFamily: 'Poppins',
-                  fontSize: 15,
-                  height: 20 / 15,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
                   color: _CompletedColors.body,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 5),
               Text(
                 value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontFamily: 'Poppins',
-                  fontSize: 17,
-                  height: 24 / 17,
+                  fontSize: 16,
                   fontWeight: FontWeight.w700,
                   color: valueColor,
                 ),
@@ -609,24 +894,24 @@ class _CancelNotice extends StatelessWidget {
         ? 'This order has been cancelled.'
         : canCancel
         ? 'You can cancel this order within $remaining'
-        : 'The 15-minute cancellation window has ended.';
+        : 'The cancellation window has ended.';
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
+      children: [
         Icon(
           cancelled ? Icons.check_circle_outline : Icons.warning_amber_rounded,
-          size: 28,
+          size: 25,
           color: cancelled ? _CompletedColors.success : _CompletedColors.orange,
         ),
-        const SizedBox(width: 14),
+        const SizedBox(width: 12),
         Expanded(
           child: Text(
             message,
             style: const TextStyle(
               fontFamily: 'Poppins',
-              fontSize: 16,
-              height: 28 / 16,
-              fontWeight: FontWeight.w500,
+              fontSize: 15,
+              height: 1.6,
               color: _CompletedColors.muted,
             ),
           ),
@@ -637,56 +922,39 @@ class _CancelNotice extends StatelessWidget {
 }
 
 class _CancelOrderButton extends StatelessWidget {
-  const _CancelOrderButton({
-    required this.onTap,
-    required this.loading,
-    required this.cancelled,
-  });
+  const _CancelOrderButton({required this.onTap, required this.cancelled});
 
   final VoidCallback? onTap;
-  final bool loading;
   final bool cancelled;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 58,
+      height: 56,
       width: double.infinity,
       child: OutlinedButton.icon(
         onPressed: onTap,
-        icon: loading
-            ? const SizedBox.square(
-                dimension: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : Icon(
-                cancelled ? Icons.check_rounded : Icons.close_rounded,
-                size: 26,
-              ),
+        icon: Icon(cancelled ? Icons.check_rounded : Icons.close_rounded),
         label: Text(
-          loading
-              ? 'Cancelling...'
-              : cancelled
-              ? 'Order Cancelled'
-              : 'Cancel Order',
+          cancelled ? 'Order Cancelled' : 'Cancel Order',
           style: const TextStyle(
             fontFamily: 'Poppins',
-            fontSize: 17,
-            height: 24 / 17,
+            fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
         ),
         style: OutlinedButton.styleFrom(
-          foregroundColor: _CompletedColors.danger,
-          disabledForegroundColor: _CompletedColors.muted,
+          foregroundColor: cancelled
+              ? _CompletedColors.muted
+              : _CompletedColors.danger,
           side: BorderSide(
-            color: onTap == null
-                ? _CompletedColors.muted
+            color: cancelled || onTap == null
+                ? const Color(0xffc6ccd6)
                 : _CompletedColors.danger,
-            width: 1.8,
+            width: 1.6,
           ),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(15),
           ),
         ),
       ),
@@ -702,37 +970,22 @@ class _ContinueShoppingButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 58,
       width: double.infinity,
-      child: ElevatedButton(
+      height: 56,
+      child: FilledButton(
         onPressed: onTap,
-        style: ElevatedButton.styleFrom(
-          elevation: 0,
-          shadowColor: Colors.transparent,
-          backgroundColor: Colors.transparent,
-          padding: EdgeInsets.zero,
+        style: FilledButton.styleFrom(
+          backgroundColor: _CompletedColors.primary,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(15),
           ),
         ),
-        child: Ink(
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [_CompletedColors.primary, Color(0xff0968c3)],
-            ),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: const Center(
-            child: Text(
-              'Continue Shopping',
-              style: TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 17,
-                height: 24 / 17,
-                fontWeight: FontWeight.w600,
-                color: _CompletedColors.white,
-              ),
-            ),
+        child: const Text(
+          'Continue Shopping',
+          style: TextStyle(
+            fontFamily: 'Poppins',
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),
@@ -742,29 +995,42 @@ class _ContinueShoppingButton extends StatelessWidget {
 
 class _CompletedResponsive {
   static double pagePadding(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
+    final double width = MediaQuery.sizeOf(context).width;
 
-    if (width <= 340) return 16;
-    if (width <= 390) return 20;
-    if (width <= 480) return 24;
+    if (width <= 340) {
+      return 16;
+    }
+
+    if (width <= 390) {
+      return 20;
+    }
+
+    if (width <= 480) {
+      return 24;
+    }
+
     return 32;
   }
 }
 
-class _CompletedColors {
+abstract final class _CompletedColors {
   static const Color white = Color(0xffffffff);
+
   static const Color title = Color(0xff131415);
+
   static const Color body = Color(0xff666e80);
+
   static const Color muted = Color(0xff98a1b3);
 
   static const Color primary = Color(0xff0b83d9);
+
   static const Color primaryLight = Color(0xffe7f3fb);
 
   static const Color success = Color(0xff05972c);
-  static const Color orange = Color(0xfff26c0c);
-  static const Color orangeLight = Color(0xfffef0e7);
-  static const Color danger = Color(0xffe71c05);
 
-  static const Color brandBlue = Color(0xff204a8e);
-  static const Color brandGreen = Color(0xff159447);
+  static const Color orange = Color(0xfff26c0c);
+
+  static const Color orangeLight = Color(0xfffef0e7);
+
+  static const Color danger = Color(0xffe71c05);
 }

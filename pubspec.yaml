@@ -57,6 +57,7 @@ dependencies:
   latlong2: ^0.9.1
   flutter_map_dragmarker: ^8.0.3
   share_plus: ^13.3.0
+  image_cropper: ^12.2.1
 
 dev_dependencies:
   flutter_test:

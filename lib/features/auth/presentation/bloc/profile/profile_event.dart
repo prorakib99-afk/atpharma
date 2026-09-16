@@ -20,3 +20,16 @@ final class ProfileUpdateRequested extends ProfileEvent {
   @override
   List<Object?> get props => <Object?>[name, phone];
 }
+
+final class ProfileImageUpdateRequested extends ProfileEvent {
+  const ProfileImageUpdateRequested({required this.imagePath});
+
+  final String imagePath;
+
+  @override
+  List<Object?> get props => <Object?>[imagePath];
+}
+
+final class ProfileImageRemoveRequested extends ProfileEvent {
+  const ProfileImageRemoveRequested();
+}

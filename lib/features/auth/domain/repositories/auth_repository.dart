@@ -30,10 +30,17 @@ abstract interface class AuthRepository {
     required String resetToken,
     required String password,
   });
+  Future<AppResult<void>> continueAsGuest();
   Future<AppResult<void>> logout();
   Future<AppResult<Map<String, dynamic>>> getMyProfile();
   Future<AppResult<Map<String, dynamic>>> updateMyProfile({
     required String name,
     required String phone,
   });
+
+  Future<AppResult<Map<String, dynamic>>> updateMyProfileImage({
+    required String imagePath,
+  });
+
+  Future<AppResult<Map<String, dynamic>>> removeMyProfileImage();
 }

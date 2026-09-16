@@ -10,6 +10,8 @@ final class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     : super(const ProfileState()) {
     on<ProfileRequested>(_onRequested);
     on<ProfileUpdateRequested>(_onUpdateRequested);
+    on<ProfileImageUpdateRequested>(_onImageUpdateRequested);
+    on<ProfileImageRemoveRequested>(_onImageRemoveRequested);
   }
 
   final SessionManager _sessionManager;
@@ -27,7 +29,10 @@ final class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
         emit(
           state.copyWith(
             status: ProfileStatus.success,
-            profile: ProfileData.fromSession(user, isGuest: false),
+            profile: ProfileData.fromSession(
+            user,
+            isGuest: _sessionManager.isGuestMode,
+          ),
           ),
         );
         return;
@@ -63,7 +68,10 @@ final class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
       emit(
         state.copyWith(
           updateStatus: ProfileUpdateStatus.success,
-          profile: ProfileData.fromSession(user, isGuest: false),
+          profile: ProfileData.fromSession(
+            user,
+            isGuest: _sessionManager.isGuestMode,
+          ),
         ),
       );
       return;
@@ -75,4 +83,69 @@ final class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
       ),
     );
   }
-}
+
+  Future<void> _onImageUpdateRequested(
+    ProfileImageUpdateRequested event,
+    Emitter<ProfileState> emit,
+  ) async {
+    emit(
+      state.copyWith(
+        updateStatus: ProfileUpdateStatus.submitting,
+        updateError: null,
+      ),
+    );
+    final result = await _repository.updateMyProfileImage(
+      imagePath: event.imagePath,
+    );
+    final user = result.dataOrNull;
+    if (user != null) {
+      emit(
+        state.copyWith(
+          updateStatus: ProfileUpdateStatus.success,
+          profile: ProfileData.fromSession(
+            user,
+            isGuest: _sessionManager.isGuestMode,
+          ),
+        ),
+      );
+      return;
+    }
+    emit(
+      state.copyWith(
+        updateStatus: ProfileUpdateStatus.failure,
+        updateError: result.failureOrNull?.message ?? 'Failed to update photo.',
+      ),
+    );
+  }
+
+  Future<void> _onImageRemoveRequested(
+    ProfileImageRemoveRequested event,
+    Emitter<ProfileState> emit,
+  ) async {
+    emit(
+      state.copyWith(
+        updateStatus: ProfileUpdateStatus.submitting,
+        updateError: null,
+      ),
+    );
+    final result = await _repository.removeMyProfileImage();
+    final user = result.dataOrNull;
+    if (user != null) {
+      emit(
+        state.copyWith(
+          updateStatus: ProfileUpdateStatus.success,
+          profile: ProfileData.fromSession(
+            user,
+            isGuest: _sessionManager.isGuestMode,
+          ),
+        ),
+      );
+      return;
+    }
+    emit(
+      state.copyWith(
+        updateStatus: ProfileUpdateStatus.failure,
+        updateError: result.failureOrNull?.message ?? 'Failed to remove photo.',
+      ),
+    );
+  }}

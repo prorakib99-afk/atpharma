@@ -83,6 +83,7 @@ class _ReviewOrderScreenState extends State<ReviewOrderScreen> {
         (ProductCartItem item) => OfflineOrderItem(
           productId: item.product.id ?? item.id,
           quantity: item.quantity,
+          price: item.product.price.toDouble(),
         ),
       )
       .toList(growable: false);

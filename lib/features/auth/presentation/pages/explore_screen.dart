@@ -74,6 +74,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
   String? _error;
   int _version = 0;
   late ExploreFilter _filter;
+  ShopProductSort _sort = ShopProductSort.popular;
+  bool _sortMenuOpen = false;
 
   ShopProductQuery _query(int page) {
     return ShopProductQuery(
@@ -94,7 +96,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
         null => ShopProductPrescription.all,
       },
       featured: _filter.featured,
-      sort: ShopProductSort.popular,
+      sort: _sort,
     );
   }
 
@@ -304,6 +306,26 @@ class _ExploreScreenState extends State<ExploreScreen> {
     super.dispose();
   }
 
+  static const Map<ShopProductSort, String> _sortLabels = <ShopProductSort, String>{
+    ShopProductSort.popular: 'Most Popular',
+    ShopProductSort.newest: 'Newest',
+    ShopProductSort.priceAscending: 'Price: Low to High',
+    ShopProductSort.priceDescending: 'Price: High to Low',
+  };
+
+  void _toggleSortMenu(BuildContext buttonContext) {
+    setState(() => _sortMenuOpen = !_sortMenuOpen);
+  }
+
+  Future<void> _selectSort(ShopProductSort sort) async {
+    setState(() => _sortMenuOpen = false);
+    if (sort == _sort) return;
+    _cancelProducts(requestKey: _prefetchKey);
+    _cache.clear();
+    setState(() => _sort = sort);
+    await _loadPage(1);
+  }
+
   Future<void> _openFilters() async {
     final ExploreFilter? result = await showFloatingExploreFilterScreen(
       context,
@@ -384,9 +406,91 @@ class _ExploreScreenState extends State<ExploreScreen> {
               child: _FilterPanel(
                 activeFilterCount: _filter.activeCount,
                 onFilterTap: _openFilters,
+                sortLabel: _sortLabels[_sort] ?? 'Popular',
+                onSortTap: _toggleSortMenu,
               ),
             ),
+            if (_sortMenuOpen) ...[
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: () => setState(() => _sortMenuOpen = false),
+                ),
+              ),
+              Positioned(
+                left: _Responsive.pagePadding(context),
+                right: _Responsive.pagePadding(context),
+                bottom: 112 + bottomSafe + 52,
+                child: _SortMenu(
+                  labels: _sortLabels,
+                  selected: _sort,
+                  onSelected: _selectSort,
+                ),
+              ),
+            ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SortMenu extends StatelessWidget {
+  const _SortMenu({
+    required this.labels,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final Map<ShopProductSort, String> labels;
+  final ShopProductSort selected;
+  final void Function(ShopProductSort sort) onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 220),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x26000000),
+              blurRadius: 24,
+              offset: Offset(0, 8),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: labels.entries.map((entry) {
+            final bool isSelected = entry.key == selected;
+            return InkWell(
+              onTap: () => onSelected(entry.key),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                color: isSelected
+                    ? _ExploreColors.title.withValues(alpha: .06)
+                    : Colors.transparent,
+                child: Text(
+                  entry.value,
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 13,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: _ExploreColors.title,
+                  ),
+                ),
+              ),
+            );
+          }).toList(growable: false),
         ),
       ),
     );
@@ -983,10 +1087,14 @@ class _FilterPanel extends StatelessWidget {
   const _FilterPanel({
     required this.activeFilterCount,
     required this.onFilterTap,
+    required this.sortLabel,
+    required this.onSortTap,
   });
 
   final int activeFilterCount;
   final VoidCallback onFilterTap;
+  final String sortLabel;
+  final void Function(BuildContext context) onSortTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1011,12 +1119,15 @@ class _FilterPanel extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Expanded(
-                child: _ActionChipButton(
-                  iconAsset: 'assets/icons/explore_sort.svg',
-                  iconSize: 20,
-                  iconQuarterTurns: 1,
-                  label: 'Sort: Popular',
+              Expanded(
+                child: Builder(
+                  builder: (context) => _ActionChipButton(
+                    iconAsset: 'assets/icons/explore_sort.svg',
+                    iconSize: 20,
+                    iconQuarterTurns: 1,
+                    label: 'Sort: $sortLabel',
+                    onTap: () => onSortTap(context),
+                  ),
                 ),
               ),
               const SizedBox(width: 8),

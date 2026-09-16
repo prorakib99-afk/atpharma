@@ -103,6 +103,7 @@ class FloatingProfileScreen extends StatelessWidget {
     this.onMyReviewsTap,
     this.onSignOutTap,
     this.showAccentTab = true,
+    this.isGuest = false,
   });
 
   final String? avatarAssetPath;
@@ -116,6 +117,7 @@ class FloatingProfileScreen extends StatelessWidget {
   final VoidCallback? onMyReviewsTap;
   final VoidCallback? onSignOutTap;
   final bool showAccentTab;
+  final bool isGuest;
 
   static const _accent = Color(0xff7c3aed);
   static const _textMuted = Color(0xff6b7280);
@@ -189,6 +191,7 @@ class FloatingProfileScreen extends StatelessWidget {
                                 : profile.avatarUrl,
                             name: profile.name,
                             role: profile.roleLine,
+                            isGuest: profile.isGuest,
                             onProfileTap: () {
                               runAfterClose(onProfileTap);
                               Navigator.of(context).pop();
@@ -310,12 +313,13 @@ class FloatingProfileScreen extends StatelessWidget {
                       subtitle: 'View your order history',
                       onTap: onMyOrdersTap,
                     ),
-                    _MenuRow(
-                      icon: Icons.star_outline_rounded,
-                      title: 'My Reviews',
-                      subtitle: 'Manage your product reviews',
-                      onTap: onMyReviewsTap,
-                    ),
+                    if (!isGuest)
+                      _MenuRow(
+                        icon: Icons.star_outline_rounded,
+                        title: 'My Reviews',
+                        subtitle: 'Manage your product reviews',
+                        onTap: onMyReviewsTap,
+                      ),
                     _MenuRow(
                       icon: Icons.local_shipping_outlined,
                       title: 'Track Order',

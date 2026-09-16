@@ -128,11 +128,49 @@ final class SessionManager {
     await saveRememberedLogin(rememberMe: rememberMe, identifier: identifier);
   }
 
-  Future<void> startGuestSession() async {
+  Future<void> saveGuestSession({
+    required String accessToken,
+    required Map<String, dynamic> guest,
+  }) async {
+    final String normalizedToken = accessToken.trim();
+    if (normalizedToken.isEmpty) {
+      throw ArgumentError.value(
+        accessToken,
+        'accessToken',
+        'Guest access token cannot be empty.',
+      );
+    }
+
     await clearSession(preserveRememberedLogin: true);
+    await _tokenStorage.saveAccessToken(normalizedToken);
+
+    final String guestNumber = _guestDisplayName(guest);
+    await _localStorageService.write<String>(
+      key: StorageKeys.guestNumber,
+      value: guestNumber,
+    );
+    await _localStorageService.writeMap(
+      key: StorageKeys.currentUser,
+      value: <String, dynamic>{
+        ...guest,
+        'name': guest['name'] ?? guestNumber,
+        'guestNumber': guest['guestNumber'] ?? guest['guest_number'] ?? guest['id'] ?? guestNumber,
+        'accountType': guest['accountType'] ?? 'Guest',
+        'role': guest['role'] ?? 'Guest User',
+        'status': guest['status'] ?? 'Active',
+      },
+    );
+    await _localStorageService.write<bool>(
+      key: StorageKeys.guestMode,
+      value: true,
+    );
+  }
+
+  Future<void> startGuestSession() async {
     final String guestNumber =
         _localStorageService.readString(StorageKeys.guestNumber) ??
         'GUEST-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
+    await clearSession(preserveRememberedLogin: true);
     await _localStorageService.write<String>(
       key: StorageKeys.guestNumber,
       value: guestNumber,
@@ -151,6 +189,14 @@ final class SessionManager {
       key: StorageKeys.guestMode,
       value: true,
     );
+  }
+
+  String _guestDisplayName(Map<String, dynamic> guest) {
+    for (final String key in <String>['name', 'guestNumber', 'guest_number', 'id']) {
+      final String value = guest[key]?.toString().trim() ?? '';
+      if (value.isNotEmpty) return value;
+    }
+    return 'GUEST-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
   }
 
   Future<void> updateCurrentUser(Map<String, dynamic> user) async {

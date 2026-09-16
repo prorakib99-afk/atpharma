@@ -86,6 +86,26 @@ Future<void> main() async {
   runApp(const AtPharmaApp());
 }
 
+Future<void> _continueAsGuest(BuildContext context) async {
+  await FavoriteStore.instance.clear();
+  await ProductCart.instance.clear();
+  final result = await sl<AuthRepository>().continueAsGuest();
+  if (!context.mounted) return;
+  result.fold(
+    onSuccess: (_) {
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        AppRoutes.home,
+        (Route<dynamic> route) => false,
+      );
+    },
+    onFailure: (failure) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(failure.message)),
+      );
+    },
+  );
+}
+
 class AtPharmaApp extends StatelessWidget {
   const AtPharmaApp({super.key});
 
@@ -118,14 +138,7 @@ class AtPharmaApp extends StatelessWidget {
             onSignInTap: () {
               Navigator.of(context).pushNamed(AppRoutes.login);
             },
-            onGuestTap: () async {
-              await FavoriteStore.instance.clear();
-              await ProductCart.instance.clear();
-              await sl<SessionManager>().startGuestSession();
-              if (context.mounted) {
-                Navigator.of(context).pushReplacementNamed(AppRoutes.home);
-              }
-            },
+            onGuestTap: () => _continueAsGuest(context),
             onSignUpTap: () {
               Navigator.of(context).pushNamed(AppRoutes.register);
             },
@@ -448,12 +461,7 @@ class AtPharmaApp extends StatelessWidget {
                     ),
                 onSignInTap: () =>
                     Navigator.of(context).pushNamed(AppRoutes.login),
-                onGuestTap: () async {
-                  await sl<SessionManager>().startGuestSession();
-                  if (context.mounted) {
-                    Navigator.of(context).pushReplacementNamed(AppRoutes.home);
-                  }
-                },
+                onGuestTap: () => _continueAsGuest(context),
               ),
             ),
           );

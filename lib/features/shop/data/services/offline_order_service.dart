@@ -46,14 +46,20 @@ final class CouponValidationResult {
 }
 
 final class OfflineOrderItem {
-  const OfflineOrderItem({required this.productId, required this.quantity});
+  const OfflineOrderItem({
+    required this.productId,
+    required this.quantity,
+    this.price,
+  });
 
   final String productId;
   final int quantity;
+  final double? price;
 
   Map<String, Object?> toJson() => <String, Object?>{
     'productId': productId.trim(),
     'quantity': quantity,
+    if (price != null) 'price': price,
   };
 }
 
@@ -290,12 +296,7 @@ final class OfflineOrderService extends ChangeNotifier {
         'code': code.trim().toUpperCase(),
         'subtotal': subtotal,
         'items': items
-            .map(
-              (OfflineOrderItem item) => <String, Object?>{
-                'productId': item.productId,
-                'quantity': item.quantity,
-              },
-            )
+            .map((OfflineOrderItem item) => item.toJson())
             .toList(growable: false),
       },
       options: ApiRequestOptions.publicRequest(allowRetry: false),

@@ -10,12 +10,22 @@ abstract interface class AuthRemoteDataSource {
     required String password,
   });
 
+  Future<Map<String, dynamic>> startGuestSession();
+
+  Future<void> claimGuestOrders({required String guestToken});
+
   Future<Map<String, dynamic>> getMyProfile();
 
   Future<Map<String, dynamic>> updateMyProfile({
     required String name,
     required String phone,
   });
+
+  Future<Map<String, dynamic>> updateMyProfileImage({
+    required String imagePath,
+  });
+
+  Future<Map<String, dynamic>> removeMyProfileImage();
 
   Future<Map<String, dynamic>> register({
     required String name,
@@ -45,6 +55,18 @@ final class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   AuthRemoteDataSourceImpl({required this._dioClient});
 
   final DioClient _dioClient;
+  Map<String, dynamic> _profileFromResponse(dynamic responseData) {
+    if (responseData is! Map) {
+      throw const FormatException('Invalid profile response.');
+    }
+    final Map<String, dynamic> root = Map<String, dynamic>.from(responseData);
+    final dynamic data = root['data'];
+    final dynamic value = data is Map
+        ? (data['_profile'] ?? data['profile'] ?? data['user'] ?? data['customer'] ?? data)
+        : (root['_profile'] ?? root['profile'] ?? root['user'] ?? root['customer'] ?? root);
+    if (value is! Map) throw const FormatException('Profile was not returned.');
+    return Map<String, dynamic>.from(value);
+  }
 
   @override
   Future<Map<String, dynamic>> login({
@@ -54,7 +76,12 @@ final class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     final Response<dynamic> response = await _dioClient.post<dynamic>(
       AuthEndpoints.login,
       data: <String, dynamic>{'email': identifier, 'password': password},
-      options: ApiRequestOptions.publicRequest(allowRetry: false),
+      options: ApiRequestOptions.publicRequest(
+        headers: <String, dynamic>{
+          'X-Pharmacy-Slug': ApiConstants.pharmacySlug,
+        },
+        allowRetry: false,
+      ),
     );
 
     if (response.data is! Map) {
@@ -71,7 +98,12 @@ final class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     final response = await _dioClient.post<dynamic>(
       path,
       data: data,
-      options: ApiRequestOptions.publicRequest(allowRetry: false),
+      options: ApiRequestOptions.publicRequest(
+        headers: <String, dynamic>{
+          'X-Pharmacy-Slug': ApiConstants.pharmacySlug,
+        },
+        allowRetry: false,
+      ),
     );
     if (response.data is! Map) {
       throw const FormatException('Invalid authentication response.');
@@ -79,6 +111,37 @@ final class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     return Map<String, dynamic>.from(response.data as Map);
   }
 
+
+  @override
+  Future<Map<String, dynamic>> startGuestSession() async {
+    final Response<dynamic> response = await _dioClient.post<dynamic>(
+      AuthEndpoints.guest,
+      options: ApiRequestOptions.publicRequest(
+        headers: <String, dynamic>{
+          'X-Pharmacy-Slug': ApiConstants.pharmacySlug,
+        },
+        allowRetry: false,
+      ),
+    );
+    if (response.data is! Map) {
+      throw const FormatException('Invalid guest session response.');
+    }
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  @override
+  Future<void> claimGuestOrders({required String guestToken}) async {
+    await _dioClient.post<dynamic>(
+      AuthEndpoints.claimGuestOrders,
+      data: <String, dynamic>{'guestToken': guestToken},
+      options: ApiRequestOptions.authenticated(
+        headers: <String, dynamic>{
+          'X-Pharmacy-Slug': ApiConstants.pharmacySlug,
+        },
+        allowRetry: false,
+      ),
+    );
+  }
   @override
   Future<Map<String, dynamic>> register({
     required String name,
@@ -110,7 +173,12 @@ final class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     await _dioClient.post<dynamic>(
       AuthEndpoints.requestCode,
       data: {'email': email},
-      options: ApiRequestOptions.publicRequest(allowRetry: false),
+      options: ApiRequestOptions.publicRequest(
+        headers: <String, dynamic>{
+          'X-Pharmacy-Slug': ApiConstants.pharmacySlug,
+        },
+        allowRetry: false,
+      ),
     );
   }
 
@@ -150,7 +218,12 @@ final class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     await _dioClient.post<dynamic>(
       AuthEndpoints.resetPassword,
       data: <String, dynamic>{'resetToken': resetToken, 'password': password},
-      options: ApiRequestOptions.publicRequest(allowRetry: false),
+      options: ApiRequestOptions.publicRequest(
+        headers: <String, dynamic>{
+          'X-Pharmacy-Slug': ApiConstants.pharmacySlug,
+        },
+        allowRetry: false,
+      ),
     );
   }
 
@@ -170,23 +243,14 @@ final class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<Map<String, dynamic>> getMyProfile() async {
     final response = await _dioClient.get<dynamic>(
-      AuthEndpoints.me,
+      AuthEndpoints.accountProfile,
       options: ApiRequestOptions.authenticated(
         headers: <String, dynamic>{
           'X-Pharmacy-Slug': ApiConstants.pharmacySlug,
         },
       ),
     );
-    if (response.data is! Map) {
-      throw const FormatException('Invalid profile response.');
-    }
-    final root = Map<String, dynamic>.from(response.data as Map);
-    final dynamic data = root['data'];
-    final dynamic value = data is Map
-        ? (data['user'] ?? data['customer'] ?? data)
-        : (root['user'] ?? root['customer'] ?? root);
-    if (value is! Map) throw const FormatException('Profile was not returned.');
-    return Map<String, dynamic>.from(value);
+    return _profileFromResponse(response.data);
   }
 
   @override
@@ -195,7 +259,7 @@ final class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     required String phone,
   }) async {
     final response = await _dioClient.patch<dynamic>(
-      UserEndpoints.updateMyProfile,
+      AuthEndpoints.accountProfile,
       data: <String, dynamic>{'name': name, 'phone': phone},
       options: ApiRequestOptions.authenticated(
         headers: <String, dynamic>{
@@ -203,15 +267,39 @@ final class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         },
       ),
     );
-    if (response.data is! Map) {
-      throw const FormatException('Invalid profile response.');
-    }
-    final root = Map<String, dynamic>.from(response.data as Map);
-    final dynamic data = root['data'];
-    final dynamic value = data is Map
-        ? (data['user'] ?? data['customer'] ?? data)
-        : (root['user'] ?? root['customer'] ?? root);
-    if (value is! Map) throw const FormatException('Profile was not returned.');
-    return Map<String, dynamic>.from(value);
+    return _profileFromResponse(response.data);
+  }
+
+  @override
+  Future<Map<String, dynamic>> updateMyProfileImage({
+    required String imagePath,
+  }) async {
+    final response = await _dioClient.post<dynamic>(
+      AuthEndpoints.accountProfileImage,
+      data: FormData.fromMap(<String, dynamic>{
+        'image': await MultipartFile.fromFile(imagePath),
+      }),
+      options: ApiRequestOptions.authenticated(
+        headers: <String, dynamic>{
+          'X-Pharmacy-Slug': ApiConstants.pharmacySlug,
+        },
+        allowRetry: false,
+      ),
+    );
+    return _profileFromResponse(response.data);
+  }
+
+  @override
+  Future<Map<String, dynamic>> removeMyProfileImage() async {
+    final response = await _dioClient.delete<dynamic>(
+      AuthEndpoints.accountProfileImage,
+      options: ApiRequestOptions.authenticated(
+        headers: <String, dynamic>{
+          'X-Pharmacy-Slug': ApiConstants.pharmacySlug,
+        },
+        allowRetry: false,
+      ),
+    );
+    return _profileFromResponse(response.data);
   }
 }
