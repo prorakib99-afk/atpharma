@@ -10,10 +10,9 @@ import 'shop_reviews_state.dart';
 
 final class ShopReviewsBloc extends Bloc<ShopReviewsEvent, ShopReviewsState> {
   ShopReviewsBloc({
-    required GetShopReviewsUseCase getReviews,
+    required this._getReviews,
     required CreateShopReviewUseCase createReview,
-  }) : _getReviews = getReviews,
-       _createReview = createReview,
+  }) : _createReview = createReview,
        super(const ShopReviewsState()) {
     on<ShopReviewsRequested>(_onRequested, transformer: restartable());
 

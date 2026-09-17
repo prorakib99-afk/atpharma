@@ -99,9 +99,9 @@ Future<void> _continueAsGuest(BuildContext context) async {
       );
     },
     onFailure: (failure) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(failure.message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(failure.message)));
     },
   );
 }
@@ -325,6 +325,7 @@ class AtPharmaApp extends StatelessWidget {
                 final SessionManager session = sl<SessionManager>();
                 return LoginScreen(
                   initialIdentifier: session.rememberedIdentifier,
+                  initialPassword: session.rememberedPassword,
                   initialRememberMe: session.rememberMe,
                   isLoading: state.isLoading,
                   onSignIn: (identifier, password, rememberMe) {

@@ -10,10 +10,18 @@ final class ReviewOrderBloc extends Bloc<ReviewOrderEvent, ReviewOrderState> {
   ReviewOrderBloc(this._service) : super(const ReviewOrderState()) {
     on<ReviewOrderStarted>(_onStarted);
     on<ReviewCouponSubmitted>(_onCoupon, transformer: droppable());
+    on<ReviewCouponCleared>(_onCouponCleared);
     on<ReviewOrderSubmitted>(_onSubmitted, transformer: droppable());
   }
 
   final OfflineOrderService _service;
+
+  void _onCouponCleared(
+    ReviewCouponCleared event,
+    Emitter<ReviewOrderState> emit,
+  ) {
+    emit(state.copyWith(discount: 0, clearCoupon: true, clearMessage: true));
+  }
 
   Future<void> _onStarted(
     ReviewOrderStarted event,

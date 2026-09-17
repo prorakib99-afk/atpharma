@@ -6,13 +6,9 @@ import '../../../../core/session/session_manager.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../domain/usecases/logout_use_case.dart';
 import '../bloc/profile/profile_state.dart';
-import 'favorite_store.dart';
-import 'screen_product_details.dart';
 
 Future<void> signOutFromProfile(BuildContext context) async {
   await sl<LogoutUseCase>()();
-  await FavoriteStore.instance.clear();
-  await ProductCart.instance.clear();
   if (!context.mounted) return;
   Navigator.of(context).pushNamedAndRemoveUntil(
     AppRoutes.startpage,
@@ -264,9 +260,7 @@ class FloatingProfileScreen extends StatelessWidget {
                       backgroundColor: const Color(0xffe5e7eb),
                       backgroundImage: avatarUrl?.trim().isNotEmpty == true
                           ? NetworkImage(avatarUrl!) as ImageProvider
-                          : const AssetImage(
-                              'assets/images/dummy_avatar.png',
-                            ),
+                          : const AssetImage('assets/images/dummy_avatar.png'),
                     ),
                     const SizedBox(width: 8),
                     Expanded(

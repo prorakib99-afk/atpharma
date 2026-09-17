@@ -97,11 +97,20 @@ final class SessionManager {
     return _localStorageService.readString(StorageKeys.rememberedIdentifier);
   }
 
+  String? get rememberedPassword {
+    if (!rememberMe) {
+      return null;
+    }
+
+    return _localStorageService.readString(StorageKeys.rememberedPassword);
+  }
+
   Future<void> saveAuthenticatedSession({
     required String accessToken,
     required Map<String, dynamic> user,
     required bool rememberMe,
     String? identifier,
+    String? password,
   }) async {
     final String normalizedToken = accessToken.trim();
 
@@ -125,7 +134,11 @@ final class SessionManager {
       value: user,
     );
 
-    await saveRememberedLogin(rememberMe: rememberMe, identifier: identifier);
+    await saveRememberedLogin(
+      rememberMe: rememberMe,
+      identifier: identifier,
+      password: password,
+    );
   }
 
   Future<void> saveGuestSession({
@@ -154,7 +167,11 @@ final class SessionManager {
       value: <String, dynamic>{
         ...guest,
         'name': guest['name'] ?? guestNumber,
-        'guestNumber': guest['guestNumber'] ?? guest['guest_number'] ?? guest['id'] ?? guestNumber,
+        'guestNumber':
+            guest['guestNumber'] ??
+            guest['guest_number'] ??
+            guest['id'] ??
+            guestNumber,
         'accountType': guest['accountType'] ?? 'Guest',
         'role': guest['role'] ?? 'Guest User',
         'status': guest['status'] ?? 'Active',
@@ -192,7 +209,12 @@ final class SessionManager {
   }
 
   String _guestDisplayName(Map<String, dynamic> guest) {
-    for (final String key in <String>['name', 'guestNumber', 'guest_number', 'id']) {
+    for (final String key in <String>[
+      'name',
+      'guestNumber',
+      'guest_number',
+      'id',
+    ]) {
       final String value = guest[key]?.toString().trim() ?? '';
       if (value.isNotEmpty) return value;
     }
@@ -209,6 +231,7 @@ final class SessionManager {
   Future<void> saveRememberedLogin({
     required bool rememberMe,
     String? identifier,
+    String? password,
   }) async {
     await _localStorageService.write<bool>(
       key: StorageKeys.rememberMe,
@@ -217,6 +240,7 @@ final class SessionManager {
 
     if (!rememberMe) {
       await _localStorageService.remove(StorageKeys.rememberedIdentifier);
+      await _localStorageService.remove(StorageKeys.rememberedPassword);
       return;
     }
 
@@ -224,6 +248,7 @@ final class SessionManager {
 
     if (normalizedIdentifier.isEmpty) {
       await _localStorageService.remove(StorageKeys.rememberedIdentifier);
+      await _localStorageService.remove(StorageKeys.rememberedPassword);
       return;
     }
 
@@ -231,6 +256,16 @@ final class SessionManager {
       key: StorageKeys.rememberedIdentifier,
       value: normalizedIdentifier,
     );
+
+    final String normalizedPassword = password ?? '';
+    if (normalizedPassword.isEmpty) {
+      await _localStorageService.remove(StorageKeys.rememberedPassword);
+    } else {
+      await _localStorageService.write<String>(
+        key: StorageKeys.rememberedPassword,
+        value: normalizedPassword,
+      );
+    }
   }
 
   /// Clears authenticated data but optionally keeps the identifier used by
@@ -248,6 +283,7 @@ final class SessionManager {
       await _localStorageService.removeAll(<String>[
         StorageKeys.rememberMe,
         StorageKeys.rememberedIdentifier,
+        StorageKeys.rememberedPassword,
       ]);
     }
   }

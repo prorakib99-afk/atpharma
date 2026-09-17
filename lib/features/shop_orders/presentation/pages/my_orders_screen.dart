@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/session/session_manager.dart';
+import '../../../auth/presentation/pages/product_detail_tabs.dart';
 import '../../../auth/presentation/pages/screen_product_details.dart';
 import '../../domain/entities/shop_order_entity.dart';
 import '../bloc/shop_orders_bloc.dart';
@@ -417,6 +418,7 @@ class _OrderCard extends StatelessWidget {
                   : item.productName.trim(),
               image: item.productImage.trim(),
             ),
+            initialTab: ProductDetailTab.reviews,
           );
         },
       ),

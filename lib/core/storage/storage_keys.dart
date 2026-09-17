@@ -16,6 +16,9 @@ abstract final class StorageKeys {
   /// Email or phone saved when "Remember me" is enabled.
   static const String rememberedIdentifier = 'remembered_identifier';
 
+  /// Password saved when "Remember me" is enabled.
+  static const String rememberedPassword = 'remembered_password';
+
   /// Last successfully resolved delivery address shown on the home screen.
   static const String lastKnownAddress = 'last_known_address';
   static const String lastKnownLatitude = 'last_known_latitude';

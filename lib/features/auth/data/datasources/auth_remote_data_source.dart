@@ -62,8 +62,16 @@ final class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     final Map<String, dynamic> root = Map<String, dynamic>.from(responseData);
     final dynamic data = root['data'];
     final dynamic value = data is Map
-        ? (data['_profile'] ?? data['profile'] ?? data['user'] ?? data['customer'] ?? data)
-        : (root['_profile'] ?? root['profile'] ?? root['user'] ?? root['customer'] ?? root);
+        ? (data['_profile'] ??
+              data['profile'] ??
+              data['user'] ??
+              data['customer'] ??
+              data)
+        : (root['_profile'] ??
+              root['profile'] ??
+              root['user'] ??
+              root['customer'] ??
+              root);
     if (value is! Map) throw const FormatException('Profile was not returned.');
     return Map<String, dynamic>.from(value);
   }
@@ -111,7 +119,6 @@ final class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     return Map<String, dynamic>.from(response.data as Map);
   }
 
-
   @override
   Future<Map<String, dynamic>> startGuestSession() async {
     final Response<dynamic> response = await _dioClient.post<dynamic>(
@@ -142,6 +149,7 @@ final class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       ),
     );
   }
+
   @override
   Future<Map<String, dynamic>> register({
     required String name,
@@ -185,9 +193,25 @@ final class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<String> forgotPassword({required String email}) async {
     final json = await _post(AuthEndpoints.forgotPassword, {'email': email});
-    final message = json['message'];
-    return message is String && message.trim().isNotEmpty
-        ? message.trim()
+    final data = json['data'] is Map
+        ? Map<String, dynamic>.from(json['data'] as Map)
+        : json;
+    final accountExists =
+        data['accountExists'] ??
+        data['account_exists'] ??
+        data['userExists'] ??
+        data['user_exists'] ??
+        data['exists'];
+    final message = json['message']?.toString().trim() ?? '';
+    final normalizedMessage = message.toLowerCase();
+    if (accountExists == false ||
+        normalizedMessage.contains('account not found') ||
+        normalizedMessage.contains('user not found') ||
+        normalizedMessage.contains('email not found')) {
+      throw ArgumentError('Account not found for this email.');
+    }
+    return message.isNotEmpty
+        ? message
         : 'A password reset verification code has been sent to your email.';
   }
 

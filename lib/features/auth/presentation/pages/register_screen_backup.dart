@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import '../../../../core/validation/validation.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({
@@ -38,10 +37,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
-  String? _nameError;
-  String? _phoneError;
-  String? _emailError;
-  String? _passwordError;
 
   static const _primary = Color(0xff0b83d9);
   static const _primaryDark = Color(0xff005384);
@@ -58,43 +53,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
-  }
-
-  void _submit() {
-    final name = _nameController.text.trim();
-    final phone = _phoneController.text.trim();
-    final email = _emailController.text.trim();
-
-    setState(() {
-      _nameError = Validation.fullName(name);
-      _phoneError = Validation.phone(phone);
-      _emailError = Validation.email(email);
-      _passwordError = Validation.password(_passwordController.text);
-    });
-
-    if (_nameError != null ||
-        _phoneError != null ||
-        _emailError != null ||
-        _passwordError != null) {
-      return;
-    }
-
-    widget.onSignUp?.call(name, phone, email, _passwordController.text);
-  }
-
-  void _updateError(String field, String? error) {
-    setState(() {
-      switch (field) {
-        case 'name':
-          _nameError = error;
-        case 'phone':
-          _phoneError = error;
-        case 'email':
-          _emailError = error;
-        case 'password':
-          _passwordError = error;
-      }
-    });
   }
 
   @override
@@ -270,11 +228,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 hint: 'Enter your name',
                                 icon: Icons.person_outline,
                                 keyboardType: TextInputType.name,
-                                errorText: _nameError,
-                                onChanged: (value) => _updateError(
-                                  'name',
-                                  Validation.fullName(value),
-                                ),
                               ),
                               const SizedBox(height: 20),
                               const Text(
@@ -292,11 +245,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 hint: 'Enter phone number',
                                 iconAsset: 'assets/icons/phone.svg',
                                 keyboardType: TextInputType.phone,
-                                errorText: _phoneError,
-                                onChanged: (value) => _updateError(
-                                  'phone',
-                                  Validation.phone(value),
-                                ),
                               ),
                               const SizedBox(height: 20),
                               const Text(
@@ -314,11 +262,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 hint: 'example@gmail.com',
                                 iconAsset: 'assets/icons/email.svg',
                                 keyboardType: TextInputType.emailAddress,
-                                errorText: _emailError,
-                                onChanged: (value) => _updateError(
-                                  'email',
-                                  Validation.email(value),
-                                ),
                               ),
                               const SizedBox(height: 20),
                               const Text(
@@ -336,11 +279,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 hint: 'Enter your password',
                                 iconAsset: 'assets/icons/lock.svg',
                                 obscureText: _obscurePassword,
-                                errorText: _passwordError,
-                                onChanged: (value) => _updateError(
-                                  'password',
-                                  Validation.password(value),
-                                ),
                                 suffixIcon: IconButton(
                                   icon: Icon(
                                     _obscurePassword
@@ -360,7 +298,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 loading: widget.isLoading,
                                 backgroundColor: _primary,
                                 textColor: Colors.white,
-                                onTap: widget.isLoading ? null : _submit,
+                                onTap: widget.isLoading
+                                    ? null
+                                    : () => widget.onSignUp?.call(
+                                        _nameController.text,
+                                        _phoneController.text,
+                                        _emailController.text,
+                                        _passwordController.text,
+                                      ),
                               ),
                               if (widget.onGuestTap != null) ...[
                                 const SizedBox(height: 16),
@@ -485,8 +430,6 @@ class _InputField extends StatelessWidget {
     this.obscureText = false,
     this.suffixIcon,
     this.keyboardType,
-    this.errorText,
-    this.onChanged,
   }) : assert(iconAsset != null || icon != null);
 
   final TextEditingController controller;
@@ -496,8 +439,6 @@ class _InputField extends StatelessWidget {
   final bool obscureText;
   final Widget? suffixIcon;
   final TextInputType? keyboardType;
-  final String? errorText;
-  final ValueChanged<String>? onChanged;
 
   static const _hintGray = Color(0xff9aa3af);
 
@@ -507,7 +448,6 @@ class _InputField extends StatelessWidget {
       controller: controller,
       obscureText: obscureText,
       keyboardType: keyboardType,
-      onChanged: onChanged,
       style: const TextStyle(
         fontFamily: 'Poppins',
         fontSize: 15,
@@ -539,7 +479,6 @@ class _InputField extends StatelessWidget {
           minHeight: 20,
         ),
         suffixIcon: suffixIcon,
-        errorText: errorText,
         contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),

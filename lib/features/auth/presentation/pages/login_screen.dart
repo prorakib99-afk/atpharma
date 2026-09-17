@@ -11,6 +11,7 @@ class LoginScreen extends StatefulWidget {
     this.onAppleTap,
     this.onFacebookTap,
     this.initialIdentifier,
+    this.initialPassword,
     this.initialRememberMe = false,
     this.isLoading = false,
   });
@@ -22,6 +23,7 @@ class LoginScreen extends StatefulWidget {
   final VoidCallback? onAppleTap;
   final VoidCallback? onFacebookTap;
   final String? initialIdentifier;
+  final String? initialPassword;
   final bool initialRememberMe;
   final bool isLoading;
 
@@ -46,6 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void initState() {
     super.initState();
     _emailController.text = widget.initialIdentifier ?? '';
+    _passwordController.text = widget.initialPassword ?? '';
     _rememberMe = widget.initialRememberMe;
   }
 

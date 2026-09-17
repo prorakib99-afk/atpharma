@@ -6,6 +6,7 @@ import '../../../shop_reviews/domain/entities/my_review_entity.dart';
 import '../../../shop_reviews/presentation/bloc/my_reviews_bloc.dart';
 import '../../../shop_reviews/presentation/bloc/my_reviews_event.dart';
 import '../../../shop_reviews/presentation/bloc/my_reviews_state.dart';
+import 'product_detail_tabs.dart';
 import 'screen_product_details.dart';
 
 class MyReviewsScreen extends StatelessWidget {
@@ -16,8 +17,7 @@ class MyReviewsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider<MyReviewsBloc>(
-      create: (_) =>
-          sl<MyReviewsBloc>()..add(const MyReviewsRequested()),
+      create: (_) => sl<MyReviewsBloc>()..add(const MyReviewsRequested()),
       child: const _View(),
     );
   }
@@ -203,6 +203,7 @@ class _ReviewCard extends StatelessWidget {
             name: review.productName,
             image: review.productImageUrl,
           ),
+          initialTab: ProductDetailTab.reviews,
         ),
       ),
     );
@@ -354,11 +355,7 @@ class _ReviewCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 14),
-                Container(
-                  width: 1,
-                  height: 16,
-                  color: const Color(0xffe4ebf4),
-                ),
+                Container(width: 1, height: 16, color: const Color(0xffe4ebf4)),
                 const SizedBox(width: 14),
                 InkWell(
                   onTap: deleting ? null : () => _confirmDelete(context),

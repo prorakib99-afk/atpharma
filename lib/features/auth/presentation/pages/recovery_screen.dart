@@ -55,80 +55,73 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final compact = constraints.maxHeight < 720;
+              final veryCompact = constraints.maxHeight < 560;
               return SingleChildScrollView(
                 keyboardDismissBehavior:
                     ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: EdgeInsets.fromLTRB(
                   _RecoveryLayout.pagePadding(constraints.maxWidth),
-                  compact ? 8 : 22,
+                  veryCompact ? 4 : (compact ? 8 : 22),
                   _RecoveryLayout.pagePadding(constraints.maxWidth),
                   24,
                 ),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minHeight: constraints.maxHeight - (compact ? 32 : 46),
-                  ),
-                  child: IntrinsicHeight(
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        children: [
-                          Image.asset(
-                            'assets/images/forgot_password_illustration.png',
-                            width: compact ? 232 : 294,
-                            height: compact ? 232 : 294,
-                            fit: BoxFit.contain,
-                          ),
-                          SizedBox(height: compact ? 16 : 30),
-                          const _RecoveryHeading(),
-                          SizedBox(height: compact ? 24 : 40),
-                          _RecoveryField(
-                            controller: _controller,
-                            enabled: !widget.isLoading,
-                            onSubmit: _submit,
-                          ),
-                          const SizedBox(height: 24),
-                          _PrimaryButton(
-                            loading: widget.isLoading,
-                            onPressed: _submit,
-                          ),
-                          if (widget.message != null) ...[
-                            const SizedBox(height: 16),
-                            Semantics(
-                              liveRegion: true,
-                              child: Text(
-                                widget.message!,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: widget.isError
-                                      ? const Color(0xffd92d20)
-                                      : _RecoveryColors.body,
-                                ),
-                              ),
-                            ),
-                          ],
-                          const Spacer(),
-                          const SizedBox(height: 36),
-                          TextButton.icon(
-                            onPressed: () => Navigator.maybePop(context),
-                            icon: const Icon(
-                              Icons.arrow_back_ios_new_rounded,
-                              size: 15,
-                            ),
-                            label: const Text('Back to Sign In'),
-                            style: TextButton.styleFrom(
-                              foregroundColor: _RecoveryColors.primary,
-                              textStyle: const TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ],
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    children: [
+                      Image.asset(
+                        'assets/images/forgot_password_illustration.png',
+                        width: veryCompact ? 180 : (compact ? 232 : 294),
+                        height: veryCompact ? 180 : (compact ? 232 : 294),
+                        fit: BoxFit.contain,
                       ),
-                    ),
+                      SizedBox(height: veryCompact ? 10 : (compact ? 16 : 30)),
+                      const _RecoveryHeading(),
+                      SizedBox(height: veryCompact ? 16 : (compact ? 24 : 40)),
+                      _RecoveryField(
+                        controller: _controller,
+                        enabled: !widget.isLoading,
+                        onSubmit: _submit,
+                      ),
+                      const SizedBox(height: 24),
+                      _PrimaryButton(
+                        loading: widget.isLoading,
+                        onPressed: _submit,
+                      ),
+                      if (widget.message != null) ...[
+                        const SizedBox(height: 16),
+                        Semantics(
+                          liveRegion: true,
+                          child: Text(
+                            widget.message!,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: widget.isError
+                                  ? const Color(0xffd92d20)
+                                  : _RecoveryColors.body,
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 36),
+                      TextButton.icon(
+                        onPressed: () => Navigator.maybePop(context),
+                        icon: const Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          size: 15,
+                        ),
+                        label: const Text('Back to Sign In'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: _RecoveryColors.primary,
+                          textStyle: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               );

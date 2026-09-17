@@ -326,8 +326,13 @@ class ProductCartItem {
 }
 
 class ScreenProductDetails extends StatefulWidget {
-  const ScreenProductDetails({super.key, required this.product});
+  const ScreenProductDetails({
+    super.key,
+    required this.product,
+    this.initialTab = ProductDetailTab.dosage,
+  });
   final ProductDetailsData product;
+  final ProductDetailTab initialTab;
 
   @override
   State<ScreenProductDetails> createState() => _ScreenProductDetailsState();
@@ -796,6 +801,7 @@ class _ScreenProductDetailsState extends State<ScreenProductDetails> {
                     description: product.description,
                     dosageUsage: product.dosageUsage,
                     substituteMedicines: product.substituteMedicines,
+                    initialTab: widget.initialTab,
                   ),
                 ),
                 const SizedBox(height: 12),

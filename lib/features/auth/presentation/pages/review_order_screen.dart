@@ -64,6 +64,7 @@ class _ReviewOrderScreenState extends State<ReviewOrderScreen> {
   final TextEditingController _couponController = TextEditingController();
   String? _couponError;
   bool _couponApplied = false;
+  bool _couponCanApply = false;
   bool _isEditingItems = false;
   late List<ProductCartItem> _editableItems;
 
@@ -124,8 +125,11 @@ class _ReviewOrderScreenState extends State<ReviewOrderScreen> {
   }
 
   void _applyCoupon() {
+    if (!_couponCanApply || _couponApplied) return;
     FocusScope.of(context).unfocus();
     final code = _couponController.text.trim().toUpperCase();
+    if (code.isEmpty) return;
+    setState(() => _couponCanApply = false);
     context.read<ReviewOrderBloc>().add(
       ReviewCouponSubmitted(
         code: code,
@@ -165,13 +169,17 @@ class _ReviewOrderScreenState extends State<ReviewOrderScreen> {
           isApplied: _couponApplied,
           errorText: _couponError,
           onApply: _applyCoupon,
-          onChanged: (_) {
-            if (_couponError != null || _couponApplied) {
-              setState(() {
-                _couponError = null;
-                _couponApplied = false;
-              });
+          canApply: _couponCanApply,
+          onChanged: (value) {
+            final hasCode = value.trim().isNotEmpty;
+            if (_couponApplied) {
+              context.read<ReviewOrderBloc>().add(const ReviewCouponCleared());
             }
+            setState(() {
+              _couponError = null;
+              _couponApplied = false;
+              _couponCanApply = hasCode;
+            });
           },
         ),
       ),
@@ -720,6 +728,7 @@ class _CouponCodeField extends StatelessWidget {
     required this.errorText,
     required this.onApply,
     required this.onChanged,
+    required this.canApply,
   });
 
   final TextEditingController controller;
@@ -727,6 +736,7 @@ class _CouponCodeField extends StatelessWidget {
   final String? errorText;
   final VoidCallback onApply;
   final ValueChanged<String> onChanged;
+  final bool canApply;
 
   @override
   Widget build(BuildContext context) {
@@ -792,13 +802,15 @@ class _CouponCodeField extends StatelessWidget {
                   width: 72,
                   height: 38,
                   child: ElevatedButton(
-                    onPressed: onApply,
+                    onPressed: canApply && !isApplied ? onApply : null,
                     style: ElevatedButton.styleFrom(
                       elevation: 0,
                       padding: EdgeInsets.zero,
                       backgroundColor: isApplied
                           ? _ReviewColors.success
-                          : const Color(0xff86c3ec),
+                          : canApply
+                          ? const Color(0xff0b83d9)
+                          : const Color(0xffc9e5f7),
                       foregroundColor: _ReviewColors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(11),

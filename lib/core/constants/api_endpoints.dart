@@ -11,9 +11,9 @@ abstract final class AuthEndpoints {
 
   static const String login = '/shop/auth/login'; // POST
   static const String guest = '/shop/auth/guest'; // POST
-  static const String forgotPassword = '/auth/forgot-password'; // POST
+  static const String forgotPassword = '/shop/auth/forgot-password'; // POST
   static const String verifyForgotPasswordCode =
-      '/auth/forgot-password/verify-code'; // POST
+      '/shop/auth/forgot-password/verify-code'; // POST
   static const String resetPassword = '/auth/reset-password'; // POST
   static const String verifyLoginCode = '/auth/login/verify-code'; // POST
   static const String register = '/shop/auth/register'; // POST
@@ -21,9 +21,11 @@ abstract final class AuthEndpoints {
   static const String requestCode = '/shop/auth/request-code'; // POST
   static const String me = '/shop/auth/me'; // GET
   static const String logout = '/auth/logout'; // POST
-  static const String claimGuestOrders = '/shop/account/claim-guest-orders'; // POST
+  static const String claimGuestOrders =
+      '/shop/account/claim-guest-orders'; // POST
   static const String accountProfile = '/shop/account/profile'; // GET, PATCH
-  static const String accountProfileImage = '/shop/account/profile/image'; // POST, DELETE
+  static const String accountProfileImage =
+      '/shop/account/profile/image'; // POST, DELETE
 }
 
 // =============================================================================

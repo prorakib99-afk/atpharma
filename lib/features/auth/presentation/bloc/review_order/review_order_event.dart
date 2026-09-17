@@ -33,6 +33,10 @@ final class ReviewCouponSubmitted extends ReviewOrderEvent {
   List<Object?> get props => <Object?>[code, subtotal, items];
 }
 
+final class ReviewCouponCleared extends ReviewOrderEvent {
+  const ReviewCouponCleared();
+}
+
 final class ReviewOrderSubmitted extends ReviewOrderEvent {
   const ReviewOrderSubmitted({required this.draft});
 

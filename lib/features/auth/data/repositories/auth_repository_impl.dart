@@ -36,7 +36,8 @@ final class AuthRepositoryImpl implements AuthRepository {
 
   Map<String, dynamic> _guestFrom(Map<String, dynamic> json) {
     final Map<String, dynamic> payload = _payloadFrom(json);
-    final Object? guest = payload['guest'] ?? payload['customer'] ?? payload['user'];
+    final Object? guest =
+        payload['guest'] ?? payload['customer'] ?? payload['user'];
     if (guest is Map) return Map<String, dynamic>.from(guest);
     return <String, dynamic>{};
   }
@@ -76,9 +77,13 @@ final class AuthRepositoryImpl implements AuthRepository {
       );
       final Map<String, dynamic> payload = _payloadFrom(json);
       final bool requiresTwoFactor =
-          payload['requiresTwoFactor'] == true || json['requiresTwoFactor'] == true;
+          payload['requiresTwoFactor'] == true ||
+          json['requiresTwoFactor'] == true;
       final Object? profile =
-          payload['user'] ?? payload['customer'] ?? json['user'] ?? json['customer'];
+          payload['user'] ??
+          payload['customer'] ??
+          json['user'] ??
+          json['customer'];
       final Map<String, dynamic> user = profile is Map
           ? Map<String, dynamic>.from(profile)
           : <String, dynamic>{};
@@ -100,6 +105,7 @@ final class AuthRepositoryImpl implements AuthRepository {
           user: user,
           rememberMe: rememberMe,
           identifier: identifier,
+          password: password,
         );
         await _sessionManager.savePharmacySlug(_pharmacySlugFrom(json));
         await _claimPreviousGuestOrders(previousGuestToken);
@@ -114,7 +120,8 @@ final class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<AppResult<void>> continueAsGuest() async {
     try {
-      final Map<String, dynamic> json = await _remoteDataSource.startGuestSession();
+      final Map<String, dynamic> json = await _remoteDataSource
+          .startGuestSession();
       final String? token = _tokenFrom(json);
       if (token == null || token.isEmpty) {
         throw const FormatException('Guest token was not returned.');
@@ -167,7 +174,8 @@ final class AuthRepositoryImpl implements AuthRepository {
         registration: registration,
       );
       final json = _payloadFrom(response);
-      final token = json['accessToken'] ?? json['access_token'] ?? json['token'];
+      final token =
+          json['accessToken'] ?? json['access_token'] ?? json['token'];
       final profile = json['user'] ?? json['customer'];
       if (token is! String ||
           token.trim().isEmpty ||
@@ -201,7 +209,9 @@ final class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<AppResult<void>> resendRegistrationCode({required String email}) async {
+  Future<AppResult<void>> resendRegistrationCode({
+    required String email,
+  }) async {
     try {
       await _remoteDataSource.resendRegistrationCode(email: email);
       return const AppSuccess<void>(null);
@@ -328,4 +338,5 @@ final class AuthRepositoryImpl implements AuthRepository {
     } catch (error) {
       return AppError<Map<String, dynamic>>(FailureMapper.fromException(error));
     }
-  }}
+  }
+}
