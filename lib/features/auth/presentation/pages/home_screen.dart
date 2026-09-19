@@ -546,7 +546,7 @@ void _showNotifications(BuildContext context) {
               left: 28,
               child: const Align(
                 alignment: Alignment.topRight,
-                child: NotificationScreen(maxHeight: 280, width: 330),
+                child: NotificationScreen(maxHeight: 420, width: 330),
               ),
             ),
           ],
@@ -857,6 +857,7 @@ class _CategorySectionState extends State<_CategorySection> {
                     width: 108,
                     child: _CategoryCard(
                       categoryName: category.name,
+                      imageUrl: category.imageUrl,
                       title: category.name,
                       count: '${category.count}',
                       color: categoryColorFor(category.name, index),
@@ -880,6 +881,7 @@ class _CategorySectionState extends State<_CategorySection> {
 class _CategoryCard extends StatelessWidget {
   const _CategoryCard({
     required this.categoryName,
+    required this.imageUrl,
     required this.title,
     required this.count,
     required this.color,
@@ -887,6 +889,7 @@ class _CategoryCard extends StatelessWidget {
   });
 
   final String categoryName;
+  final String? imageUrl;
   final String title;
   final String count;
   final Color color;
@@ -905,13 +908,18 @@ class _CategoryCard extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
-              CategoryVisual(name: categoryName),
+              CategoryVisual(name: categoryName, imageUrl: imageUrl),
               const SizedBox(height: 8),
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: _Text.cardTitle12,
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  softWrap: true,
+                  style: _Text.cardTitle12,
+                ),
               ),
               Text(count, style: _Text.body12),
             ],

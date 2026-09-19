@@ -48,6 +48,7 @@ class _CartFlyTargetRenderBox extends RenderProxyBox {
 Future<void> flyToCart(
   BuildContext context, {
   required String imageUrl,
+  RenderBox? targetOverride,
   VoidCallback? onArrived,
 }) async {
   final OverlayState overlay = Overlay.of(context);
@@ -58,7 +59,7 @@ Future<void> flyToCart(
   }
 
   final Offset start = source.localToGlobal(source.size.center(Offset.zero));
-  final RenderBox? target = CartFlyTarget.renderBox;
+  final RenderBox? target = targetOverride ?? CartFlyTarget.renderBox;
   final Size screen = MediaQuery.sizeOf(context);
   final EdgeInsets screenPadding = MediaQuery.paddingOf(context);
   final Offset fallbackEnd = Offset(
@@ -77,7 +78,7 @@ Future<void> flyToCart(
         candidate.dy >= screen.height * .70 &&
         candidate.dy <= screen.height;
 
-    if (isInsideCartZone) {
+    if (targetOverride != null || isInsideCartZone) {
       end = candidate;
     }
   }

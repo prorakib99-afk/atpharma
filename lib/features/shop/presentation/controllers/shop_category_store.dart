@@ -12,12 +12,14 @@ final class ShopCategory {
     required this.id,
     required this.name,
     required this.count,
+    this.imageUrl,
     this.additionalIds = const <String>[],
   });
 
   final String id;
   final String name;
   final int count;
+  final String? imageUrl;
   final List<String> additionalIds;
 
   List<String> get filterIds {
@@ -73,13 +75,25 @@ final class ShopCategoryStore extends ChangeNotifier {
         final String id = item['id']?.toString().trim() ?? '';
         final String name = item['name']?.toString().trim() ?? '';
         final int count = int.tryParse(item['count']?.toString() ?? '') ?? 0;
+        final String image =
+            (item['imageUrl'] ?? item['image'] ?? item['icon'])
+                ?.toString()
+                .trim() ??
+            '';
 
         if (id.isNotEmpty && name.isNotEmpty) {
-          loaded.add(ShopCategory(id: id, name: name, count: count));
+          loaded.add(
+            ShopCategory(
+              id: id,
+              name: name,
+              count: count,
+              imageUrl: image.isEmpty ? null : image,
+            ),
+          );
         }
       }
 
-      _categories = List<ShopCategory>.unmodifiable(_groupCategories(loaded));
+      _categories = List<ShopCategory>.unmodifiable(loaded);
       _totalProducts =
           int.tryParse(data['total']?.toString() ?? '') ??
           loaded.fold<int>(0, (int sum, ShopCategory item) => sum + item.count);
@@ -89,59 +103,5 @@ final class ShopCategoryStore extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
-  }
-
-  List<ShopCategory> _groupCategories(List<ShopCategory> source) {
-    const List<String> groupOrder = <String>[
-      'Medicines',
-      'Grocery',
-      'Personal Care',
-      'Baby Care',
-      'Ayurvedic & Herbal',
-    ];
-    final Map<String, List<ShopCategory>> groups = <String, List<ShopCategory>>{
-      for (final String name in groupOrder) name: <ShopCategory>[],
-    };
-
-    for (final ShopCategory category in source) {
-      groups[_groupNameFor(category.name)]!.add(category);
-    }
-
-    return groupOrder
-        .map((String groupName) {
-          final List<ShopCategory> members = groups[groupName]!;
-          return ShopCategory(
-            id: members.isEmpty
-                ? 'missing:${groupName.toLowerCase()}'
-                : members.first.id,
-            name: groupName,
-            count: members.fold<int>(
-              0,
-              (int total, ShopCategory category) => total + category.count,
-            ),
-            additionalIds: members
-                .skip(1)
-                .map((ShopCategory category) => category.id)
-                .toList(growable: false),
-          );
-        })
-        .toList(growable: false);
-  }
-
-  String _groupNameFor(String categoryName) {
-    final String name = categoryName.toLowerCase();
-    if (name.contains('baby')) return 'Baby Care';
-    if (name.contains('ayurvedic') || name.contains('herbal')) {
-      return 'Ayurvedic & Herbal';
-    }
-    if (name.contains('cosmetic') ||
-        name.contains('toiletr') ||
-        name.contains('personal')) {
-      return 'Personal Care';
-    }
-    if (name.contains('general') || name.contains('grocery')) {
-      return 'Grocery';
-    }
-    return 'Medicines';
   }
 }

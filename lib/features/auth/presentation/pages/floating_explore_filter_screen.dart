@@ -1,4 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+
+import '../../../shop/presentation/controllers/shop_category_store.dart';
 
 class ExploreFilter {
   const ExploreFilter({
@@ -60,6 +64,7 @@ class FloatingExploreFilterScreen extends StatefulWidget {
 
 class _FloatingExploreFilterScreenState
     extends State<FloatingExploreFilterScreen> {
+  final ShopCategoryStore _categoryStore = ShopCategoryStore.instance;
   late Set<String> _categories;
   String? _featured;
   String? _availability;
@@ -69,11 +74,9 @@ class _FloatingExploreFilterScreenState
   @override
   void initState() {
     super.initState();
-    _categories = _categoryIds.entries
-        .where((entry) => widget.initial.categoryIds.contains(entry.value))
-        .map((entry) => entry.key)
-        .toSet();
-    if (_categories.isEmpty) _categories.add('All Products');
+    _categories = widget.initial.categoryIds.toSet();
+    if (_categories.isEmpty) _categories.add(_allCategoriesId);
+    unawaited(_categoryStore.load());
     _featured = widget.initial.featured == null
         ? null
         : (widget.initial.featured! ? 'Featured' : 'Not-Featured');
@@ -92,7 +95,7 @@ class _FloatingExploreFilterScreenState
   void _reset() => setState(() {
     _categories
       ..clear()
-      ..add('All Products');
+      ..add(_allCategoriesId);
     _featured = null;
     _availability = null;
     _prescription = null;
@@ -101,9 +104,7 @@ class _FloatingExploreFilterScreenState
 
   ExploreFilter get _result => ExploreFilter(
     categoryIds: _categories
-        .where((name) => name != 'All Products')
-        .map((name) => _categoryIds[name])
-        .whereType<String>()
+        .where((id) => id != _allCategoriesId)
         .toList(growable: false),
     featured: _featured == null ? null : _featured == 'Featured',
     availability: _availability == null ? null : _availability == 'In Stock',
@@ -160,33 +161,45 @@ class _FloatingExploreFilterScreenState
               children: [
                 const Text('Categories', style: _Text.section),
                 const SizedBox(height: 12),
-                GridView.count(
-                  crossAxisCount: 2,
-                  childAspectRatio: 5.2,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  mainAxisSpacing: 8,
-                  crossAxisSpacing: 16,
-                  children: _categoryNames
-                      .map(
-                        (name) => _CategoryOption(
-                          label: name,
-                          selected: _categories.contains(name),
+                AnimatedBuilder(
+                  animation: _categoryStore,
+                  builder: (BuildContext context, _) {
+                    final List<Widget> options = <Widget>[
+                      _CategoryOption(
+                        label: 'All Products',
+                        selected: _categories.contains(_allCategoriesId),
+                        onTap: () => setState(() {
+                          _categories
+                            ..clear()
+                            ..add(_allCategoriesId);
+                        }),
+                      ),
+                      ..._categoryStore.categories.map(
+                        (ShopCategory category) => _CategoryOption(
+                          label: category.name,
+                          selected: _categories.contains(category.id),
                           onTap: () => setState(() {
-                            if (name == 'All Products') {
-                              _categories
-                                ..clear()
-                                ..add(name);
-                            } else {
-                              _categories.remove('All Products');
-                              _categories.contains(name)
-                                  ? _categories.remove(name)
-                                  : _categories.add(name);
+                            _categories.remove(_allCategoriesId);
+                            _categories.contains(category.id)
+                                ? _categories.remove(category.id)
+                                : _categories.add(category.id);
+                            if (_categories.isEmpty) {
+                              _categories.add(_allCategoriesId);
                             }
                           }),
                         ),
-                      )
-                      .toList(),
+                      ),
+                    ];
+                    return GridView.count(
+                      crossAxisCount: 2,
+                      childAspectRatio: 5.2,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      mainAxisSpacing: 8,
+                      crossAxisSpacing: 16,
+                      children: options,
+                    );
+                  },
                 ),
                 const _Line(),
                 const Text('Featured Options', style: _Text.section),
@@ -421,22 +434,7 @@ class _Line extends StatelessWidget {
   );
 }
 
-const Map<String, String> _categoryIds = <String, String>{
-  'Baby Care': 'cmrf7emiv0001hkvpccx3pmqe',
-  'Ayurvedic & Herbal': 'cmrf7emiy0002hkvp2m4inznz',
-  'Medicine': 'cmrdtm3u90000dc06b8txq5c8',
-  'Personal Care': 'cmrf6hrf30000ufw7wnco3wy2',
-  'Grocery': 'cmrf7emim0000hkvp20b5ffet',
-};
-
-const List<String> _categoryNames = <String>[
-  'All Products',
-  'Baby Care',
-  'Ayurvedic & Herbal',
-  'Medicine',
-  'Personal Care',
-  'Grocery',
-];
+const String _allCategoriesId = '__all_categories__';
 
 class _Colors {
   static const blue = Color(0xFF0B83D9);

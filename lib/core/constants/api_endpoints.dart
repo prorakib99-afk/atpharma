@@ -281,6 +281,7 @@ abstract final class ShopOrderEndpoints {
   static const String config = '/shop/orders/config'; // GET
   static const String createOrder = '/shop/orders'; // POST
   static const String guestOrders = '/shop/guest/orders'; // GET
+  static const String coupons = '/shop/coupons'; // GET
 
   static const String validateCoupon = '/shop/coupons/validate'; // POST
 

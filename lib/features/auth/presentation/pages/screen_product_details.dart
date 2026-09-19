@@ -21,6 +21,8 @@ import 'favorite_store.dart';
 import 'favourite_screen.dart';
 import 'floating_order_cart.dart';
 import 'product_detail_tabs.dart';
+import '../../../shop/presentation/controllers/shop_category_store.dart';
+import '../../../../shared/widgets/fly_to_cart.dart';
 
 class ProductDetailsData {
   const ProductDetailsData({
@@ -346,6 +348,7 @@ class _ScreenProductDetailsState extends State<ScreenProductDetails> {
   static int _cartSnackBarGeneration = 0;
   Timer? _addedButtonTimer;
   bool _showAddedConfirmation = false;
+  final GlobalKey _topCartKey = GlobalKey();
 
   ProductDetailsData get product => _product;
   String get productId => product.id?.trim().isNotEmpty == true
@@ -353,6 +356,8 @@ class _ScreenProductDetailsState extends State<ScreenProductDetails> {
       : product.name.trim();
   int get cartQuantity => ProductCart.instance.quantityFor(productId);
   int get remainingStock => (product.stock ?? 0) - cartQuantity;
+  int get availableStock =>
+      (remainingStock - quantity).clamp(0, remainingStock);
   bool get canAddToCart =>
       !product.isOutOfStock &&
       (product.stock == null || remainingStock >= quantity);
@@ -616,6 +621,7 @@ class _ScreenProductDetailsState extends State<ScreenProductDetails> {
                 clipBehavior: Clip.none,
                 children: [
                   _RoundIcon(
+                    key: _topCartKey,
                     icon: Icons.shopping_cart_outlined,
                     onTap: _openFloatingCart,
                   ),
@@ -742,15 +748,21 @@ class _ScreenProductDetailsState extends State<ScreenProductDetails> {
                           ? () => setState(() => quantity--)
                           : null,
                       onPlus:
-                          quantity < 31 &&
-                              (product.stock == null ||
-                                  quantity < remainingStock)
+                          (product.stock == null || quantity < remainingStock)
                           ? () => setState(() => quantity++)
                           : null,
+                      onValueSubmitted: (int value) {
+                        final int maximum = product.stock == null
+                            ? value
+                            : remainingStock;
+                        setState(() {
+                          quantity = value.clamp(1, maximum);
+                        });
+                      },
                     ),
                     const Spacer(),
                     Text(
-                      '(${product.stock == null ? 31 : remainingStock} available)',
+                      '(${product.stock == null ? 'Available' : availableStock} available)',
                       style: TextStyle(color: _body),
                     ),
                   ],
@@ -809,6 +821,7 @@ class _ScreenProductDetailsState extends State<ScreenProductDetails> {
                   key: ValueKey(product.id ?? product.name),
                   current: product,
                   onCurrentLoaded: _applyFreshProduct,
+                  cartTargetKey: _topCartKey,
                 ),
               ],
             ),
@@ -1048,6 +1061,7 @@ class _Dot extends StatelessWidget {
 
 class _RoundIcon extends StatelessWidget {
   const _RoundIcon({
+    super.key,
     required this.icon,
     required this.onTap,
     this.color,
@@ -1204,11 +1218,42 @@ class _Badge extends StatelessWidget {
   );
 }
 
-class _QuantityPicker extends StatelessWidget {
-  const _QuantityPicker({required this.value, this.onMinus, this.onPlus});
+class _QuantityPicker extends StatefulWidget {
+  const _QuantityPicker({
+    required this.value,
+    this.onMinus,
+    this.onPlus,
+    required this.onValueSubmitted,
+  });
   final int value;
   final VoidCallback? onMinus;
   final VoidCallback? onPlus;
+  final ValueChanged<int> onValueSubmitted;
+
+  @override
+  State<_QuantityPicker> createState() => _QuantityPickerState();
+}
+
+class _QuantityPickerState extends State<_QuantityPicker> {
+  late final TextEditingController _controller = TextEditingController(
+    text: '${widget.value}',
+  );
+
+  @override
+  void didUpdateWidget(covariant _QuantityPicker oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.value != widget.value &&
+        _controller.text != '${widget.value}') {
+      _controller.text = '${widget.value}';
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) => Container(
     height: 40,
@@ -1218,19 +1263,32 @@ class _QuantityPicker extends StatelessWidget {
     ),
     child: Row(
       children: [
-        _QuantityButton('-', onMinus),
+        _QuantityButton('-', widget.onMinus),
         Container(width: 1, color: _border),
         SizedBox(
           width: 40,
           child: Center(
-            child: Text(
-              '$value',
+            child: TextField(
+              controller: _controller,
+              keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.done,
+              textAlign: TextAlign.center,
+              onSubmitted: (String text) {
+                final int? value = int.tryParse(text.trim());
+                if (value != null) widget.onValueSubmitted(value);
+                FocusScope.of(context).unfocus();
+              },
               style: const TextStyle(fontWeight: FontWeight.w600),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
             ),
           ),
         ),
         Container(width: 1, color: _border),
-        _QuantityButton('+', onPlus),
+        _QuantityButton('+', widget.onPlus),
       ],
     ),
   );
@@ -1297,9 +1355,11 @@ class _RelatedProducts extends StatefulWidget {
     super.key,
     required this.current,
     required this.onCurrentLoaded,
+    required this.cartTargetKey,
   });
   final ProductDetailsData current;
   final ValueChanged<ShopProductEntity> onCurrentLoaded;
+  final GlobalKey cartTargetKey;
 
   @override
   State<_RelatedProducts> createState() => _RelatedProductsState();
@@ -1340,11 +1400,23 @@ class _RelatedProductsState extends State<_RelatedProducts> {
         throw StateError('Unable to load related products.');
       }
       widget.onCurrentLoaded(current);
-      final categoryId = current.category?.id.trim() ?? '';
-      final typeId = current.type?.id.trim() ?? '';
+      final String categoryName =
+          current.category?.name.trim() ?? widget.current.categoryName.trim();
+      String categoryId = current.category?.id.trim() ?? '';
+      if (categoryId.isEmpty && categoryName.isNotEmpty) {
+        final ShopCategoryStore categoryStore = ShopCategoryStore.instance;
+        await categoryStore.load();
+        final String normalizedName = categoryName.toLowerCase();
+        for (final ShopCategory category in categoryStore.categories) {
+          if (category.name.trim().toLowerCase() == normalizedName) {
+            categoryId = category.id;
+            break;
+          }
+        }
+      }
       final candidates = <ShopProductEntity>[];
       final seen = <String>{current.id, id};
-      if (categoryId.isNotEmpty || typeId.isNotEmpty) {
+      if (categoryId.isNotEmpty) {
         var page = 1;
         while (mounted) {
           final result = await _repository.getProducts(
@@ -1361,13 +1433,7 @@ class _RelatedProductsState extends State<_RelatedProducts> {
             throw StateError('Unable to load related products.');
           }
           for (final product in data.items) {
-            final sameCategory =
-                categoryId.isNotEmpty && product.category?.id == categoryId;
-            final sameType = typeId.isNotEmpty && product.type?.id == typeId;
-            if ((sameCategory || sameType) &&
-                product.isActive &&
-                product.isPublished &&
-                seen.add(product.id)) {
+            if (seen.add(product.id)) {
               candidates.add(product);
             }
           }
@@ -1380,48 +1446,10 @@ class _RelatedProductsState extends State<_RelatedProducts> {
         }
       }
       if (!mounted) return;
-      // Prefer the same type among products in the matching category.
-      candidates.sort((a, b) {
-        final aMatch = typeId.isNotEmpty && a.type?.id == typeId;
-        final bMatch = typeId.isNotEmpty && b.type?.id == typeId;
-        return aMatch == bMatch ? 0 : (aMatch ? -1 : 1);
-      });
-      // Always fill up to the target count so the section is never left
-      // sparse or empty — top up with any other active product if the
-      // current product's category/type doesn't have enough matches.
-      final fallback = <ShopProductEntity>[];
-      if (candidates.length < _targetCount) {
-        try {
-          var page = 1;
-          while (mounted &&
-              candidates.length + fallback.length < _targetCount) {
-            final result = await _repository.getProducts(
-              query: ShopProductQuery(page: page, perPage: 60),
-              requestKey: _requestKey,
-            );
-            if (!mounted) return;
-            final data = result.dataOrNull;
-            if (data == null) break;
-            for (final product in data.items) {
-              if (candidates.length + fallback.length >= _targetCount) break;
-              if (product.isActive &&
-                  product.isPublished &&
-                  seen.add(product.id)) {
-                fallback.add(product);
-              }
-            }
-            if (!data.hasNextPage || data.isEmpty || page >= 5) break;
-            page++;
-          }
-        } catch (_) {
-          // Best-effort top-up; keep whatever matched candidates we already have.
-        }
-      }
-      if (!mounted) return;
       _categoryId = categoryId.isNotEmpty ? categoryId : null;
-      _categoryName = current.category?.name;
+      _categoryName = categoryName.isNotEmpty ? categoryName : null;
       setState(() {
-        items = [...candidates, ...fallback]
+        items = candidates
             .take(_targetCount)
             .map(
               (product) => ProductDetailsData(
@@ -1471,38 +1499,10 @@ class _RelatedProductsState extends State<_RelatedProducts> {
     if (item.isOutOfStock) return;
 
     ProductCart.instance.add(item, 1);
-
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.removeCurrentSnackBar();
-    messenger.showSnackBar(
-      SnackBar(
-        duration: const Duration(seconds: 3),
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-        elevation: 4,
-        backgroundColor: const Color(0xFFF2FFF6),
-        shape: RoundedRectangleBorder(
-          side: const BorderSide(color: Color(0xFF65C982)),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle, color: _green, size: 19),
-            const SizedBox(width: 9),
-            Expanded(
-              child: Text(
-                '${item.name} added to cart',
-                style: const TextStyle(color: Color(0xFF131415)),
-              ),
-            ),
-          ],
-        ),
-        action: SnackBarAction(
-          label: 'View Cart',
-          textColor: _blue,
-          onPressed: () => Navigator.of(context).pushNamed(AppRoutes.cart),
-        ),
-      ),
+    final RenderBox? cartTarget =
+        widget.cartTargetKey.currentContext?.findRenderObject() as RenderBox?;
+    unawaited(
+      flyToCart(context, imageUrl: item.image, targetOverride: cartTarget),
     );
   }
 
@@ -1560,7 +1560,7 @@ class _RelatedProductsState extends State<_RelatedProducts> {
 
   Widget _buildContent() {
     if (_loading) {
-      return const ProductGridSkeleton(itemCount: 4, mainAxisExtent: 222);
+      return const ProductGridSkeleton(itemCount: 4, mainAxisExtent: 210);
     }
     if (_error != null) {
       return Column(
@@ -1587,7 +1587,7 @@ class _RelatedProductsState extends State<_RelatedProducts> {
         crossAxisCount: 2,
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
-        mainAxisExtent: 222,
+        mainAxisExtent: 210,
       ),
       itemBuilder: (context, index) {
         final item = items[index];
@@ -1598,123 +1598,126 @@ class _RelatedProductsState extends State<_RelatedProducts> {
               builder: (_) => ScreenProductDetails(product: item),
             ),
           ),
-          child: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: const [
-                BoxShadow(color: Color(0x14000000), blurRadius: 12),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Positioned.fill(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: _ProductImage(image: item.image),
+          child: Builder(
+            builder: (BuildContext buttonContext) => Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: const [
+                  BoxShadow(color: Color(0x14000000), blurRadius: 12),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AspectRatio(
+                    aspectRatio: 1.45,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Positioned.fill(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: _ProductImage(image: item.image),
+                          ),
                         ),
-                      ),
-                      Positioned(
-                        right: -2,
-                        bottom: -12,
-                        child: Material(
-                          color: item.isOutOfStock
-                              ? const Color(0xFF98A1B3)
-                              : _blue,
-                          elevation: 4,
-                          shadowColor: const Color(0x300B83D9),
-                          shape: const CircleBorder(),
-                          child: InkWell(
-                            onTap: item.isOutOfStock
-                                ? null
-                                : () => _quickAddToCart(context, item),
-                            customBorder: const CircleBorder(),
-                            child: const SizedBox(
-                              width: 30,
-                              height: 30,
-                              child: Icon(
-                                Icons.add_rounded,
-                                color: Colors.white,
-                                size: 20,
+                        Positioned(
+                          right: 0,
+                          bottom: 4,
+                          child: Material(
+                            color: item.isOutOfStock
+                                ? const Color(0xFF98A1B3)
+                                : _blue,
+                            elevation: 4,
+                            shadowColor: const Color(0x300B83D9),
+                            shape: const CircleBorder(),
+                            child: InkWell(
+                              onTap: item.isOutOfStock
+                                  ? null
+                                  : () => _quickAddToCart(buttonContext, item),
+                              customBorder: const CircleBorder(),
+                              child: const SizedBox(
+                                width: 30,
+                                height: 30,
+                                child: Icon(
+                                  Icons.add_rounded,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
                               ),
                             ),
                           ),
                         ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    item.brand,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 9, color: _green),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
+                      if (item.prescriptionRequired) ...[
+                        const SizedBox(width: 4),
+                        const _RelatedRxBadge(),
+                      ],
                     ],
                   ),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  item.brand,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 9, color: _green),
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        item.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 11,
+                  const Spacer(),
+                  const Divider(height: 1, color: Color(0xFFE3E6EB)),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.star_rounded,
+                        size: 14,
+                        color: Color(0xFFFFA000),
+                      ),
+                      const SizedBox(width: 2),
+                      const Text(
+                        '4.8',
+                        style: TextStyle(
+                          fontSize: 10,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                    ),
-                    if (item.prescriptionRequired) ...[
-                      const SizedBox(width: 4),
-                      const _RelatedRxBadge(),
+                      const SizedBox(width: 3),
+                      const Text(
+                        '(33 reviews)',
+                        style: TextStyle(fontSize: 9, color: _body),
+                      ),
+                      const Spacer(),
+                      Text(
+                        CurrencyDisplay.format(
+                          item.price.toDouble(),
+                          currencyCode: item.currencyCode,
+                          countryCode: item.countryCode,
+                        ),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ],
-                  ],
-                ),
-                const Spacer(),
-                const Divider(height: 1, color: Color(0xFFE3E6EB)),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.star_rounded,
-                      size: 14,
-                      color: Color(0xFFFFA000),
-                    ),
-                    const SizedBox(width: 2),
-                    const Text(
-                      '4.8',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(width: 3),
-                    const Text(
-                      '(33 reviews)',
-                      style: TextStyle(fontSize: 9, color: _body),
-                    ),
-                    const Spacer(),
-                    Text(
-                      CurrencyDisplay.format(
-                        item.price.toDouble(),
-                        currencyCode: item.currencyCode,
-                        countryCode: item.countryCode,
-                      ),
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                  ),
+                ],
+              ),
             ),
           ),
         );

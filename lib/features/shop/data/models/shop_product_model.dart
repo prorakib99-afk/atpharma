@@ -76,6 +76,15 @@ final class ShopProductModel {
 
   factory ShopProductModel.fromJson(Map<String, dynamic> json) {
     final String publicImageUrl = JsonValueParser.string(json['imageSrc']);
+    final Map<String, dynamic>? categoryJson = JsonValueParser.map(
+      json['category'],
+    );
+    final String categoryId = JsonValueParser.string(
+      json['categoryId'] ?? json['category_id'],
+    );
+    final String categoryName = JsonValueParser.string(
+      json['categoryName'] ?? json['category_name'],
+    );
     final bool? publicInStock = json['inStock'] is bool
         ? json['inStock'] as bool
         : null;
@@ -141,7 +150,10 @@ final class ShopProductModel {
           .whereType<ShopProductSectionModel>()
           .toList(growable: false),
       category: ShopProductCategoryModel.fromNullableJson(
-        JsonValueParser.map(json['category']),
+        categoryJson ??
+            (categoryId.isEmpty
+                ? null
+                : <String, dynamic>{'id': categoryId, 'name': categoryName}),
       ),
       type: ShopProductTypeModel.fromNullableJson(
         JsonValueParser.map(json['type']),

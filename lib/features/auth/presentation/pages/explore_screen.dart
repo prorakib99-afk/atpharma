@@ -30,7 +30,7 @@ void _openNotifications(BuildContext context) {
         alignment: Alignment.topRight,
         child: Padding(
           padding: EdgeInsets.only(top: 66, right: 28),
-          child: NotificationScreen(maxHeight: 280, width: 330),
+          child: NotificationScreen(maxHeight: 420, width: 330),
         ),
       ),
     ),
@@ -103,6 +103,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
   PaginatedResult<ShopProductEntity> _prioritizeProductImages(
     PaginatedResult<ShopProductEntity> page,
   ) {
+    if (_sort == ShopProductSort.priceAscending ||
+        _sort == ShopProductSort.priceDescending) {
+      return page;
+    }
     final List<ShopProductEntity> productsWithImages = page.items
         .where(
           (ShopProductEntity product) =>
@@ -115,12 +119,33 @@ class _ExploreScreenState extends State<ExploreScreen> {
         )
         .toList(growable: false);
 
-    return page.copyWith(
+    final PaginatedResult<ShopProductEntity> prioritized = page.copyWith(
       items: List<ShopProductEntity>.unmodifiable(<ShopProductEntity>[
         ...productsWithImages,
         ...productsWithoutImages,
       ]),
     );
+    return prioritized;
+  }
+
+  PaginatedResult<ShopProductEntity> _sortByRequestedPrice(
+    PaginatedResult<ShopProductEntity> page,
+  ) {
+    if (_sort != ShopProductSort.priceAscending &&
+        _sort != ShopProductSort.priceDescending) {
+      return page;
+    }
+    final List<ShopProductEntity> sorted =
+        List<ShopProductEntity>.of(page.items)
+          ..sort((ShopProductEntity first, ShopProductEntity second) {
+            final int comparison = first.sellingPrice.compareTo(
+              second.sellingPrice,
+            );
+            return _sort == ShopProductSort.priceAscending
+                ? comparison
+                : -comparison;
+          });
+    return page.copyWith(items: List<ShopProductEntity>.unmodifiable(sorted));
   }
 
   Future<PaginatedResult<ShopProductEntity>> _loadImageFirstPage(
@@ -171,8 +196,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
         return seenIds.add(product.id);
       }),
     ];
-    return page.copyWith(
-      items: List<ShopProductEntity>.unmodifiable(ordered.take(_perPage)),
+    return _sortByRequestedPrice(
+      page.copyWith(
+        items: List<ShopProductEntity>.unmodifiable(ordered.take(_perPage)),
+      ),
     );
   }
 
@@ -243,8 +270,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
         _error = result.failureOrNull?.message ?? 'Unable to load products.';
       }
     });
-    if (rawData != null) {
+    if (rawData != null &&
+        _sort != ShopProductSort.priceAscending &&
+        _sort != ShopProductSort.priceDescending) {
       unawaited(_refreshImagePriority(rawData, version));
+      unawaited(_prefetch(page + 1));
+    } else if (rawData != null) {
       unawaited(_prefetch(page + 1));
     }
   }
@@ -306,12 +337,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
     super.dispose();
   }
 
-  static const Map<ShopProductSort, String> _sortLabels = <ShopProductSort, String>{
-    ShopProductSort.popular: 'Most Popular',
-    ShopProductSort.newest: 'Newest',
-    ShopProductSort.priceAscending: 'Price: Low to High',
-    ShopProductSort.priceDescending: 'Price: High to Low',
-  };
+  static const Map<ShopProductSort, String> _sortLabels =
+      <ShopProductSort, String>{
+        ShopProductSort.popular: 'Most Popular',
+        ShopProductSort.newest: 'Newest',
+        ShopProductSort.priceAscending: 'Price: Low to High',
+        ShopProductSort.priceDescending: 'Price: High to Low',
+      };
 
   void _toggleSortMenu(BuildContext buttonContext) {
     setState(() => _sortMenuOpen = !_sortMenuOpen);
@@ -466,31 +498,35 @@ class _SortMenu extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          children: labels.entries.map((entry) {
-            final bool isSelected = entry.key == selected;
-            return InkWell(
-              onTap: () => onSelected(entry.key),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                color: isSelected
-                    ? _ExploreColors.title.withValues(alpha: .06)
-                    : Colors.transparent,
-                child: Text(
-                  entry.value,
-                  style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 13,
-                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                    color: _ExploreColors.title,
+          children: labels.entries
+              .map((entry) {
+                final bool isSelected = entry.key == selected;
+                return InkWell(
+                  onTap: () => onSelected(entry.key),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    color: isSelected
+                        ? _ExploreColors.title.withValues(alpha: .06)
+                        : Colors.transparent,
+                    child: Text(
+                      entry.value,
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 13,
+                        fontWeight: isSelected
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                        color: _ExploreColors.title,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            );
-          }).toList(growable: false),
+                );
+              })
+              .toList(growable: false),
         ),
       ),
     );
@@ -760,6 +796,18 @@ class _ExploreProductsContent extends StatelessWidget {
 
     return Column(
       children: <Widget>[
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            '${page.total} ${page.total == 1 ? 'product' : 'products'}',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: _ExploreColors.body,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
         AnimatedOpacity(
           opacity: loading ? .45 : 1,
           duration: const Duration(milliseconds: 160),
@@ -1044,33 +1092,170 @@ class _ExplorePagination extends StatelessWidget {
   final PaginatedResult<ShopProductEntity> page;
   final ValueChanged<int> onChanged;
 
+  Future<void> _openPagePicker(BuildContext context) async {
+    final int? selectedPage = await showModalBottomSheet<int>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: Colors.white,
+      builder: (BuildContext sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const Text(
+                  'Select page',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 14),
+                Flexible(
+                  child: GridView.builder(
+                    shrinkWrap: true,
+                    itemCount: page.totalPages,
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 5,
+                          mainAxisSpacing: 10,
+                          crossAxisSpacing: 10,
+                          childAspectRatio: 1.35,
+                        ),
+                    itemBuilder: (BuildContext context, int index) {
+                      final int pageNumber = index + 1;
+                      final bool selected = pageNumber == page.page;
+                      return InkWell(
+                        onTap: () => Navigator.pop(sheetContext, pageNumber),
+                        borderRadius: BorderRadius.circular(18),
+                        child: Container(
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: selected
+                                ? _ExploreColors.primary
+                                : Colors.white,
+                            border: Border.all(
+                              color: selected
+                                  ? _ExploreColors.primary
+                                  : _ExploreColors.border,
+                            ),
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: Text(
+                            '$pageNumber',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: selected
+                                  ? Colors.white
+                                  : _ExploreColors.title,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (selectedPage != null && selectedPage != page.page) {
+      onChanged(selectedPage);
+    }
+  }
+
+  List<int?> _pages() {
+    final int total = page.totalPages;
+    final int current = page.page;
+    if (total <= 5) {
+      return List<int?>.generate(total, (int index) => index + 1);
+    }
+    if (current <= 3) return <int?>[1, 2, 3, null, total];
+    if (current >= total - 2) {
+      return <int?>[1, null, total - 2, total - 1, total];
+    }
+    return <int?>[1, null, current, null, total];
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: <Widget>[
-        IconButton(
-          onPressed: page.hasPreviousPage
-              ? () => onChanged(page.page - 1)
-              : null,
-          icon: const Icon(Icons.chevron_left_rounded),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-          decoration: BoxDecoration(
-            color: _ExploreColors.card,
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Text(
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: <Widget>[
+          Text(
             'Page ${page.page} of ${page.totalPages}',
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            style: const TextStyle(fontSize: 12, color: _ExploreColors.body),
           ),
-        ),
-        IconButton(
-          onPressed: page.hasNextPage ? () => onChanged(page.page + 1) : null,
-          icon: const Icon(Icons.chevron_right_rounded),
-        ),
-      ],
+          const SizedBox(width: 12),
+          IconButton(
+            onPressed: page.hasPreviousPage
+                ? () => onChanged(page.page - 1)
+                : null,
+            icon: const Icon(Icons.chevron_left_rounded),
+            visualDensity: VisualDensity.compact,
+          ),
+          for (final int? value in _pages())
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 3),
+              child: value == null
+                  ? const SizedBox(width: 32, child: Center(child: Text('...')))
+                  : value == page.page
+                  ? InkWell(
+                      onTap: () => _openPagePicker(context),
+                      borderRadius: BorderRadius.circular(18),
+                      child: Container(
+                        width: 38,
+                        height: 34,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: _ExploreColors.primary,
+                          border: Border.all(color: _ExploreColors.border),
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Text(
+                          '$value',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    )
+                  : InkWell(
+                      onTap: () => onChanged(value),
+                      borderRadius: BorderRadius.circular(18),
+                      child: Container(
+                        width: 38,
+                        height: 34,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          border: Border.all(color: _ExploreColors.border),
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Text(
+                          '$value',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: _ExploreColors.title,
+                          ),
+                        ),
+                      ),
+                    ),
+            ),
+          IconButton(
+            onPressed: page.hasNextPage ? () => onChanged(page.page + 1) : null,
+            icon: const Icon(Icons.chevron_right_rounded),
+            visualDensity: VisualDensity.compact,
+          ),
+        ],
+      ),
     );
   }
 }

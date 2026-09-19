@@ -213,36 +213,19 @@ class _FigmaCategoryGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      child: Column(
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              for (int index = 0; index < 3; index++) ...<Widget>[
-                if (index > 0) const SizedBox(width: 8),
-                Expanded(
-                  child: _CategoryCard(
-                    category: categories[index],
-                    index: index,
-                  ),
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: <Widget>[
-              for (int index = 3; index < 5; index++) ...<Widget>[
-                if (index > 3) const SizedBox(width: 8),
-                Expanded(
-                  child: _CategoryCard(
-                    category: categories[index],
-                    index: index,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ],
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: categories.length,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 8,
+          mainAxisExtent: 116,
+        ),
+        itemBuilder: (BuildContext context, int index) {
+          return _CategoryCard(category: categories[index], index: index);
+        },
       ),
     );
   }
@@ -262,20 +245,23 @@ class _CategoryCard extends StatelessWidget {
       child: InkWell(
         onTap: () => Navigator.of(context).pop(category),
         borderRadius: BorderRadius.circular(16),
-        child: SizedBox(
-          height: 104,
+        child: SizedBox.expand(
           child: Padding(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(8),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: <Widget>[
-                CategoryVisual(name: category.name),
-                const SizedBox(height: 12),
+                CategoryVisual(
+                  name: category.name,
+                  imageUrl: category.imageUrl,
+                ),
+                const SizedBox(height: 6),
                 Text(
                   category.name,
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
+                  softWrap: true,
                   style: const TextStyle(
                     fontFamily: 'Poppins',
                     fontSize: 11,
@@ -301,20 +287,32 @@ class _CategoryCard extends StatelessWidget {
 }
 
 class CategoryVisual extends StatelessWidget {
-  const CategoryVisual({super.key, required this.name});
+  const CategoryVisual({super.key, required this.name, this.imageUrl});
 
   final String name;
+  final String? imageUrl;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       width: 38,
       height: 34,
-      child: Image.asset(
-        categoryImageFor(name),
-        fit: BoxFit.contain,
-        cacheWidth: 80,
-      ),
+      child: imageUrl == null
+          ? Image.asset(
+              categoryImageFor(name),
+              fit: BoxFit.contain,
+              cacheWidth: 80,
+            )
+          : Image.network(
+              imageUrl!,
+              fit: BoxFit.contain,
+              cacheWidth: 80,
+              errorBuilder: (_, _, _) => Image.asset(
+                categoryImageFor(name),
+                fit: BoxFit.contain,
+                cacheWidth: 80,
+              ),
+            ),
     );
   }
 }

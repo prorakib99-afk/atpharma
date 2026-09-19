@@ -3,34 +3,40 @@ import 'package:flutter/material.dart';
 /// ---------------------------------------------------------------------
 /// DATA MODEL
 /// ---------------------------------------------------------------------
+enum NotifType { order, payment, prescription, general }
+
 class NotifEntry {
   final String title;
   final String subtitle;
   final String timeAgo;
+  final NotifType type;
   bool isRead;
 
   NotifEntry({
     required this.title,
     required this.subtitle,
     required this.timeAgo,
+    this.type = NotifType.general,
     this.isRead = false,
   });
 }
 
 /// ---------------------------------------------------------------------
-/// NOTIFICATION SCREEN — compact dropdown-style notification list.
+/// NOTIFICATION SCREEN — floating notification panel.
 /// ---------------------------------------------------------------------
 class NotificationScreen extends StatefulWidget {
   const NotificationScreen({
     super.key,
     this.entries,
-    this.maxHeight = 320,
+    this.maxHeight = 360,
     this.width = 320,
+    this.onOpenNotificationCenter,
   });
 
   final List<NotifEntry>? entries;
   final double maxHeight;
   final double width;
+  final VoidCallback? onOpenNotificationCenter;
 
   @override
   State<NotificationScreen> createState() => _NotificationScreenState();
@@ -38,12 +44,6 @@ class NotificationScreen extends StatefulWidget {
 
 class _NotificationScreenState extends State<NotificationScreen> {
   late List<NotifEntry> _entries;
-  final _scrollController = ScrollController();
-
-  static const _primary = Color(0xff0b83d9);
-  static const _primarySoft = Color(0xffe7f3fb);
-  static const _textDark = Color(0xff131314);
-  static const _textMuted = Color(0xff6b7280);
 
   @override
   void initState() {
@@ -52,59 +52,30 @@ class _NotificationScreenState extends State<NotificationScreen> {
         widget.entries ??
         [
           NotifEntry(
-            title: 'New order AT1000030',
-            subtitle: 'azizul hakim placed an order for SAR 64.16 (4 item...',
-            timeAgo: '2d ago',
+            title: 'Order AT1000030 confirmed',
+            subtitle: 'SAR 64.50 · Cash on delivery',
+            timeAgo: 'Just now',
+            type: NotifType.order,
           ),
           NotifEntry(
-            title: 'Payment received \u00b7 AT1000029',
-            subtitle: 'Card payment for order AT1000029 was complete...',
-            timeAgo: '4d ago',
+            title: 'Payment received',
+            subtitle: 'AT1000029 payment was successful',
+            timeAgo: '4m ago',
+            type: NotifType.payment,
           ),
           NotifEntry(
-            title: 'New order AT1000029',
-            subtitle: 'TANZIM Al Tamam placed an order for SAR 52.56 (...',
-            timeAgo: '5d ago',
-          ),
-          NotifEntry(
-            title: 'New order AT1000028',
-            subtitle: 'TANZIM Al Tamam placed an order for SAR 52.56 (...',
-            timeAgo: '5d ago',
-          ),
-          NotifEntry(
-            title: 'Payment received \u00b7 AT1000027',
-            subtitle: 'Card payment for order AT1000027 was complete...',
-            timeAgo: '6d ago',
+            title: 'Prescription approved',
+            subtitle: 'Your uploaded prescription was reviewed',
+            timeAgo: '18m ago',
+            type: NotifType.prescription,
           ),
         ];
   }
 
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
-
   int get _unreadCount => _entries.where((e) => !e.isRead).length;
 
-  void _markAllRead() {
-    setState(() {
-      for (final e in _entries) {
-        e.isRead = true;
-      }
-    });
-  }
-
-  void _scrollBy(double delta) {
-    final target = (_scrollController.offset + delta).clamp(
-      0.0,
-      _scrollController.position.maxScrollExtent,
-    );
-    _scrollController.animateTo(
-      target,
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOut,
-    );
+  void _clearAll() {
+    setState(() => _entries.clear());
   }
 
   @override
@@ -121,27 +92,27 @@ class _NotificationScreenState extends State<NotificationScreen> {
           color: Colors.transparent,
           child: Container(
             width: effectiveWidth,
-            constraints: BoxConstraints(maxHeight: widget.maxHeight + 52),
+            constraints: BoxConstraints(maxHeight: widget.maxHeight),
+            clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xffe5e7eb)),
+              borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.08),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
+                  color: Colors.black.withValues(alpha: 0.16),
+                  blurRadius: 28,
+                  offset: const Offset(0, 14),
                 ),
               ],
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _Header(unreadCount: _unreadCount, onMarkAllRead: _markAllRead),
+                _Header(unreadCount: _unreadCount, onClearAll: _clearAll),
                 Flexible(
                   child: _entries.isEmpty
                       ? const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 30),
+                          padding: EdgeInsets.symmetric(vertical: 36),
                           child: Center(
                             child: Text(
                               'No notifications',
@@ -149,34 +120,40 @@ class _NotificationScreenState extends State<NotificationScreen> {
                             ),
                           ),
                         )
-                      : Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Expanded(
-                              child: ListView.separated(
-                                controller: _scrollController,
-                                shrinkWrap: true,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 4,
-                                ),
-                                itemCount: _entries.length,
-                                separatorBuilder: (_, _) => Divider(
-                                  height: 1,
-                                  color: Colors.grey.shade200,
-                                ),
-                                itemBuilder: (context, i) => _NotifTile(
-                                  entry: _entries[i],
-                                  onTap: () =>
-                                      setState(() => _entries[i].isRead = true),
-                                ),
-                              ),
-                            ),
-                            _MiniScrollbar(
-                              onUp: () => _scrollBy(-60),
-                              onDown: () => _scrollBy(60),
-                            ),
-                          ],
+                      : ListView.builder(
+                          shrinkWrap: true,
+                          padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+                          itemCount: _entries.length,
+                          itemBuilder: (context, i) => _NotifTile(
+                            entry: _entries[i],
+                            onTap: () =>
+                                setState(() => _entries[i].isRead = true),
+                            onMarkAsRead: () =>
+                                setState(() => _entries[i].isRead = true),
+                          ),
                         ),
+                ),
+                InkWell(
+                  onTap: widget.onOpenNotificationCenter,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: const BoxDecoration(
+                      border: Border(
+                        top: BorderSide(color: Color(0xffeef0f2)),
+                      ),
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'Open notification center',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xff0b83d9),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -188,58 +165,70 @@ class _NotificationScreenState extends State<NotificationScreen> {
 }
 
 /// ---------------------------------------------------------------------
-/// HEADER
+/// HEADER — blue gradient banner
 /// ---------------------------------------------------------------------
 class _Header extends StatelessWidget {
-  const _Header({required this.unreadCount, required this.onMarkAllRead});
+  const _Header({required this.unreadCount, required this.onClearAll});
   final int unreadCount;
-  final VoidCallback onMarkAllRead;
+  final VoidCallback onClearAll;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(18, 20, 16, 18),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xff1591e8), Color(0xff0b6fc4)],
+        ),
+      ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Notifications',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(width: 8),
-          if (unreadCount > 0)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: const Color(0xffe7f3fb),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                '$unreadCount new',
-                style: const TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xff0b83d9),
-                ),
-              ),
-            ),
-          const Spacer(),
-          InkWell(
-            onTap: onMarkAllRead,
-            borderRadius: BorderRadius.circular(6),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.done_all, size: 14, color: Color(0xff0b83d9)),
-                SizedBox(width: 4),
-                Text(
-                  'Mark all read',
+                const Text(
+                  'Notifications',
                   style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xff0b83d9),
+                    fontSize: 19,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  unreadCount > 0
+                      ? 'You have $unreadCount unread updates'
+                      : 'You’re all caught up',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    color: Color(0xffdcedfb),
                   ),
                 ),
               ],
+            ),
+          ),
+          InkWell(
+            onTap: onClearAll,
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Text(
+                'Clear all',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
             ),
           ),
         ],
@@ -252,129 +241,153 @@ class _Header extends StatelessWidget {
 /// SINGLE NOTIFICATION ROW
 /// ---------------------------------------------------------------------
 class _NotifTile extends StatelessWidget {
-  const _NotifTile({required this.entry, required this.onTap});
+  const _NotifTile({
+    required this.entry,
+    required this.onTap,
+    required this.onMarkAsRead,
+  });
   final NotifEntry entry;
   final VoidCallback onTap;
+  final VoidCallback onMarkAsRead;
+
+  ({IconData icon, Color color, Color bg}) get _style {
+    switch (entry.type) {
+      case NotifType.order:
+        return (
+          icon: Icons.description_rounded,
+          color: const Color(0xff0b83d9),
+          bg: const Color(0xffe7f3fb),
+        );
+      case NotifType.payment:
+        return (
+          icon: Icons.attach_money_rounded,
+          color: const Color(0xff17a45a),
+          bg: const Color(0xffe4f7ec),
+        );
+      case NotifType.prescription:
+        return (
+          icon: Icons.receipt_long_rounded,
+          color: const Color(0xff7c5cf0),
+          bg: const Color(0xffede8fd),
+        );
+      case NotifType.general:
+        return (
+          icon: Icons.notifications_rounded,
+          color: const Color(0xff9aa1ab),
+          bg: const Color(0xfff0f1f3),
+        );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final style = _style;
     return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
       child: Container(
-        color: entry.isRead ? Colors.transparent : const Color(0xfff7fbff),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: entry.isRead ? const Color(0xfff8f9fb) : const Color(0xfff1f8fe),
+          borderRadius: BorderRadius.circular(14),
+        ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 5),
-              child: SizedBox(
-                width: 14,
-                child: entry.isRead
-                    ? null
-                    : Container(
-                        width: 7,
-                        height: 7,
-                        decoration: const BoxDecoration(
-                          color: Color(0xff0b83d9),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: style.bg,
+                borderRadius: BorderRadius.circular(12),
               ),
+              child: Icon(style.icon, size: 20, color: style.color),
             ),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    entry.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          entry.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xff131314),
+                          ),
+                        ),
+                      ),
+                      if (!entry.isRead) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xff0b83d9),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Text(
+                            'NEW',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              letterSpacing: 0.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: 3),
                   Text(
                     entry.subtitle,
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 12.5,
+                      fontSize: 12,
                       color: Color(0xff6b7280),
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    entry.timeAgo,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: Color(0xff9aa1ab),
-                    ),
+                  const SizedBox(height: 5),
+                  Row(
+                    children: [
+                      Text(
+                        entry.timeAgo,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xff9aa1ab),
+                        ),
+                      ),
+                      if (!entry.isRead) ...[
+                        const SizedBox(width: 10),
+                        InkWell(
+                          onTap: onMarkAsRead,
+                          child: const Text(
+                            'Mark as Read',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xff0b83d9),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// ---------------------------------------------------------------------
-/// MINI SCROLLBAR (up/down arrow buttons, matches the reference design)
-/// ---------------------------------------------------------------------
-class _MiniScrollbar extends StatelessWidget {
-  const _MiniScrollbar({required this.onUp, required this.onDown});
-  final VoidCallback onUp;
-  final VoidCallback onDown;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 22,
-      decoration: BoxDecoration(
-        border: Border(left: BorderSide(color: Colors.grey.shade200)),
-      ),
-      child: Column(
-        children: [
-          InkWell(
-            onTap: onUp,
-            child: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 6),
-              child: Icon(
-                Icons.arrow_drop_up,
-                size: 18,
-                color: Color(0xff9aa1ab),
-              ),
-            ),
-          ),
-          Expanded(
-            child: Center(
-              child: Container(
-                width: 3,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(3),
-                ),
-              ),
-            ),
-          ),
-          InkWell(
-            onTap: onDown,
-            child: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 6),
-              child: Icon(
-                Icons.arrow_drop_down,
-                size: 18,
-                color: Color(0xff9aa1ab),
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

@@ -45,6 +45,26 @@ final class CouponValidationResult {
   final String? message;
 }
 
+final class StorefrontCoupon {
+  const StorefrontCoupon({
+    required this.code,
+    required this.description,
+    required this.discountType,
+    required this.discountValue,
+    required this.minOrderAmount,
+    required this.maxDiscountAmount,
+    required this.expiresAt,
+  });
+
+  final String code;
+  final String description;
+  final String discountType;
+  final double discountValue;
+  final double minOrderAmount;
+  final double maxDiscountAmount;
+  final DateTime? expiresAt;
+}
+
 final class OfflineOrderItem {
   const OfflineOrderItem({
     required this.productId,
@@ -309,6 +329,38 @@ final class OfflineOrderService extends ChangeNotifier {
       discount: JsonValueParser.decimal(data?['discount']),
       message: JsonValueParser.string(data?['message']),
     );
+  }
+
+  Future<List<StorefrontCoupon>> fetchCoupons() async {
+    final Response<dynamic> response = await _dioClient.get<dynamic>(
+      ShopOrderEndpoints.coupons,
+      options: ApiRequestOptions.publicRequest(allowRetry: false),
+    );
+    final Map<String, dynamic>? root = JsonValueParser.map(response.data);
+    final List<dynamic> values = root == null
+        ? JsonValueParser.list(response.data)
+        : JsonValueParser.list(root['data'] ?? root['coupons']);
+    return values
+        .map(JsonValueParser.map)
+        .whereType<Map<String, dynamic>>()
+        .map(
+          (Map<String, dynamic> item) => StorefrontCoupon(
+            code: JsonValueParser.string(item['code']),
+            description: JsonValueParser.string(item['description']),
+            discountType: JsonValueParser.string(
+              item['discountType'],
+              fallback: 'PERCENTAGE',
+            ),
+            discountValue: JsonValueParser.decimal(item['discountValue']),
+            minOrderAmount: JsonValueParser.decimal(item['minOrderAmount']),
+            maxDiscountAmount: JsonValueParser.decimal(
+              item['maxDiscountAmount'],
+            ),
+            expiresAt: JsonValueParser.dateTime(item['expiresAt']),
+          ),
+        )
+        .where((StorefrontCoupon coupon) => coupon.code.isNotEmpty)
+        .toList(growable: false);
   }
 
   Future<void> refreshConfig() async {

@@ -9,6 +9,7 @@ import '../bloc/review_order/review_order_bloc.dart';
 import '../bloc/review_order/review_order_event.dart';
 import '../bloc/review_order/review_order_state.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:get_it/get_it.dart';
 import '../../../shop/data/services/offline_order_service.dart';
 import 'completed_order_screen.dart';
 import 'screen_product_details.dart';
@@ -139,6 +140,78 @@ class _ReviewOrderScreenState extends State<ReviewOrderScreen> {
     );
   }
 
+  Future<void> _showCoupons() async {
+    FocusScope.of(context).unfocus();
+    try {
+      final List<StorefrontCoupon> coupons =
+          await GetIt.I<OfflineOrderService>().fetchCoupons();
+      if (!mounted) return;
+      final StorefrontCoupon?
+      selected = await showModalBottomSheet<StorefrontCoupon>(
+        context: context,
+        showDragHandle: true,
+        backgroundColor: _ReviewColors.white,
+        builder: (BuildContext context) {
+          if (coupons.isEmpty) {
+            return const SizedBox(
+              height: 180,
+              child: Center(child: Text('No coupons available right now.')),
+            );
+          }
+          return SafeArea(
+            child: ListView.separated(
+              shrinkWrap: true,
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+              itemCount: coupons.length,
+              separatorBuilder: (_, _) => const Divider(height: 1),
+              itemBuilder: (BuildContext context, int index) {
+                final StorefrontCoupon coupon = coupons[index];
+                final String offer =
+                    coupon.discountType.toUpperCase() == 'PERCENTAGE'
+                    ? '${coupon.discountValue.toStringAsFixed(0)}% off'
+                    : 'SAR ${coupon.discountValue.toStringAsFixed(0)} off';
+                final String minimum = coupon.minOrderAmount > 0
+                    ? 'Minimum order SAR ${coupon.minOrderAmount.toStringAsFixed(0)}'
+                    : 'No minimum order';
+                return ListTile(
+                  contentPadding: const EdgeInsets.symmetric(vertical: 6),
+                  leading: const CircleAvatar(
+                    backgroundColor: Color(0xffe8f4fb),
+                    child: Icon(
+                      Icons.local_offer_outlined,
+                      color: Color(0xff0b83d9),
+                    ),
+                  ),
+                  title: Text(
+                    coupon.code,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  subtitle: Text(
+                    '${coupon.description.isEmpty ? offer : coupon.description}\n$offer  |  $minimum',
+                  ),
+                  isThreeLine: true,
+                  onTap: () => Navigator.pop(context, coupon),
+                );
+              },
+            ),
+          );
+        },
+      );
+      if (!mounted || selected == null) return;
+      _couponController.text = selected.code;
+      setState(() {
+        _couponError = null;
+        _couponCanApply = true;
+      });
+      _applyCoupon();
+    } catch (error) {
+      if (!mounted) return;
+      setState(
+        () => _couponError = error.toString().replaceFirst('Exception: ', ''),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final ReviewOrderState reviewState = context.watch<ReviewOrderBloc>().state;
@@ -169,6 +242,7 @@ class _ReviewOrderScreenState extends State<ReviewOrderScreen> {
           isApplied: _couponApplied,
           errorText: _couponError,
           onApply: _applyCoupon,
+          onTap: _showCoupons,
           canApply: _couponCanApply,
           onChanged: (value) {
             final hasCode = value.trim().isNotEmpty;
@@ -558,38 +632,40 @@ class _OrderItemTile extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Container(
-                      width: 4,
-                      height: 4,
-                      decoration: const BoxDecoration(
-                        color: _ReviewColors.muted,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _ReviewColors.primaryLight,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        'Qty ${item.quantity}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 12,
-                          height: 14 / 12,
-                          fontWeight: FontWeight.w600,
-                          color: _ReviewColors.primary,
+                    if (!isEditing) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        width: 4,
+                        height: 4,
+                        decoration: const BoxDecoration(
+                          color: _ReviewColors.muted,
+                          shape: BoxShape.circle,
                         ),
                       ),
-                    ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _ReviewColors.primaryLight,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'Qty ${item.quantity}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 12,
+                            height: 14 / 12,
+                            fontWeight: FontWeight.w600,
+                            color: _ReviewColors.primary,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ],
@@ -729,6 +805,7 @@ class _CouponCodeField extends StatelessWidget {
     required this.onApply,
     required this.onChanged,
     required this.canApply,
+    required this.onTap,
   });
 
   final TextEditingController controller;
@@ -737,6 +814,7 @@ class _CouponCodeField extends StatelessWidget {
   final VoidCallback onApply;
   final ValueChanged<String> onChanged;
   final bool canApply;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -770,6 +848,7 @@ class _CouponCodeField extends StatelessWidget {
                 Expanded(
                   child: TextField(
                     controller: controller,
+                    onTap: onTap,
                     onChanged: onChanged,
                     onSubmitted: (_) => onApply(),
                     textCapitalization: TextCapitalization.characters,

@@ -19,7 +19,7 @@ void _openNotifications(BuildContext context) {
         alignment: Alignment.topRight,
         child: Padding(
           padding: EdgeInsets.only(top: 66, right: 28),
-          child: NotificationScreen(maxHeight: 280, width: 330),
+          child: NotificationScreen(maxHeight: 420, width: 330),
         ),
       ),
     ),
